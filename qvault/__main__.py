@@ -186,6 +186,33 @@ def cmd_fwdiff(args) -> None:
     sys.exit(0 if rep["severity"] == "clean" else 1)
 
 
+def cmd_netobs(args) -> None:
+    from .netobs import DnsEvent, FlowEvent, correlate, evaluate_rules, to_evidence
+    from hashlib import sha256
+
+    with open(args.input, "r", encoding="utf-8") as fh:
+        doc = json.load(fh)
+    host = [FlowEvent(**r) for r in doc.get("host", [])]
+    wire = [FlowEvent(**r) for r in doc.get("wire", [])]
+    dns = [DnsEvent(**r) for r in doc.get("dns", [])]
+
+    findings = correlate(host, wire) + evaluate_rules(host + wire, dns)
+    evidence = to_evidence(host + wire + dns)
+    _json_out(
+        {
+            "findings": [f.to_dict() for f in findings],
+            "counts": {
+                "host": len(host),
+                "wire": len(wire),
+                "dns": len(dns),
+                "high": sum(1 for f in findings if f.severity == "high"),
+            },
+            "evidence_sha256": sha256(evidence).hexdigest(),
+        }
+    )
+    sys.exit(0 if not any(f.severity == "high" for f in findings) else 1)
+
+
 def cmd_checkpoint(args) -> None:
     paths = store.VaultPaths.open(args.root)
     name = f"checkpoint-{int(time.time())}.json"
@@ -254,6 +281,14 @@ def build_parser() -> argparse.ArgumentParser:
     fd.add_argument("--reference", required=True, help="known-good OEM image")
     fd.add_argument("--suspect", required=True, help="image under examination")
     fd.set_defaults(func=cmd_fwdiff)
+
+    nb = sub.add_parser(
+        "netobs", help="correlate network observation against host accounting"
+    )
+    nb.add_argument(
+        "--input", required=True, help="JSON case file with host[], wire[], dns[]"
+    )
+    nb.set_defaults(func=cmd_netobs)
 
     cp = sub.add_parser("checkpoint", help="sign the current audit head")
     cp.add_argument("--root", required=True)

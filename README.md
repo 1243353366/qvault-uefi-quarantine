@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 30 tests, ~0.2s
+python -m pytest qvault/tests -q      # 67 tests, ~0.2s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -93,6 +93,25 @@ python -m qvault verify --root vault
 python -m qvault audit --root vault
 python -m qvault checkpoint --root vault     # sign the current audit head
 ```
+
+## Network observation
+
+`qvault/netobs.py` records DNS, flow metadata, process ancestry and destination
+classification, then does the part that matters: joins what the host **claims**
+against what the wire **shows**.
+
+```bash
+python -m qvault netobs --input case.json     # {host:[], wire:[], dns:[]}
+```
+
+The output leads with disagreements (`unattributed_egress`, `phantom_claim`,
+`attribution_conflict`) because agreement is not evidence of innocence. On a host
+running BlackLotus or MoonBounce, endpoint attribution names `winlogon.exe` or
+`svchost.exe` exactly as designed, so the named-process rules see legitimate
+components doing legitimate-looking things. Only the divergence rule notices.
+
+Metadata only: no payloads, no query strings, no third-party traffic. Design,
+privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
 
 ## Comparing a suspect image against the OEM reference
 
