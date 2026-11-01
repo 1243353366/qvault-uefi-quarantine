@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 326 tests, ~0.7s
+python -m pytest qvault/tests -q      # 364 tests, ~0.75s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -119,6 +119,22 @@ privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
 > in `vendor/UPSTREAM.sha256`. The detector is theirs; the grading, correlation,
 > containment and verification around it are what this repository adds. See
 > `CREDITS.md`.
+
+## The scan covers the scanner
+
+`qvault/integrity.py` scans this installation as an artifact: file digests, interpreter
+startup hooks inside the package, import shadowing, world-writable code, `.pth` hooks,
+bytecode with no source. It refuses a digest stored beside the code it describes, and a
+self-computed digest with no external reference is `unverified`, never verified.
+
+A device result is then read through the scanner's own status: a finding from an
+unattested instrument stands but is capped at INFERRED, and an absence of findings from
+one is INCONCLUSIVE.
+
+`qvault/calibration.py` measures false positives and false negatives against a labelled
+corpus with Wilson intervals. Abstentions count against accuracy, and zero-error claims
+are rejected by `refuse_zero_claim()`: zero errors in n cases is a bound of about 3/n,
+not an absence.
 
 ## The engine cannot certify itself
 

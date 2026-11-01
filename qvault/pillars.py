@@ -64,6 +64,12 @@ PILLARS: list[dict] = [
              "symbol": "EVIDENCE_MAP", "test": "qvault/tests/test_zbt_merge.py",
              "status": IMPLEMENTED, "required": True,
              "limit": "vendored snapshot; corpus refresh is a manual upstream pull"},
+            {"req": "the tool scans its own installation, not only the device",
+             "module": "integrity", "symbol": "self_scan",
+             "test": "qvault/tests/test_integrity_calibration.py",
+             "status": IMPLEMENTED, "required": True,
+             "limit": "a self-check cannot detect a trojan that edited the self-check; "
+                      "an external digest is required and supplied by the user"},
             {"req": "vocabulary drift guard", "module": "zbt_bridge",
              "symbol": "assert_vocabulary", "test": "qvault/tests/test_zbt_merge.py",
              "status": IMPLEMENTED, "required": True, "limit": ""},
@@ -176,10 +182,17 @@ PILLARS: list[dict] = [
              "test": "qvault/tests/test_separation.py",
              "status": IMPLEMENTED, "required": True,
              "limit": "the verifier's own root is external and reported when absent"},
-            {"req": "calibrated confidence from real outcomes", "module": "findings",
+            {"req": "false-positive and false-negative rates measured with intervals",
+             "module": "calibration", "symbol": "evaluate",
+             "test": "qvault/tests/test_integrity_calibration.py",
+             "status": IMPLEMENTED, "required": True,
+             "limit": "the harness exists; no labelled corpus of real devices is bundled, "
+                      "so the measured rates are the caller's to supply"},
+            {"req": "calibrated grades from a real-world labelled corpus", "module": "findings",
              "symbol": "confidence_grade", "test": "qvault/tests/test_findings.py",
              "status": GAP, "required": False,
-             "limit": "grades are principled but not yet checked against known-truth cases"},
+             "limit": "the measurement harness exists (calibration.py); what is missing is "
+                      "ground-truth outcomes from real devices to feed it"},
         ],
     },
 ]
