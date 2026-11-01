@@ -35,7 +35,7 @@ retrieve ──► K-of-N shares ──► 2-person approval ──► enclave s
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 17 tests, ~0.1s
+python -m pytest qvault/tests -q      # 30 tests, ~0.2s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -66,6 +66,27 @@ python -m qvault audit --root vault
 python -m qvault checkpoint --root vault     # sign the current audit head
 ```
 
+## Comparing a suspect image against the OEM reference
+
+LoJax is catchable by inventory (it adds `SecDxe` and removes `NtfsDxe`).
+MoonBounce is not: it patches a legitimate `CORE_DXE` in place, appends an
+**unnamed section** after `.reloc`, and turns five bytes at the head of three boot
+services into a `call`. The file GUID, name, type and volume layout are unchanged,
+so only a per-section byte comparison sees it.
+
+```bash
+python -m qvault fwdiff --reference oem_image.bin --suspect dump.bin
+```
+
+It reports modules added/removed, per-section hash changes, unnamed sections,
+write-and-execute sections, entry-point prologue changes, and any of the
+MoonBounce immediates (including `0x6F4EB841`, the original `ExAllocatePool`
+prologue the implant compares against). Exit code 0 means clean.
+
+Limits, stated in the module docstring: compressed sections are compared as
+opaque bytes, TE images are detected but not section-parsed, and a byte diff can
+tell you a module changed but not which function, without symbols.
+
 ## What the tests prove
 
 `python -m pytest qvault/tests -q` exercises, among others:
@@ -81,7 +102,10 @@ python -m qvault checkpoint --root vault     # sign the current audit head
 - audit edits break the hash chain, and truncation breaks the signed checkpoint;
 - triage recognises a flash descriptor and FV header without parsing them, and
   phantom regions can no longer be produced from synthetic input;
-- orphan objects (bytes with no envelope) are reported as errors.
+- orphan objects (bytes with no envelope) are reported as errors;
+- `fwdiff` detects an added module, a removed module, a modified section, an
+  unnamed appended section, a prologue replaced by a `call`, and a W+X section;
+  and malformed or truncated input never raises.
 
 ## Non-goals and honest limits
 

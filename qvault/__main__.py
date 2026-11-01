@@ -178,6 +178,14 @@ def cmd_audit(args) -> None:
     sys.exit(0 if ok else 1)
 
 
+def cmd_fwdiff(args) -> None:
+    from .fwdiff import diff_files
+
+    rep = diff_files(args.reference, args.suspect)
+    _json_out(rep)
+    sys.exit(0 if rep["severity"] == "clean" else 1)
+
+
 def cmd_checkpoint(args) -> None:
     paths = store.VaultPaths.open(args.root)
     name = f"checkpoint-{int(time.time())}.json"
@@ -239,6 +247,13 @@ def build_parser() -> argparse.ArgumentParser:
     au = sub.add_parser("audit", help="verify the audit chain")
     au.add_argument("--root", required=True)
     au.set_defaults(func=cmd_audit)
+
+    fd = sub.add_parser(
+        "fwdiff", help="diff a suspect firmware image against an OEM reference image"
+    )
+    fd.add_argument("--reference", required=True, help="known-good OEM image")
+    fd.add_argument("--suspect", required=True, help="image under examination")
+    fd.set_defaults(func=cmd_fwdiff)
 
     cp = sub.add_parser("checkpoint", help="sign the current audit head")
     cp.add_argument("--root", required=True)
