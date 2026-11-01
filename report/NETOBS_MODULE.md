@@ -231,6 +231,78 @@ only the divergence rule notices.
 
 ---
 
+## 11. Network context as a policy selector
+
+An observed association (BSSID, SSID, security mode) selects which collection,
+retention and custody policy applies to evidence gathered on that network. This is
+the same shape as enterprise Wi-Fi profiles keyed on SSID or EAP realm, and it is
+sound — with one hard boundary.
+
+### 11.1 BSSID is a selector, never key material
+
+A BSSID is 48 bits, transmitted in the clear in every beacon and probe response,
+observable from outside the building, and clonable in seconds. Deriving, seeding
+or "strengthening" a key with it yields a key every nearby radio already knows.
+`tests/test_netpolicy.py` demonstrates it directly: two independent hosts hashing
+the same BSSID land on identical bytes.
+
+Where per-network keys are genuinely wanted, the key must come from a CSPRNG on
+the host and be **tagged** with the network context, not derived from it. The
+envelope records the tag; the key derives from entropy.
+
+### 11.2 Selection is fail-safe because the BSSID is attacker-controlled
+
+An evil-twin AP chooses the BSSID it presents, so "we are on the office network"
+is a claim by whoever is radiating. Therefore evaluation is ordered so every
+disqualifier is checked before any credit is given, and a BSSID can only ever lose
+trust, never earn it alone:
+
+| Condition | Result |
+|---|---|
+| No valid BSSID, or multicast bit set | `untrusted`, fail-safe |
+| Registry records the network as hostile | `hostile` |
+| BSSID locally administered (randomised) | `untrusted` — hotspots and spoofed APs |
+| Security mode without server authentication (open, WEP, WPA2-PSK) | `untrusted` — a shared secret proves nothing about the network |
+| EAP offered but server certificate not validated | `untrusted` — evil twin indistinguishable |
+| Authenticated, but registry does not know the BSSID | `ambiguous` |
+| Authenticated, known, but no independent corroboration | `ambiguous` |
+| Authenticated, known, corroborated, and DHCP domain contradicts registry | `ambiguous` |
+| Authenticated, known, corroborated | `managed` |
+
+Corroborating factors are things the AP does not get to assert alone: gateway MAC
+consistency with the registry, DHCP domain matching expectation, prior observation
+of that BSSID in the estate.
+
+### 11.3 What the policy may and may not gate
+
+| May gate | Must never gate |
+|---|---|
+| Collection depth | Key release or decryption authorisation |
+| Retention period | Whether a sample may be preserved at all |
+| Custody threshold (2-of-3 vs 3-of-5) | Whether the audit chain is verified |
+| Whether evidence may transit the network | The operator's ability to record |
+
+Note the direction of the `hostile` policy: it preserves *more* evidence under
+*tighter* custody, rather than discarding. A containment system that responds to
+a hostile network by deleting evidence has inverted its purpose.
+
+### 11.4 Recording the decision
+
+`envelope_context()` writes the BSSID, its structural flags, the selected policy,
+the reasons, the corroborating factors and a fail-safe marker into the evidence
+envelope. A reviewer can then see which policy was in force at capture and whether
+it was appropriate — checkable later, instead of asserted in a report.
+
+### 11.5 Open questions
+
+1. How stale may the BSSID registry be before "not hostile" means nothing? Needs a
+   policy decision, and a compromise between coverage and false confidence.
+2. Should a *managed* network relax custody at all, given that a managed network
+   can still be compromised? The current answer (2-of-3 instead of 3-of-5) is a
+   judgement, not a measurement.
+3. Client-side MAC randomisation is irrelevant to BSSID mapping, but AP-side
+   BSSID rotation on mesh networks will fragment the registry. Untested.
+
 ## 10. Status
 
 Design complete, implementation a prototype, review outstanding. Added to the

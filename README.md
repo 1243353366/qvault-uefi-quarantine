@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 67 tests, ~0.2s
+python -m pytest qvault/tests -q      # 91 tests, ~0.25s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,21 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Network context as a policy selector
+
+`qvault/netpolicy.py` maps an observed association (BSSID, SSID, EAP state) to a
+collection, retention and custody policy. The BSSID is a **selector only** — it is
+48 bits broadcast in every beacon and clonable in seconds, so it can never be or
+seed a key. A test demonstrates why: two independent hosts hashing the same BSSID
+land on identical bytes.
+
+Because an evil-twin AP chooses its own BSSID, every disqualifier is checked
+before any credit is given. Randomised BSSIDs, open or PSK-only networks, and EAP
+without server-validation all fall to `untrusted`. Raising trust requires an
+authenticated network *plus* corroboration the AP does not get to assert alone.
+A hostile network yields the `forensic` policy: more evidence, tighter custody,
+no egress.
 
 ## Comparing a suspect image against the OEM reference
 
