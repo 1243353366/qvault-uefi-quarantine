@@ -1,9 +1,3 @@
 __pycache__/
 *.pyc
-.venv/
-vault/
-custodian/
-enclave/
-*.sample
-*.partial
 .pytest_cache/

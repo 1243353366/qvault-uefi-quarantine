@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 237 tests, ~0.55s
+python -m pytest qvault/tests -q      # 268 tests, ~0.6s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,23 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Merged with Zero-Breach-Toolkit
+
+The upstream detector is vendored unmodified at `vendor/zbtriage` (Apache-2.0, pinned
+commit in `vendor/UPSTREAM.md`). The split is by responsibility: upstream decides which
+artifacts to read and which indicator matched; qvault decides what that match is worth.
+
+- `qvault/zbt_bridge.py` maps each upstream `EV_*` class to an evidence plane and grade,
+  fails loudly if upstream adds a grade nobody mapped, converts hits to `Observation`s
+  (never `Finding`s), and refuses family attribution on a single feed.
+- `qvault/correlate.py` is the temporal evidence graph: grade comes from independence,
+  not from event count. Four contacts from one plane stay `INFERRED`.
+- Honest consequence: every upstream grade lands on the historical plane, which is
+  forgeable by the subject, so `adversarial_value()` returns `none` even for an
+  `on-disk` fingerprint.
+
+See `MERGE.md` for the strategy, the attribution notice, and the known gaps.
 
 ## Firmware integrity is its own subsystem
 
