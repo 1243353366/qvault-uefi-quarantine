@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 111 tests, ~0.3s
+python -m pytest qvault/tests -q      # 132 tests, ~0.35s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,27 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## What the evidence planes can and cannot establish
+
+`qvault/limitations.py` models the four architectural limitations (live-state
+visibility, firmware blind spots, baselines, indicator trust) as evidence planes
+with a `forgeable_by_subject` property, so a claim's strength is computed from the
+plane it rests on:
+
+| Claim | Plane | Defensible against an adversary |
+|---|---|---|
+| Firmware integrity | read via the subject's OS | **no** |
+| Firmware integrity | read out-of-band (physical) | yes |
+| Process existed | live response | **no** |
+| Network contact | wire observation | yes |
+| Behaviour is normal | baseline | **no** |
+| Object is malicious | threat intel | **no** |
+
+Also included: `baseline_validity()` returns `unverified` when the compromise window
+is unknown, never `valid`; `intel_trust()` reports three feeds sharing one upstream
+as `circular`, not corroboration. The controls raise coverage; none of them raises
+integrity. See `report/ARCHITECTURAL_LIMITATIONS.md`.
 
 ## Capability denial, and who enforces it
 
