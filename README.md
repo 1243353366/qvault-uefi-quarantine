@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 218 tests, ~0.5s
+python -m pytest qvault/tests -q      # 237 tests, ~0.55s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,25 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Firmware integrity is its own subsystem
+
+An OS scan runs on the machine it judges, so it cannot certify the hardware hosting
+it. `qvault/firmware_integrity.py` ranks anchors by independence and enforces that a
+verdict may not be stronger than its anchor:
+
+| Anchor | Establishes |
+|---|---|
+| OS-mediated read | **nothing** |
+| Firmware measures itself | boot chain (hypothesis) |
+| TPM quote | boot chain, DXE, option ROM (**not** flash or CRTM) |
+| Hardware boot ROM | CRTM |
+| Out-of-band flash read | flash image, CRTM, DXE, ME/EC |
+
+Host trust needs `flash_image` and `crtm` at rank 3 or above, and the only route to
+`flash_image` is out-of-band. `certify_host()` refuses on weaker evidence naming the
+missing subject, and `os_scan_verdict()` returns `UNATTESTED` even when every module
+matched.
 
 ## Isolating the components that interpret attacker bytes
 
