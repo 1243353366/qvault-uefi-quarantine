@@ -1,7 +1,13 @@
 # Merging Zero-Breach-Toolkit into qvault
 
-Upstream: https://github.com/interplains/Zero-Breach-Toolkit (Apache-2.0).
-Vendored commit and refresh procedure: `vendor/UPSTREAM.md`.
+Upstream: https://github.com/interplains/Zero-Breach-Toolkit by
+[@interplains](https://github.com/interplains) (Apache-2.0).
+Release consumed: **v2.0.2**, commit `90148ea` (signed). The vendored tree is
+byte-identical to that tag (`git diff v2.0.2 5c86adf -- scan/zbtriage` is empty) and is
+pinned by digest in `vendor/UPSTREAM.sha256`, which a test verifies.
+
+Credit: the detection engine, its evidence taxonomy and its doctrine are theirs. This
+repository's contribution is what surrounds them.
 
 ## The strategy question, answered
 

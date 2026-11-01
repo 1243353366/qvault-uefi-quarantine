@@ -277,3 +277,79 @@ def test_assess_summarises_without_overclaiming():
                                                   plane="live_state")])
     assert out["event_count"] == 2
     assert "worth a look" in out["statement"]
+
+
+# --- the vendored detector must match its recorded digest -----------------
+
+
+def test_vendored_detector_matches_its_recorded_tree_digest():
+    """Silent edits to the vendored engine are a supply-chain change, not a refactor."""
+    import hashlib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent.parent
+    manifest = root / "vendor" / "UPSTREAM.sha256"
+    assert manifest.exists(), "vendor/UPSTREAM.sha256 is missing"
+    recorded = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+    lines = []
+    for f in sorted((root / "vendor" / "zbtriage").rglob("*")):
+        if f.is_file() and "__pycache__" not in str(f):
+            lines.append(f"{hashlib.sha256(f.read_bytes()).hexdigest()}  "
+                         f"{f.relative_to(root / 'vendor').as_posix()}")
+    rebuilt = hashlib.sha256(("\n".join(lines) + "\n").encode()).hexdigest()
+    assert rebuilt == recorded, (
+        "vendored zbtriage differs from vendor/UPSTREAM.sha256: re-vendor deliberately "
+        "and update the manifest, do not edit the detector in place"
+    )
+
+
+def test_upstream_release_is_named_not_just_a_commit():
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parent.parent.parent / "vendor" / "UPSTREAM.md").read_text()
+    assert "v2.0.2" in text
+    assert "90148eae72b722b59fb4f191daf959b21a002bb0" in text
+    assert "@interplains" in text
+
+
+def test_truncated_matches_are_counted_not_capped():
+    """The incident upstream documented: 291k matches must not report as 100."""
+    mr = zbt.ModuleResult(name="backup")
+    for _ in range(zbt.HIT_LIST_LIMIT + 950):
+        mr.add_hit(hit(indicator="evil.example"))
+    assert len(mr.hits) == zbt.HIT_LIST_LIMIT
+    assert B.total_matches(mr) == zbt.HIT_LIST_LIMIT + 950
+    assert B.serious_match_count(mr) == zbt.HIT_LIST_LIMIT + 950
+    assert B.truncated_summary(mr) == [("evil.example", zbt.HIT_LIST_LIMIT + 950)]
+
+
+def test_truncation_is_a_telemetry_gap_and_degrades_confidence():
+    mr = zbt.ModuleResult(name="backup")
+    for _ in range(zbt.HIT_LIST_LIMIT + 5):
+        mr.add_hit(hit(indicator="evil.example"))
+    gaps = B.module_gaps(mr)
+    assert any(g.startswith("hits_truncated") for g in gaps)
+    obs = B.observations(mr)[0]
+    assert obs.confidence == F.INFERRED   # CORROBORATED, one step lower
+    assert F._RANK[obs.confidence] < F._RANK[obs.grade]
+
+
+def test_verdict_reports_true_count_and_how_many_are_enumerated():
+    mr = zbt.ModuleResult(name="backup")
+    for _ in range(zbt.HIT_LIST_LIMIT + 900):
+        mr.add_hit(hit(indicator="evil.example"))
+    v = B.run_verdict([mr])
+    assert v["serious_hits"] == zbt.HIT_LIST_LIMIT + 900
+    assert v["listed_hits"] == zbt.HIT_LIST_LIMIT
+    assert v["truncated"] == [{"indicator": "evil.example",
+                              "count": zbt.HIT_LIST_LIMIT + 900}]
+    assert "enumerated in full" in v["statement"]
+
+
+def test_benign_overflow_does_not_raise_the_verdict():
+    mr = zbt.ModuleResult(name="browser")
+    for _ in range(zbt.HIT_LIST_LIMIT + 500):
+        mr.add_hit(hit(evidence=zbt.EV_REFERENCED, indicator="news.example"))
+    assert B.serious_match_count(mr) == 0
+    assert B.run_verdict([mr])["verdict"] == F.NO_EVIDENCE_FOUND

@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 320 tests, ~0.7s
+python -m pytest qvault/tests -q      # 326 tests, ~0.7s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,13 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+> **Built on [Zero-Breach-Toolkit](https://github.com/interplains/Zero-Breach-Toolkit) by
+> [@interplains](https://github.com/interplains)** — release **v2.0.2**
+> (`90148ea`, Apache-2.0), vendored unmodified at `vendor/zbtriage` and pinned by digest
+> in `vendor/UPSTREAM.sha256`. The detector is theirs; the grading, correlation,
+> containment and verification around it are what this repository adds. See
+> `CREDITS.md`.
 
 ## The engine cannot certify itself
 

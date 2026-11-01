@@ -153,6 +153,56 @@ def is_serious(evidence: str) -> bool:
     return zbt.is_serious(evidence)
 
 
+def truncated_counts(module_result) -> list[tuple[str, int]]:
+    """Indicators whose match count exceeded the listing cap.
+
+    Upstream lists at most HIT_LIST_LIMIT matches per (indicator, grade) and counts
+    the rest, because a crafted artifact can name one indicator hundreds of thousands
+    of times. Counting only the listed rows therefore reports 100 for a 291,000-match
+    input: an undercount of three orders of magnitude, on an input the attacker
+    authored. The true totals live in the module's private counters.
+    """
+    counters = getattr(module_result, "_hit_counts", {}) or {}
+    out = []
+    for (indicator, evidence), count in counters.items():
+        if count > zbt.HIT_LIST_LIMIT:
+            out.append((str(indicator), evidence, int(count)))
+    return sorted(out)
+
+
+def truncated_serious(module_result) -> list[tuple[str, int]]:
+    """Truncated summaries of *serious* evidence, which are coverage gaps.
+
+    A summarised benign listing is not a coverage gap: `referenced` never touches the
+    verdict upstream, and treating it as one would turn every browser cache holding a
+    frequently-referenced domain into 'inconclusive', which trains readers to ignore
+    the verdict for the wrong reason.
+    """
+    return [(i, n) for i, evidence, n in truncated_counts(module_result)
+            if is_serious(evidence)]
+
+
+def truncated_summary(module_result) -> list[tuple[str, int]]:
+    """(indicator, count) for every truncated listing, benign included."""
+    return [(i, n) for i, _e, n in truncated_counts(module_result)]
+
+
+def total_matches(module_result) -> int:
+    """Every match the module recorded, listed or not."""
+    counters = getattr(module_result, "_hit_counts", {}) or {}
+    if not counters:
+        return len(module_result.hits)
+    return int(sum(counters.values()))
+
+
+def serious_match_count(module_result) -> int:
+    """Serious matches, counted from the true totals rather than the listing."""
+    counters = getattr(module_result, "_hit_counts", {}) or {}
+    if not counters:
+        return sum(1 for h in module_result.hits if is_serious(h.evidence))
+    return int(sum(n for (_ind, evidence), n in counters.items() if is_serious(evidence)))
+
+
 def module_gaps(module_result) -> tuple[str, ...]:
     """Blind spots for one module: checks that did not run, plus its status."""
     gaps = [f"check_not_run:{c.name}" for c in module_result.checks if not c.ran]
@@ -160,6 +210,11 @@ def module_gaps(module_result) -> tuple[str, ...]:
         gaps.append(f"module_status:{module_result.status}")
     if module_result.skipped:
         gaps.append(f"records_skipped:{module_result.skipped}")
+    for indicator, count in truncated_serious(module_result):
+        gaps.append(
+            f"hits_truncated:{indicator}={count}: listing capped at "
+            f"{zbt.HIT_LIST_LIMIT}, so this evidence is summarised rather than enumerated"
+        )
     return tuple(gaps)
 
 
@@ -199,9 +254,10 @@ def run_verdict(module_results) -> dict:
     gaps -> inconclusive, neither -> no_evidence_found.
     """
     results = list(module_results)
-    serious_hits = [
-        h for r in results for h in r.hits if is_serious(h.evidence)
-    ]
+    serious_hits = sum(serious_match_count(r) for r in results)
+    listed_hits = sum(1 for r in results for h in r.hits if is_serious(h.evidence))
+    total = sum(total_matches(r) for r in results)
+    truncated = [t for r in results for t in truncated_serious(r)]
     gaps = tuple(g for r in results for g in module_gaps(r))
 
     if serious_hits:
@@ -218,12 +274,17 @@ def run_verdict(module_results) -> dict:
         raise BridgeError("a cleanliness verdict was produced; this is a bug")
 
     head = (
-        f"{len(serious_hits)} indicator match(es) across {len(results)} module(s)."
+        f"{serious_hits} indicator match(es) across {len(results)} module(s)"
+        + (f", {listed_hits} of them enumerated in full"
+           if truncated else "") + "."
         if serious_hits else D1_LINE
     )
     return {
         "verdict": verdict,
-        "serious_hits": len(serious_hits),
+        "serious_hits": serious_hits,
+        "listed_hits": listed_hits,
+        "total_matches": total,
+        "truncated": [{"indicator": i, "count": n} for i, n in truncated],
         "gaps": list(gaps),
         "unobserved_checks": sorted({g.split(":", 1)[1] for g in gaps
                                      if g.startswith("check_not_run:")}),

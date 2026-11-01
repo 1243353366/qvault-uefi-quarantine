@@ -1,8 +1,19 @@
 # Vendored upstream
 
-Source: https://github.com/interplains/Zero-Breach-Toolkit
-Commit: 5c86adf3994c004c26d6e54e751e0dd4c9964389 (v2.0.2 tree, `scan/zbtriage/` only)
+Source: https://github.com/interplains/Zero-Breach-Toolkit by **@interplains**
+Release: [v2.0.2](https://github.com/interplains/Zero-Breach-Toolkit/releases/tag/v2.0.2) = `90148eae72b722b59fb4f191daf959b21a002bb0` (signed, GPG `9B4D575499AFA53C`)
+Snapshot taken at: `5c86adf3994c004c26d6e54e751e0dd4c9964389`
+Equivalence: `git diff v2.0.2 5c86adf -- scan/zbtriage` is empty, so this snapshot is
+the released library exactly, not a later development tree.
+Tree digest: `sha256:7ace5ffe057e5c913c1c5be527c3f2802764a1bd19d0b3cbc6c2b77b54860b14` over the file list in `UPSTREAM.sha256`
 License: Apache License 2.0 (see `LICENSE`, `NOTICE`)
+
+## Credit
+
+The detection engine, its evidence taxonomy and its doctrine are the work of
+[@interplains](https://github.com/interplains). This repository consumes that work and
+adds grading, correlation, containment and verification around it; it does not replace
+it. If you find an indicator or artifact-coverage bug, it belongs upstream.
 
 ## What was taken
 
