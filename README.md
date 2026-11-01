@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 132 tests, ~0.35s
+python -m pytest qvault/tests -q      # 158 tests, ~0.4s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,22 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Five rules the tool cannot break
+
+Enforced in `qvault/findings.py` by construction, not by review:
+
+1. **Every finding has an evidence grade** — `Finding` refuses to construct without one.
+2. **Every finding considers a plausible benign explanation** — including all-clear results.
+3. **Missing telemetry lowers confidence** — computed as grade minus one step per gap,
+   floor `UNKNOWN`. A gap can never raise a result.
+4. **Detection and attribution are separate** — attribution cannot exceed detection,
+   because you cannot be more certain who did it than that it happened.
+5. **No device is ever called clean** — `clean` is not a value the verdict type can
+   produce, and an unexamined critical surface forces `inconclusive`.
+
+An unexcluded benign explanation caps a finding at `suspicious`: failing to rule out
+the boring answer is not evidence of malice.
 
 ## What the evidence planes can and cannot establish
 

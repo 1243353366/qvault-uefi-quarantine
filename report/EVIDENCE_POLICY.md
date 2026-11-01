@@ -51,6 +51,27 @@ interpreted generously.
 
 ---
 
+**R4. Every finding carries an evidence grade.** No finding exists as prose.
+
+**R5. Every finding considers at least one plausible benign explanation.** Including
+the finding that says "this is fine", which is why the rule applies to all-clear
+results too.
+
+**R6. Missing telemetry lowers confidence; it never silently becomes a clean
+result.** A surface that was not examined declares itself, and reduces the grade.
+
+**R7. Detection and attribution are separate.** You may not be more certain who did
+something than that something happened, and the two are graded independently.
+
+**R8. The tool never calls a device clean because no known spyware was found.**
+`clean` is not a value the verdict type can produce.
+
+R4-R8 are enforced in `qvault/findings.py` rather than reviewed by hand: `Finding`
+refuses to construct, confidence is computed rather than asserted, attribution is
+capped by detection, and `DeviceAssessment.verdict` has no branch that returns
+cleanliness. `tools/check_findings.py` applies the same checks to findings imported
+from other tools.
+
 ## 3. Self-audit: where this work broke its own rules
 
 Recorded rather than quietly fixed, because a report that hides its process is
