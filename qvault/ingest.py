@@ -47,25 +47,45 @@ class _HashingWriter:
         self._h = sha256()
 
     def write(self, b: bytes) -> int:
+        written = self._fh.write(b)
+        if written != len(b):
+            raise OSError("short ciphertext write")
         self._h.update(b)
-        return self._fh.write(b)
+        return written
 
     def hexdigest(self) -> str:
         return self._h.hexdigest()
 
 
-def _hash_stream(fh, size: int, block: int = 1 << 20) -> str:
-    fh.seek(0)
-    h = sha256()
-    remaining = size
-    while remaining > 0:
-        chunk = fh.read(min(block, remaining))
-        if not chunk:
-            break
-        h.update(chunk)
-        remaining -= len(chunk)
-    fh.seek(0)
-    return h.hexdigest()
+class _HashingReader:
+    """Hash and retain a bounded prefix of the exact bytes encrypted."""
+
+    def __init__(self, fh, prefix_limit: int = 4 * 1024 * 1024):
+        self._fh = fh
+        self._h = sha256()
+        self._count = 0
+        self._prefix_limit = prefix_limit
+        self._prefix = bytearray()
+
+    def read(self, size: int = -1) -> bytes:
+        block = self._fh.read(size)
+        self._h.update(block)
+        self._count += len(block)
+        remaining = self._prefix_limit - len(self._prefix)
+        if remaining > 0:
+            self._prefix.extend(block[:remaining])
+        return block
+
+    def hexdigest(self) -> str:
+        return self._h.hexdigest()
+
+    @property
+    def bytes_read(self) -> int:
+        return self._count
+
+    @property
+    def prefix(self) -> bytes:
+        return bytes(self._prefix)
 
 
 def ingest(
@@ -98,22 +118,29 @@ def ingest(
 
     src = open(source_path, "rb")
     try:
-        plain_sha = _hash_stream(src, size)
-        with open(tmp_path, "wb") as dst:
+        if os.fstat(src.fileno()).st_size != size:
+            raise CryptoError("source size changed before acquisition")
+        reader = _HashingReader(src)
+        with open(tmp_path, "xb") as dst:
             hw = _HashingWriter(dst)
             header: StreamHeader = encrypt_stream(
-                dek, src, hw, plaintext_size=size, aad_obj=aad_bind
+                dek, reader, hw, plaintext_size=size, aad_obj=aad_bind
             )
+            if reader.bytes_read != size or reader.read(1):
+                raise CryptoError("source size changed during acquisition")
             dst.flush()
             os.fsync(dst.fileno())
             cipher_sha = hw.hexdigest()
+            plain_sha = reader.hexdigest()
+            triage = triage_bytes(reader.prefix, ioc_tokens=ioc_tokens)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
     finally:
         src.close()
-
-    # Bounded, inert classification of the source (not the ciphertext).
-    with open(source_path, "rb") as fh:
-        head = fh.read(4 * 1024 * 1024)
-    triage = triage_bytes(head, ioc_tokens=ioc_tokens)
 
     object_id = cipher_sha
     wrapped = wrap_key(kek, dek, aad_obj=aad_bind)

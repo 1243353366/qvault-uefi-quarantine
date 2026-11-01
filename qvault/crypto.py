@@ -79,16 +79,38 @@ class StreamHeader:
             "plaintext_size": self.plaintext_size,
         }
 
+    def __post_init__(self) -> None:
+        # Validate before a hostile header can drive a huge loop or invalid nonce.
+        if self.suite != SUITE:
+            raise CryptoError(f"unsupported suite: {self.suite!r}")
+        if (isinstance(self.chunk_size, bool) or not isinstance(self.chunk_size, int)
+                or self.chunk_size != CHUNK_SIZE):
+            raise CryptoError("refusing non-standard chunk size")
+        if isinstance(self.plaintext_size, bool) or not isinstance(self.plaintext_size, int):
+            raise CryptoError("plaintext_size must be an integer")
+        if self.plaintext_size < 0:
+            raise CryptoError("plaintext_size cannot be negative")
+        if isinstance(self.n_chunks, bool) or not isinstance(self.n_chunks, int):
+            raise CryptoError("n_chunks must be an integer")
+        expected = max(1, (self.plaintext_size + CHUNK_SIZE - 1) // CHUNK_SIZE)
+        if self.n_chunks != expected or self.n_chunks >= 1 << 88:
+            raise CryptoError("header has an invalid chunk count")
+
     @classmethod
     def from_dict(cls, d: dict) -> "StreamHeader":
+        if not isinstance(d, dict):
+            raise CryptoError("stream header must be an object")
         if d.get("suite") != SUITE:
             raise CryptoError(f"unsupported suite: {d.get('suite')!r}")
-        return cls(
-            suite=d["suite"],
-            chunk_size=int(d["chunk_size"]),
-            n_chunks=int(d["n_chunks"]),
-            plaintext_size=int(d["plaintext_size"]),
-        )
+        try:
+            return cls(
+                suite=d["suite"],
+                chunk_size=d["chunk_size"],
+                n_chunks=d["n_chunks"],
+                plaintext_size=d["plaintext_size"],
+            )
+        except (KeyError, TypeError) as exc:
+            raise CryptoError("stream header is incomplete or malformed") from exc
 
 
 def iter_chunks(fh: BinaryIO, size: int) -> Iterator[bytes]:
@@ -156,10 +178,8 @@ def decrypt_stream(
     """
     if len(key) != KEY_LEN:
         raise CryptoError("data encryption key must be 32 bytes")
-    if header.chunk_size != CHUNK_SIZE:
-        raise CryptoError("refusing non-standard chunk size")
-    if header.suite != SUITE:
-        raise CryptoError("unsupported suite")
+    # Also validate directly-constructed headers, not only deserialized ones.
+    StreamHeader.from_dict(header.to_dict())
 
     aad = canonical_json({"header": header.to_dict(), "bind": aad_obj})
     aead = AESGCM(key)
