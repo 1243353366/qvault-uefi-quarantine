@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 187 tests, ~0.45s
+python -m pytest qvault/tests -q      # 218 tests, ~0.5s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,24 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Isolating the components that interpret attacker bytes
+
+`qvault/isolation.py` places the five untrusted components (evidence readers,
+database parsers, indicator processing, report generation, AI-assisted analysis) and
+refuses placements that cannot meet them:
+
+| Component | Zone | Must not have |
+|---|---|---|
+| Evidence reader | enclave | network, keys, model, vault write, report emit |
+| Database parser | enclave | the same |
+| Indicator processing | intel | artifact read, **finding write**, whitelist write |
+| Report generation | presentation | artifact read, plaintext, keys, model |
+| AI analysis | ai | artifact read, plaintext, keys, finding write |
+
+Placement is validated rather than labelled, data flow is deny-by-default (plaintext
+never leaves the enclave toward AI or reporting; keys flow only into the enclave), and
+model output enters as an `Observation` graded `HYPOTHESIS`, never as a `Finding`.
 
 ## Every artifact carries eight mandatory elements
 
