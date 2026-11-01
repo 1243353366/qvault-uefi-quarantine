@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 268 tests, ~0.6s
+python -m pytest qvault/tests -q      # 296 tests, ~0.65s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,27 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Seven capabilities, traced to code
+
+`report/CAPABILITY_MAP.md` is generated from `qvault/pillars.py`, which names the module
+and test for every requirement and refuses to label a pillar implemented while a
+required piece is missing:
+
+| Pillar | Status |
+|---|---|
+| P1 Forensic acquisition | partial (3/4) |
+| P2 IOC detection | partial (2/3) |
+| P3 Behavioral correlation | partial (2/4) |
+| P4 Cryptographic evidence vault | partial (3/4) |
+| P5 Firmware integrity | partial (2/3) |
+| P6 Containment | partial (3/4) |
+| P7 Evidence assessment | partial (3/4) |
+
+Two requirements are load-bearing and partial: P3 process identity normalisation
+(subjects are strings, so two spellings of one binary do not merge) and P6 substrate
+enforcement (`isolation.py` and `budgets.py` state the boundary; nothing verifies the
+hypervisor honours it).
 
 ## Merged with Zero-Breach-Toolkit
 
