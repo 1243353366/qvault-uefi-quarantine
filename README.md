@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 91 tests, ~0.25s
+python -m pytest qvault/tests -q      # 111 tests, ~0.3s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,26 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Capability denial, and who enforces it
+
+`qvault/containment.py` models the six denials (network, authentication services,
+storage, compute, inter-network, decryption) as a function of the **plane** that
+enforces them and the **posture** of the subject:
+
+| Plane | Clean | OS compromised | Firmware compromised |
+|---|---|---|---|
+| Subject OS | full | **none** | **none** |
+| Hypervisor | full | full | partial |
+| Fabric (switch/VLAN ACL) | full | full | full, if every egress path is enumerated |
+| Physical | full | full | full |
+| Cryptographic | full | full | full |
+
+A plan built from host firewalls, ACLs and service shutdown reads as complete and
+provides zero denial once the subject is compromised, because the subject decides
+whether its own rules apply. `audit_claim()` takes a plan, a posture and the
+capabilities you believe you denied, and reports which ones the plan does not
+support. `assess()` never claims eradication.
 
 ## Network context as a policy selector
 
