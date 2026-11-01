@@ -1,0 +1,107 @@
+# qvault — a cryptographic quarantine vault for firmware evidence
+
+Reference implementation of the defensive architecture described in
+[`report/UEFI_Malware_Deep_Dive_Report.md`](report/UEFI_Malware_Deep_Dive_Report.md).
+
+The goal is narrow and deliberately unglamorous: **preserve hostile firmware as
+evidence, while denying it any opportunity to execute.** This is a custody and
+containment tool. It is not an analyser, not a sandbox, and not a cleaner. It
+does not repair infected hardware.
+
+```
+ingest ──► hash ──► AES-256-GCM (chunked) ──► seal 0400 ──► audit chain
+                │                                          │
+                └──── DEK wrapped by Shamir-split KEK ──────┘
+
+retrieve ──► K-of-N shares ──► 2-person approval ──► enclave sentinel ──► 0400 plaintext
+```
+
+## Why each piece exists
+
+| Mechanism | Threat it addresses | Why not something simpler |
+|---|---|---|
+| Encrypt at ingestion, streaming | Accidental execution, casual inspection, backup/AV crawlers touching the sample | A password-protected zip still writes a plaintext temp file during `zip` |
+| Fresh DEK per object | One leaked key burns one sample, not the vault | A single vault key means any single compromise is total |
+| KEK split K-of-N (Shamir, GF(256)) | Compromise of the vault host or any one custodian | A KEK in one file is one credential away from full disclosure |
+| Dual-control approvals, requester ≠ approver | Insider misuse, rushed "just decrypt it" | Logging alone does not prevent, only records |
+| Enclave sentinel directory | Decrypting straight into a workstation or production share | Path checks alone are bypassable by symlink or mount games |
+| Chunked AEAD with metadata binding | Silent corruption, sample swapping, truncation | A plain SHA-256 manifest cannot tell you *which* bytes changed or stop a swap |
+| Content-address by ciphertext hash | Plaintext hash as a confirmation oracle | Content-addressing by plaintext hash leaks "do you have sample X?" |
+| Hash-chained audit + signed checkpoints | Log editing, entry deletion, history rewrite | A normal log file is editable by anyone with write access |
+| Inert triage (bounded reads only) | Parser exploitation at the boundary | Deep FFS/PE parsing at ingestion turns the vault into an attack surface |
+
+## Install
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+python -m pytest qvault/tests -q      # 17 tests, ~0.1s
+```
+
+Requires Python 3.10+ and `cryptography`.
+
+## Use
+
+```bash
+# 1. Create the vault. It prints three share files: give them to three people.
+python -m qvault init --root vault --shares 3 --threshold 2 --custodian-dir custodian
+
+# 2. Ingest. Password-free, non-interactive, suitable for an acquisition appliance.
+python -m qvault ingest --root vault --file dump.bin \
+    --operator aadi --method "SPI flash dump (CHIPSEC)" \
+    --share custodian/share-1.json --share custodian/share-3.json
+
+# 3. Two different people approve a specific retrieval.
+python -m qvault approve --root vault --id <object-id> --approver reviewer1 --justification "case 2026-11"
+python -m qvault approve --root vault --id <object-id> --approver reviewer2 --justification "case 2026-11"
+
+# 4. Retrieve into an analysis enclave (a directory containing a .enclave marker).
+mkdir -p enclave && touch enclave/.enclave
+python -m qvault retrieve --root vault --id <object-id> --requester analyst \
+    --out enclave --share custodian/share-1.json --share custodian/share-2.json
+
+# 5. Integrity and custody checks.
+python -m qvault verify --root vault
+python -m qvault audit --root vault
+python -m qvault checkpoint --root vault     # sign the current audit head
+```
+
+## What the tests prove
+
+`python -m pytest qvault/tests -q` exercises, among others:
+
+- byte-exact round trip across empty / sub-chunk / exact-chunk / multi-chunk inputs;
+- plaintext never appears inside the sealed object;
+- a single flipped ciphertext bit is caught by both `verify` and decryption;
+- truncated ciphertext and mismatched metadata (AAD) are rejected;
+- one share is not enough (quorum enforced), two shares are;
+- a requester cannot approve their own retrieval;
+- retrieval outside a marked enclave is refused;
+- retrieved plaintext is mode `0400`, never executable;
+- audit edits break the hash chain, and truncation breaks the signed checkpoint;
+- triage recognises a flash descriptor and FV header without parsing them, and
+  phantom regions can no longer be produced from synthetic input;
+- orphan objects (bytes with no envelope) are reported as errors.
+
+## Non-goals and honest limits
+
+- **Encryption does not disinfect.** A machine whose firmware is already
+  compromised stays compromised. The vault preserves the evidence; reflashing,
+  hardware replacement and trust re-establishment are separate procedures.
+- **The vault cannot defend a compromised ingestion host.** Code that runs
+  before encapsulation has already won. See the failure analysis in the report;
+  the fix is architectural (disposable read-only acquisition appliance), not
+  cryptographic.
+- **The local filesystem is not WORM.** For real custody, place `objects/` and
+  `envelopes/` on compliance-mode object storage or an append-only snapshot, and
+  anchor checkpoints externally (RFC 3161, transparency log, paper record).
+- **No deep parsing.** Deliberately. Deep firmware parsing belongs in the
+  enclave, on a decrypted copy, under a parser that is assumed exploitable.
+
+## Safety
+
+This repository contains no malware, no exploit code and no persistence
+mechanism. Test fixtures are synthetic byte strings. Do not point the tooling at
+live samples outside an authorised, isolated analysis environment.
+
+Defensive research, dual-use by nature; published so defenders can adopt it.

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 700" width="980" height="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6b7c"/>
+    </marker>
+    <style>
+      .zone   { fill:#f7f9fb; stroke:#9fb0bf; stroke-width:1.5; }
+      .zone-t { font-size:13px; font-weight:700; fill:#26333f; }
+      .zone-s { font-size:10.5px; fill:#5b6b7c; }
+      .box    { fill:#ffffff; stroke:#b8c6d2; stroke-width:1.2; }
+      .box-t  { font-size:11.5px; font-weight:600; fill:#1f2a33; }
+      .box-s  { font-size:9.5px; fill:#5b6b7c; }
+      .flow   { stroke:#5b6b7c; stroke-width:1.4; fill:none; marker-end:url(#arrow); }
+      .lbl    { font-size:9.5px; fill:#42525f; }
+      .warn   { fill:#fff6e5; stroke:#d9a441; stroke-width:1.2; }
+      .good   { fill:#eef7f1; stroke:#5f9e7a; stroke-width:1.2; }
+      .title  { font-size:15px; font-weight:700; fill:#17212a; }
+      .sub    { font-size:10.5px; fill:#5b6b7c; }
+    </style>
+  </defs>
+
+  <text class="title" x="24" y="30">qvault — cryptographic quarantine architecture</text>
+  <text class="sub" x="24" y="48">Zones, trust boundaries and data flow. Trust decreases downward; keys live only where marked.</text>
+
+  <!-- ZONE 0 -->
+  <rect class="zone" x="24" y="66" width="932" height="86" rx="8"/>
+  <text class="zone-t" x="40" y="88">ZONE 0 — SUBJECT</text>
+  <text class="zone-s" x="182" y="88">untrusted · powered down · never booted by the lab</text>
+  <rect class="box" x="46" y="98" width="150" height="40" rx="5"/>
+  <text class="box-t" x="58" y="116">SPI flash</text><text class="box-s" x="58" y="130">BIOS region</text>
+  <rect class="box" x="212" y="98" width="150" height="40" rx="5"/>
+  <text class="box-t" x="224" y="116">Disk + ESP</text><text class="box-s" x="224" y="130">EFI System Partition</text>
+  <rect class="box" x="378" y="98" width="150" height="40" rx="5"/>
+  <text class="box-t" x="390" y="116">TPM 2.0</text><text class="box-s" x="390" y="130">PCRs, measured boot</text>
+  <rect class="box" x="544" y="98" width="190" height="40" rx="5"/>
+  <text class="box-t" x="556" y="116">Out-of-band reader</text><text class="box-s" x="556" y="130">hardware SPI programmer</text>
+  <rect class="box" x="750" y="98" width="190" height="40" rx="5"/>
+  <text class="box-t" x="762" y="116">Write blocker</text><text class="box-s" x="762" y="130">disk acquisition</text>
+
+  <!-- flow 0 -> 1 -->
+  <path class="flow" d="M 640 140 L 640 168"/>
+  <text class="lbl" x="650" y="160">bytes only, no execution</text>
+
+  <!-- ZONE 1 -->
+  <rect class="zone" x="24" y="172" width="932" height="118" rx="8"/>
+  <text class="zone-t" x="40" y="194">ZONE 1 — ACQUISITION APPLIANCE</text>
+  <text class="zone-s" x="300" y="194">semi-trusted · disposable · read-only boot · no NIC after capture</text>
+  <rect class="box" x="46" y="206" width="176" height="34" rx="5"/>
+  <text class="box-t" x="58" y="227">hash → encrypt</text>
+  <rect class="box" x="238" y="206" width="176" height="34" rx="5"/>
+  <text class="box-t" x="250" y="227">inert triage</text>
+  <rect class="box" x="430" y="206" width="176" height="34" rx="5"/>
+  <text class="box-t" x="442" y="227">seal 0400</text>
+  <rect class="warn" x="622" y="200" width="150" height="46" rx="5"/>
+  <text class="box-t" x="634" y="219">DEK (RAM only)</text>
+  <text class="box-s" x="634" y="234">destroyed after wrap</text>
+  <rect class="good" x="788" y="200" width="152" height="46" rx="5"/>
+  <text class="box-t" x="800" y="219">no plaintext path</text>
+  <text class="box-s" x="800" y="234">64 KiB window, no temp</text>
+  <text class="lbl" x="46" y="266">Chunked AES-256-GCM · header+identity as AAD · stream halts on any read error</text>
+  <text class="lbl" x="46" y="280">Triage is bounded: magic offsets, descriptor table, strings, entropy — no decompression, no PE mapping</text>
+
+  <!-- flow 1 -> 2 -->
+  <path class="flow" d="M 490 290 L 490 318"/>
+  <text class="lbl" x="500" y="310">ciphertext + envelope + audit entry</text>
+
+  <!-- ZONE 2 -->
+  <rect class="zone" x="24" y="322" width="932" height="112" rx="8"/>
+  <text class="zone-t" x="40" y="344">ZONE 2 — IMMUTABLE VAULT</text>
+  <text class="zone-s" x="286" y="344">semi-trusted storage · holds no keys · WORM media in production</text>
+  <rect class="box" x="46" y="356" width="200" height="34" rx="5"/>
+  <text class="box-t" x="58" y="377">objects/  0400</text>
+  <rect class="box" x="262" y="356" width="200" height="34" rx="5"/>
+  <text class="box-t" x="274" y="377">envelopes/  0400</text>
+  <rect class="box" x="478" y="356" width="200" height="34" rx="5"/>
+  <text class="box-t" x="490" y="377">audit.log  hash chain</text>
+  <rect class="box" x="694" y="356" width="246" height="34" rx="5"/>
+  <text class="box-t" x="706" y="377">checkpoints/  Ed25519 + Merkle root</text>
+  <text class="lbl" x="46" y="412">Content-addressed by ciphertext hash (not plaintext) · O_EXCL seal · verify recomputes every byte</text>
+  <text class="lbl" x="46" y="426">Edits break the chain; truncation breaks the signed count</text>
+
+  <!-- flow 2 <-> 3 -->
+  <path class="flow" d="M 700 434 L 700 462"/>
+  <text class="lbl" x="710" y="454">checkpoint head, read-only mount</text>
+
+  <!-- ZONE 3 -->
+  <rect class="zone" x="24" y="466" width="932" height="96" rx="8"/>
+  <text class="zone-t" x="40" y="488">ZONE 3 — CONTROL PLANE</text>
+  <text class="zone-s" x="244" y="488">high trust · sees no samples · separate administrative domain</text>
+  <rect class="box" x="46" y="500" width="196" height="34" rx="5"/>
+  <text class="box-t" x="58" y="521">policy + approvals</text>
+  <rect class="box" x="258" y="500" width="196" height="34" rx="5"/>
+  <text class="box-t" x="270" y="521">custodian signatures</text>
+  <rect class="box" x="470" y="500" width="196" height="34" rx="5"/>
+  <text class="box-t" x="482" y="521">RFC 3161 anchor</text>
+  <rect class="box" x="682" y="500" width="258" height="34" rx="5"/>
+  <text class="box-t" x="694" y="521">K-of-N KEK shares (HSM / offline)</text>
+
+  <!-- flow 3 -> 4 -->
+  <path class="flow" d="M 490 562 L 490 590"/>
+  <text class="lbl" x="500" y="582">quorum + 2 approvals + policy</text>
+
+  <!-- ZONE 4 -->
+  <rect class="zone" x="24" y="594" width="932" height="86" rx="8"/>
+  <text class="zone-t" x="40" y="616">ZONE 4 — ANALYSIS ENCLAVE</text>
+  <text class="zone-s" x="268" y="616">hostile-by-assumption · network-isolated · plaintext exists only here</text>
+  <rect class="box" x="46" y="628" width="200" height="34" rx="5"/>
+  <text class="box-t" x="58" y="649">.enclave sentinel</text>
+  <rect class="box" x="262" y="628" width="200" height="34" rx="5"/>
+  <text class="box-t" x="274" y="649">decrypt → 0400, noexec</text>
+  <rect class="box" x="478" y="628" width="200" height="34" rx="5"/>
+  <text class="box-t" x="490" y="649">disposable VM per case</text>
+  <rect class="box" x="694" y="628" width="246" height="34" rx="5"/>
+  <text class="box-t" x="706" y="649">one-way results export only</text>
+</svg>
