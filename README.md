@@ -1,5 +1,12 @@
 # qvault — a cryptographic quarantine vault for firmware evidence
 
+> **Status: prototype, not hardened.** The code was written before the threat model
+> had been independently reviewed, which is the wrong order. Nine weaknesses found
+> on re-reading are listed in
+> [`report/THREAT_MODEL_REVIEW.md`](report/THREAT_MODEL_REVIEW.md); the four rated
+> High each reduce dual control or tamper-evident audit from a property to a claim.
+> Use it on synthetic fixtures, not on live samples.
+
 Reference implementation of the defensive architecture described in
 [`report/UEFI_Malware_Deep_Dive_Report.md`](report/UEFI_Malware_Deep_Dive_Report.md).
 
@@ -14,6 +21,27 @@ ingest ──► hash ──► AES-256-GCM (chunked) ──► seal 0400 ──
                 └──── DEK wrapped by Shamir-split KEK ──────┘
 
 retrieve ──► K-of-N shares ──► 2-person approval ──► enclave sentinel ──► 0400 plaintext
+```
+
+## Read this before trusting any claim in here
+
+This project performed **no independent reverse engineering**. No sample was
+obtained, unpacked or executed. Every statement about LoJax, MoonBounce and
+BlackLotus is a reconstruction from published vendor analysis, and every
+signature in `qvault/fwdiff.py` is derived from documented bytes without live
+validation.
+
+- [`report/EVIDENCE_POLICY.md`](report/EVIDENCE_POLICY.md) — the three rules this
+  project is held to, revised tag semantics, and a self-audit of where it broke them.
+- [`report/CLAIMS_LEDGER.csv`](report/CLAIMS_LEDGER.csv) — 48 claims with source,
+  locator, tag, verification status and a falsifier.
+- [`report/HARDWARE_TEST_QUESTIONS.md`](report/HARDWARE_TEST_QUESTIONS.md) — the 14
+  questions no document can answer, with rigs and experiments.
+- [`report/THREAT_MODEL_REVIEW.md`](report/THREAT_MODEL_REVIEW.md) — what a critic
+  should attack, and why the review gate is still open.
+
+```bash
+python tools/check_claims.py     # fails on any claim missing evidence or falsifier
 ```
 
 ## Why each piece exists
