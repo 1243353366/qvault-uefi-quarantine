@@ -63,7 +63,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 158 tests, ~0.4s
+python -m pytest qvault/tests -q      # 187 tests, ~0.45s
 ```
 
 Requires Python 3.10+ and `cryptography`.
@@ -112,6 +112,21 @@ components doing legitimate-looking things. Only the divergence rule notices.
 
 Metadata only: no payloads, no query strings, no third-party traffic. Design,
 privacy constraints and ten failure modes: `report/NETOBS_MODULE.md`.
+
+## Every artifact carries eight mandatory elements
+
+`qvault/provenance.py` refuses to build an envelope without all of them:
+
+| Element | Enforced how |
+|---|---|
+| Original-source identification | kind, locator and identity all non-empty |
+| Acquisition timestamp | positive integer milliseconds, UTC |
+| SHA-256 digest | **computed from the bytes**, never accepted from the caller; `verify()` re-hashes in constant time |
+| Acquisition method | fixed vocabulary, and each method maps to an evidence plane |
+| Tool and reader versions | both mandatory and separate: a capture bug and a parser bug need different remedies |
+| Coverage and collection errors | every error must state its effect; unobserved regions become telemetry gaps that lower finding confidence |
+| Chain of custody | append-only, hash-chained, first event must be the acquisition; verification detects edits and reordering |
+| Cryptographic protection at rest | authenticated ciphers only; `AES-256-CBC` and `none` are refused |
 
 ## Five rules the tool cannot break
 

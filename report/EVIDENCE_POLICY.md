@@ -72,6 +72,24 @@ capped by detection, and `DeviceAssessment.verdict` has no branch that returns
 cleanliness. `tools/check_findings.py` applies the same checks to findings imported
 from other tools.
 
+**R9. Every collected artifact carries an eight-element envelope.** Original source,
+acquisition timestamp, SHA-256, acquisition method, tool and reader versions,
+coverage and collection errors, chain of custody, and cryptographic protection at
+rest. Enforced in `qvault/provenance.py`: the envelope will not construct without
+them, the digest is computed from the bytes rather than supplied, custody is
+hash-chained from the acquisition event, and unauthenticated ciphers are refused.
+
+Two of these deserve explanation because they are routinely fudged:
+
+*Coverage* is not a courtesy field. A read that covered 60% of the flash produces
+telemetry gaps automatically, which lower the confidence of anything resting on it
+(rule F3). Nobody has to remember to mention it.
+
+*Tool version and reader version are separate* because they fail differently. A
+capture bug means the bytes are wrong; a reader bug means the bytes are right and
+the interpretation is wrong. One needs re-acquisition, the other re-parsing, and the
+envelope has to be able to tell them apart.
+
 ## 3. Self-audit: where this work broke its own rules
 
 Recorded rather than quietly fixed, because a report that hides its process is
