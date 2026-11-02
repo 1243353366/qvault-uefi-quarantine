@@ -338,6 +338,15 @@ def grade_ceiling(classes) -> str | None:
     return best
 
 
+def cap_grade(grade: str, ceiling: str | None) -> str:
+    """The grade to report: the claim, or the ceiling when the claim exceeds it."""
+    if grade not in _RANK:
+        raise SeparationError(f"unknown grade {grade!r}; known: {F.GRADES}")
+    if ceiling is None:
+        return F.UNKNOWN
+    return grade if _RANK[grade] <= _RANK[ceiling] else ceiling
+
+
 def assert_claim_supported(claim_grade: str, classes, what: str = "claim") -> dict:
     """Refuse a conclusion stronger than the evidence, and say what would be enough.
 

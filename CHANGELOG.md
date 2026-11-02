@@ -134,6 +134,37 @@ gate verdicts remain visible in `context()`, so the denial is not hidden.
 
 24 tests in `test_probe.py` (605 total).
 
+### Added - autostart surface assessment (`qvault/persistence.py`)
+
+Implements the eleven persistence mechanisms in Daulaguphu, "11 Critical Malware
+Persistence Mechanisms" (tech-zealots.com, 7 April 2022) as detection, never as technique.
+The module has no code that creates or enables an autostart entry.
+
+- Thirteen catalogue entries covering the article's eleven mechanisms (Run/RunOnce,
+  Policies\Explorer\Run, startup folders, scheduled tasks, services and ServiceDll,
+  BootExecute, hive loading, BHOs, AppInit_DLLs, DLL search order, plus rootkit, bootkit
+  and fileless).
+- Seven behavioural signals: user-writable location, unsigned binary, LOLBin proxy,
+  encoded command, hidden task, service outside System32, nonstandard BootExecute,
+  hive outside config, populated AppInit_DLLs.
+- Grading follows the collection basis, not the suspicion: `live_host` is a self-report and
+  yields no graded finding, `offline_image` caps at CORROBORATED, `attested_image` at
+  CONFIRMED. A ceiling is a limit, not a target.
+- Rootkit, bootkit and fileless are marked `not observable` rather than silently clean: a
+  snapshot cannot see what hides from it.
+- `coverage()` reports observed / not_observed / not_observable and states that a mechanism
+  not observed was not thereby shown to be absent. Nothing is ever reported CLEAN.
+- Every observation carries a benign twin and a control, enforced by
+  `assert_catalogue_integrity()` at import.
+
+### Fixed - BootExecute detection
+
+The first version tested whether the default string appeared in the value, so a payload
+appended to `autocheck autochk *` passed as normal. It is now an equality check after
+whitespace normalisation, which is what "has any value beyond the default" actually means.
+
+30 tests in `test_persistence.py` (635 total).
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.
