@@ -73,7 +73,11 @@ class Event:
     plane: str
     grade: str
     source: str = ""
-    benign: str = ""     # upstream's usual_reason, when it offered one
+    benign: str = ""
+    #: Digest of the underlying record, when known. Two events carrying the same
+    #: fingerprint are one piece of evidence copied twice, whatever plane each copy
+    #: claims: relabelling a duplicate must not manufacture independence.
+    fingerprint: str = ""     # upstream's usual_reason, when it offered one
 
     def __post_init__(self) -> None:
         if self.kind not in KINDS:
@@ -124,6 +128,22 @@ def _linked(a: Event, b: Event, window_s: int) -> bool:
     return a.kind != b.kind and _complementary(a.kind, b.kind)
 
 
+def deduplicate(events) -> tuple:
+    """Collapse copies of the same evidence. Returns (unique, dropped)."""
+    seen = set()
+    unique = []
+    dropped = 0
+    for ev in events:
+        key = (("fp", ev.fingerprint) if ev.fingerprint
+               else ("ev", ev.normalised_subject, ev.kind, ev.ts, ev.source))
+        if key in seen:
+            dropped += 1
+            continue
+        seen.add(key)
+        unique.append(ev)
+    return unique, dropped
+
+
 def build_clusters(events, window_s: int = 300) -> list[list[Event]]:
     """Union-find over the link relation. Order-independent by construction."""
     events = list(events)
@@ -163,6 +183,9 @@ def assess_cluster(cluster) -> dict:
 
     kinds = {e.kind for e in cluster}
     planes = {e.plane for e in cluster}
+    # One fingerprint means one piece of evidence, however many plane labels it wears.
+    fps = {e.fingerprint for e in cluster if e.fingerprint}
+    duplicate_evidence = len(fps) == 1 and len(cluster) > 1
     subjects = {e.subject for e in cluster}
     base_rank = max(_RANK[e.grade] for e in cluster)
 
@@ -171,7 +194,7 @@ def assess_cluster(cluster) -> dict:
         raised = min(_RANK[F.CONFIRMED], base_rank + 1)
 
     # One plane is one source of truth, however many events it contributes.
-    capped = len(planes) == 1
+    capped = len(planes) == 1 or duplicate_evidence
     if capped:
         raised = min(raised, _RANK[F.INFERRED])
 
@@ -195,6 +218,7 @@ def assess_cluster(cluster) -> dict:
         "status": status,
         "raised": raised > base_rank,
         "capped_by_single_plane": capped,
+        "duplicate_evidence": duplicate_evidence,
         "benign_candidates": benign,
         "unresolved_gaps": [] if benign else [
             "no benign explanation recorded for this cluster: absence of a proposed "

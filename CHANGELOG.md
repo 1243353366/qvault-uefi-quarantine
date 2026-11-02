@@ -9,6 +9,45 @@ they deliberately do not mean.
 
 ---
 
+## [0.5.0] - 2026-11-02
+
+Adversarial testing found four defects. All four were the same failure inverted: something
+unreadable, impossible or duplicated being treated as evidence.
+
+### Fixed
+
+- **The parser returned an empty image instead of admitting failure.** `parse_firmware`
+  skipped malformed volumes silently, so garbage input produced `files=0` and looked like
+  a clean read. It now records diagnostics (no `_FVH` signature, declared length beyond the
+  data, invalid header length, file extending past its volume, size below its own header,
+  `MAX_FILES` cap hit), counts rejected volumes, and exposes `parse_status()` and
+  `parse_gaps()`. Unreadable and partial are distinct from parsed, and the gaps feed
+  confidence.
+- **An artifact timestamped in the future was accepted.** A future `acquired_at_ms` is a
+  clock error, a fabricated envelope or a timezone mistake, and evidence that cannot be
+  ordered is useless. Now refused beyond a 300s skew; zero and negative refused outright.
+- **Duplicate evidence could manufacture independence.** Two copies of one record labelled
+  with different plane names counted as two independent sources and raised a cluster's
+  grade. Events now carry a `fingerprint`, duplicates collapse regardless of label, and a
+  single fingerprint caps a cluster at INFERRED.
+- **Two distinct upstreams were reported as `single_source`**, which is a false statement
+  about the evidence. New `uncorroborated` standing: agreement between resellers is weak
+  evidence, not corroboration. `supports_malicious_claim` stays false.
+
+### Added
+
+- `qvault/tests/test_adversarial.py`: 29 tests across the five attack classes — forged
+  evidence, duplicated sources, malformed firmware, parser exhaustion, misleading
+  timestamps. They assert refusal behaviour; a test passing because the tool said "clean"
+  is treated as a bug in the test.
+- `tools/smoke.py` section 6: 16 new end-to-end checks over the fixed paths, including a
+  copied tree with one injected line being detected against its own published digest.
+- `parse_status()` / `parse_gaps()`, `CustodyLog` unchanged, `MAX_CLOCK_SKEW_MS`.
+
+### Changed
+
+- Test suite 364 -> 398; smoke 38 -> 54 checks.
+
 ## [0.4.0] — 2026-11-02
 
 Current version. The release where the tool stopped taking its own word for anything.

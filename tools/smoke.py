@@ -187,6 +187,124 @@ try:
 except K.CalibrationError:
     check("zero-claim phrasing refused", True)
 
+
+# ---------------------------------------------------------------------------
+# 6. adversarial inputs
+# ---------------------------------------------------------------------------
+print("6. adversarial inputs")
+
+import shutil  # noqa: E402
+
+from qvault import budgets as B  # noqa: E402
+from qvault import calibration as CAL  # noqa: E402
+from qvault import correlate as COR  # noqa: E402
+from qvault import findings as FN  # noqa: E402
+from qvault import fwdiff as FW  # noqa: E402
+from qvault import integrity as INT  # noqa: E402
+from qvault import limitations as LIM  # noqa: E402
+from qvault import provenance as PROV  # noqa: E402
+
+NOW = 1_760_000_000_000
+
+# a firmware image that cannot be read must say so, not report zero files
+unreadable = FW.parse_firmware(b"this is not firmware" * 64)
+check("an unreadable image is not called parsed",
+      FW.parse_status(unreadable) == "unreadable", FW.parse_status(unreadable))
+check("an unreadable image yields telemetry gaps",
+      len(FW.parse_gaps(unreadable)) > 0, str(FW.parse_gaps(unreadable))[:80])
+
+# a truncated volume reports the disagreement in lengths
+_truncated = bytearray(0x38 + 64)
+_truncated[0x28:0x2C] = b"_FVH"
+_truncated[0x20:0x28] = (0x100000).to_bytes(8, "little")
+_truncated[0x30:0x32] = (0x38).to_bytes(2, "little")
+_trunc = FW.parse_firmware(bytes(_truncated))
+check("a truncated volume is reported as such",
+      any("claims" in g or "truncated" in g for g in FW.parse_gaps(_trunc)),
+      str(FW.parse_gaps(_trunc))[:80])
+
+# an artifact timestamped in the future is refused
+def _src():
+    return PROV.OriginalSource(kind="firmware_flash", locator="SPI", identity="ws")
+
+
+def _capture(ts):
+    return PROV.capture(
+        b"bytes", source=_src(), acquired_at_ms=ts, method="oob_spi_read",
+        tool="qvault", tool_version="0.5.0", reader_version="r1",
+        coverage=PROV.Coverage(attempted=("bios",), succeeded=("bios",)),
+        at_rest=PROV.AtRest(cipher="AES-256-GCM", key_id="k", object_id="o"),
+        actor="analyst", now_ms=NOW,
+    )
+
+
+try:
+    _capture(NOW + 86_400_000 * 400)
+    check("a future acquisition timestamp is refused", False, "it was accepted")
+except PROV.ProvenanceError:
+    check("a future acquisition timestamp is refused", True)
+
+try:
+    good = _capture(NOW - 1_000)
+    check("a forged digest is detected", PROV.verify(b"other bytes", good) is False)
+except PROV.ProvenanceError as exc:
+    check("a forged digest is detected", False, str(exc)[:60])
+
+# duplicate evidence cannot manufacture independence
+_d = [COR.Event(ts=1000, subject="p", kind=COR.CONTACT, plane=pl,
+                grade=FN.INFERRED, fingerprint="same")
+      for pl in ("historical_record", "wire", "live_state")]
+_dup = COR.assess_cluster(_d)
+check("relabelled duplicates stay capped", _dup["duplicate_evidence"] is True and
+      _dup["grade"] == FN.INFERRED, _dup["grade"])
+_unique, _dropped = COR.deduplicate(_d)
+check("duplicate copies are counted", _dropped == 2, str(_dropped))
+
+# a killed parser cannot leave a clean-looking result
+_usage = B.Usage(wall_s=900, memory_mb=64, output_bytes=10, open_files=1, artifact_bytes=1000)
+_gaps = B.gaps_for("db_parser", _usage)
+check("a budget kill produces gaps", any("budget_exceeded" in g for g in _gaps), str(_gaps)[:80])
+check("a killed parse cannot stay CONFIDENT",
+      FN.confidence_grade(FN.CONFIRMED, _gaps) != FN.CONFIRMED)
+
+# indicator provenance vocabulary
+_same = [LIM.IntelFeed(name=n, upstream="one-vendor", age_days=1) for n in ("a", "b", "c")]
+_two = [LIM.IntelFeed(name="a", upstream="v1", age_days=1),
+        LIM.IntelFeed(name="b", upstream="v2", age_days=1)]
+check("three feeds on one upstream are circular",
+      LIM.intel_trust(_same)["standing"] == "circular",
+      LIM.intel_trust(_same)["standing"])
+check("two unvalidated upstreams are not called corroboration",
+      LIM.intel_trust(_two)["standing"] == "uncorroborated",
+      LIM.intel_trust(_two)["standing"])
+
+# a tampered copy of the shipped tree is detected against its own digest
+_tree = os.path.join(ROOT, "qvault")
+_manifest = INT.build_manifest(_tree)
+_copy = os.path.join(tempfile.mkdtemp(), "qvault")
+shutil.copytree(_tree, _copy, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+check("an untouched copy verifies",
+      INT.verify_tree(_copy, _manifest["digest"],
+                      provenance=INT.OUT_OF_BAND_DIGEST,
+                      expected_file_count=_manifest["file_count"])["status"] == "verified")
+with open(os.path.join(_copy, "audit.py"), "a") as fh:
+    fh.write("\n# injected\n")
+_tampered = INT.verify_tree(_copy, _manifest["digest"],
+                            provenance=INT.OUT_OF_BAND_DIGEST,
+                            expected_file_count=_manifest["file_count"])
+check("a one-line injection is detected", _tampered["status"] == "mismatch", _tampered["status"])
+check("the tampered copy is not called verified", _tampered["verified"] is False)
+
+# calibration refuses to promise perfection
+_bound = CAL.zero_error_upper_bound(40)
+check("zero observed errors still has a non-zero bound", _bound > 0, f"{_bound:.3f}")
+try:
+    CAL.refuse_zero_claim("this scanner has no false positives")
+    check("a zero-claim sentence is refused", False, "it was accepted")
+except CAL.CalibrationError:
+    check("a zero-claim sentence is refused", True)
+
+
 print()
 if failures:
     print(f"SMOKE FAILED: {len(failures)} problem(s) in {steps} checks")

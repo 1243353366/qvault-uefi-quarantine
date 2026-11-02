@@ -87,6 +87,10 @@ REQUIRED_FIELDS = (
 )
 
 
+#: Tolerance for clock disagreement between the acquirer and this host.
+MAX_CLOCK_SKEW_MS = 300_000
+
+
 class ProvenanceError(ValueError):
     """Raised when an artifact envelope cannot be constructed honestly."""
 
@@ -344,6 +348,26 @@ class Artifact:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
 
+def _check_acquired_at(acquired_at_ms: int, now_ms: int | None = None) -> None:
+    """An artifact cannot be acquired in the future.
+
+    A future timestamp means a wrong clock, a fabricated envelope, or a timezone
+    mistake. All three make the artifact useless for ordering evidence, so it is
+    refused rather than stored with a note.
+    """
+    if not isinstance(acquired_at_ms, int) or acquired_at_ms <= 0:
+        raise ProvenanceError("acquisition timestamp must be a positive integer (epoch ms)")
+    if now_ms is None:
+        import time as _time
+        now_ms = int(_time.time() * 1000)
+    if acquired_at_ms > now_ms + MAX_CLOCK_SKEW_MS:
+        ahead = (acquired_at_ms - now_ms) / 86_400_000
+        raise ProvenanceError(
+            f"acquisition timestamp is {ahead:.1f} days in the future: a clock error, "
+            "a fabricated envelope, or a timezone mistake. Refused."
+        )
+
+
 def capture(
     data: bytes,
     *,
@@ -358,8 +382,10 @@ def capture(
     actor: str,
     errors: tuple[CollectionError, ...] = (),
     note: str = "",
+    now_ms: int | None = None,
 ) -> Artifact:
     """Build an envelope, computing the digest from the bytes themselves."""
+    _check_acquired_at(acquired_at_ms, now_ms)
     if not isinstance(data, (bytes, bytearray)):
         raise ProvenanceError("capture() takes bytes; the digest is of the bytes, not of a path")
     digest = hashlib.sha256(bytes(data)).hexdigest()

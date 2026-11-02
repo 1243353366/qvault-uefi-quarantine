@@ -178,14 +178,48 @@ class FirmwareImage:
     volumes: int
     files: dict[str, FfsFile]
     data: bytes = b""
+    #: Why the parse is incomplete. An empty list means every structure seen was
+    #: well formed; it does NOT mean the image is trustworthy.
+    diagnostics: list = field(default_factory=list)
+    #: Volumes whose header was rejected, and therefore never enumerated.
+    volumes_rejected: int = 0
+
+    @property
+    def readable(self) -> bool:
+        return self.volumes > 0
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "size": self.size,
             "volumes": self.volumes,
+            "volumes_rejected": self.volumes_rejected,
             "files": len(self.files),
+            "diagnostics": list(self.diagnostics),
+            "status": parse_status(self),
         }
+
+
+#: A parse result is only "parsed" when a volume was actually enumerated and nothing
+#: was rejected. "Unreadable" must never be reported as "no malware found".
+def parse_status(image: FirmwareImage) -> str:
+    if image.volumes == 0:
+        return "unreadable"
+    if image.diagnostics:
+        return "partial"
+    return "parsed"
+
+
+def parse_gaps(image: FirmwareImage) -> tuple:
+    """Telemetry gaps a caller must feed to confidence, never silently drop."""
+    gaps = []
+    if image.volumes == 0:
+        gaps.append("firmware_unreadable: no firmware volume could be enumerated")
+    for d in image.diagnostics:
+        gaps.append(f"fw_parse: {d}")
+    if image.volumes_rejected:
+        gaps.append(f"fw_parse: {image.volumes_rejected} volume(s) rejected and not enumerated")
+    return tuple(gaps)
 
 
 def _guid_str(b: bytes) -> str:
@@ -292,16 +326,39 @@ def parse_firmware(data: bytes, name: str = "image") -> FirmwareImage:
     """
     files: dict[str, FfsFile] = {}
     volumes = 0
+    rejected = 0
+    diagnostics: list = []
 
     pos = data.find(FV_SIG)
+    if pos == -1:
+        diagnostics.append(
+            "no _FVH signature anywhere in the image: it is not a plain firmware "
+            "volume, or it is compressed/encrypted, or the read was truncated"
+        )
     while pos != -1 and len(files) < MAX_FILES:
         base = pos - FV_SIG_OFF
         if base < 0 or base + 0x38 > len(data):
+            rejected += 1
+            diagnostics.append(f"FV header at 0x{pos:x} runs past the end of the data")
             pos = data.find(FV_SIG, pos + 1)
             continue
         fv_len = int.from_bytes(data[base + 0x20 : base + 0x28], "little")
         hdr_len = int.from_bytes(data[base + 0x30 : base + 0x32], "little")
-        if fv_len <= 0 or hdr_len < 0x38 or base + fv_len > len(data):
+        if fv_len <= 0 or hdr_len < 0x38:
+            rejected += 1
+            diagnostics.append(
+                f"FV at 0x{base:x} declares length {fv_len} and header {hdr_len}, "
+                "which cannot describe a volume"
+            )
+            pos = data.find(FV_SIG, pos + 1)
+            continue
+        if base + fv_len > len(data):
+            rejected += 1
+            have = len(data) - base
+            diagnostics.append(
+                f"FV at 0x{base:x} claims {fv_len} bytes but only {have} are present "
+                "(truncated read, or the declared length is a lie)"
+            )
             pos = data.find(FV_SIG, pos + 1)
             continue
         volumes += 1
@@ -319,7 +376,15 @@ def parse_firmware(data: bytes, name: str = "image") -> FirmwareImage:
             if size == 0xFFFFFF and cur + 32 <= fv_end:
                 size = int.from_bytes(data[cur + 24 : cur + 32], "little")
                 header_len = 32
-            if size < header_len or cur + size > fv_end:
+            if size < header_len:
+                diagnostics.append(
+                    f"file at 0x{cur:x} declares size {size}, smaller than its own header"
+                )
+                break
+            if cur + size > fv_end:
+                diagnostics.append(
+                    f"file at 0x{cur:x} claims {size} bytes and runs past the volume end"
+                )
                 break
             body = data[cur + header_len : cur + size]
             if ffs_type != FFS_PAD:
@@ -341,7 +406,21 @@ def parse_firmware(data: bytes, name: str = "image") -> FirmwareImage:
 
         pos = data.find(FV_SIG, pos + 1)
 
-    return FirmwareImage(name=name, size=len(data), volumes=volumes, files=files, data=data)
+    if len(files) >= MAX_FILES:
+        diagnostics.append(
+            f"stopped at the {MAX_FILES}-file cap: the image holds more files than were "
+            "enumerated, so this listing is incomplete"
+        )
+
+    return FirmwareImage(
+        name=name,
+        size=len(data),
+        volumes=volumes,
+        files=files,
+        data=data,
+        diagnostics=diagnostics,
+        volumes_rejected=rejected,
+    )
 
 
 # ---------------------------------------------------------------------------

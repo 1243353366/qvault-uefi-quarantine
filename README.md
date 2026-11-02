@@ -1,6 +1,6 @@
 # qvault
 
-**Version 0.4.0** · [CHANGELOG](CHANGELOG.md) · [credits](CREDITS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.5.0** · [CHANGELOG](CHANGELOG.md) · [credits](CREDITS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -65,7 +65,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 364 tests, ~0.75s
+python -m pytest qvault/tests -q      # 398 tests, ~0.75s
 ```
 
 Requires Python 3.10+ and `cryptography`.

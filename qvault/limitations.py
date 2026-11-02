@@ -273,7 +273,13 @@ def intel_trust(feeds) -> dict:
         )
     elif len(independent) >= 2:
         standing = "corroborated"
-    elif len(upstreams) >= 1:
+    elif len(upstreams) >= 2:
+        standing = "uncorroborated"
+        caveats.append(
+            f"{len(upstreams)} distinct upstreams agree, but none is independently "
+            "validated: agreement between resellers is weak evidence, not corroboration"
+        )
+    elif len(upstreams) == 1:
         standing = "single_source"
         caveats.append("one upstream: a single poisoned source is indistinguishable from truth")
     else:
