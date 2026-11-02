@@ -9,6 +9,39 @@ they deliberately do not mean.
 
 ---
 
+## [0.10.0] - 2026-11-02
+
+Packaging is now proven rather than declared, and CI enforces it.
+
+### Added
+
+- `python -m build` produces a wheel containing the vendored detector (74 files,
+  `vendor/zbtriage/` included), an entry point, and `qvault/lan.py`. Verified by
+  installing the wheel into a clean virtualenv and running the CLI from `/tmp`, not
+  from the checkout.
+- GitHub Actions CI (`.github/workflows/ci.yml`, prepared and validated, not yet pushed:
+  GitHub requires the `workflow` OAuth scope to create files under `.github/workflows/`,
+  and the current token does not have it), four jobs: `test` (3.11 and 3.12 against `requirements-lock.txt`,
+  then unit tests, smoke tests, claims ledger, fingerprint drift), `package` (wheel
+  build, install, detector import, console script exercised outside the repo),
+  `static` (compileall plus error-only ruff), `reproduce` (`tools/reproduce.sh`).
+- `.gitignore` for bytecode, build output and virtualenvs.
+- An oracle guard test: any short-circuiting comparison on a digest derived from a
+  secret fails the suite, so the class of bug cannot return quietly.
+
+### Fixed
+
+- `rebuild_kek` compared the derived `kek_id` with `!=`. That value is derived from the
+  secret KEK, and a caller can vary the reconstructed KEK freely by choosing shares, so
+  the comparison leaked how many leading hex characters matched. Now `hmac.compare_digest`.
+
+### Verified
+
+- CI jobs simulated locally before pushing: 466 tests, 62 smoke checks, ledger valid,
+  fingerprint drift clean, wheel built and installed.
+- `requirements-lock.txt` installs and the gates pass in a virtualenv with no repo on
+  `sys.path`.
+
 ## [0.9.0] - 2026-11-02
 
 Two problem classes, worked line by line.

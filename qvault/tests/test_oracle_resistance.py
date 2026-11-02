@@ -128,3 +128,28 @@ def test_reapproval_does_not_enumerate_others():
     text = str(exc.value)
     assert "c1" in text
     assert "c2" not in text
+
+
+def test_no_secret_derived_value_is_compared_with_a_plain_operator():
+    """A short-circuiting != on a secret-derived digest is a timing oracle.
+
+    Callers can vary a reconstructed KEK freely by choosing shares, so the comparison
+    must not reveal how many leading characters matched.
+    """
+    import pathlib as _p
+
+    root = _p.Path(__file__).resolve().parents[1]
+    secrets = ("kek", "dek", "share", "secret")
+    offenders = []
+    for path in root.rglob("*.py"):
+        if "tests" in path.parts or "vendor" in path.parts:
+            continue
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            low = line.lower()
+            if low.strip().startswith("#") or "compare_digest" in low:
+                continue
+            if "!=" not in low:
+                continue
+            if ("hexdigest" in low or "digest(" in low) and any(w in low for w in secrets):
+                offenders.append(f"{path.name}:{number}: {line.strip()}")
+    assert not offenders, f"non-constant-time comparison on a secret: {offenders}"

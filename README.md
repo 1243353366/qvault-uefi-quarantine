@@ -1,5 +1,7 @@
 # qvault
 
+[![ci](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg)](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml)
+
 **Version 0.5.0** · [CHANGELOG](CHANGELOG.md) · [credits](CREDITS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model

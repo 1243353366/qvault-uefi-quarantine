@@ -24,6 +24,7 @@ machine whose hypervisor and firmware are re-flashed between cases.
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import re
 import tempfile
@@ -115,7 +116,10 @@ def rebuild_kek(shares: list[Share], threshold: int, kek_id: str) -> bytes:
             f"quorum not met: {len(shares)} of {threshold} required shares supplied"
         )
     kek = combine(shares)
-    if sha256(kek).hexdigest()[:32] != kek_id:
+    # Constant time: kek_id is derived from the secret KEK, so a short-circuiting
+    # comparison leaks how many leading hex characters matched, and a caller can vary
+    # the reconstructed KEK freely by choosing the shares they supply.
+    if not hmac.compare_digest(sha256(kek).hexdigest()[:32], kek_id):
         raise AuthorizationError("reconstructed KEK does not match vault key id")
     return kek
 
