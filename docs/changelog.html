@@ -57,7 +57,7 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <div class="layout">
 <nav>
   <a class="brand" href="index">QVault</a>
-  <p class="ver">v0.13.3 · prototype</p>
+  <p class="ver">v0.13.4 · prototype</p>
   <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html" class="current">Changelog</a></li></ul>
 </nav>
 <main>
@@ -68,6 +68,18 @@ versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versionin
 <strong>HYPOTHESIS</strong>, <strong>UNKNOWN</strong>. See <code>report/EVIDENCE_POLICY.md</code> for what they mean and what
 they deliberately do not mean.</p>
 <hr />
+<h2 id="0134-2026-11-02">[0.13.4] - 2026-11-02</h2>
+<h3 id="added-a-way-to-ask-whether-the-release-the-remote-and-the-site-agree">Added - a way to ask whether the release, the remote and the site agree</h3>
+<p>v0.13.3 was tagged, then one more commit landed, so the tag pointed a commit behind main while the
+README read as current. Nothing caught it, because every gate runs before the tag exists: the push
+that creates drift is the push the gates cannot see.</p>
+<p><code>tools/release_state.py</code> is the post-release counterpart. It compares local HEAD, the newest tag,
+the newest CI run, the Pages build and the newest published release, and exits non-zero when they
+disagree. It is deliberately not a gate - it needs the network and a pushed tag, so its place is
+after a release, not before a push.</p>
+<h3 id="fixed-releases-existed-only-up-to-v0110">Fixed - releases existed only up to v0.11.0</h3>
+<p><code>v0.13.1</code>, <code>v0.13.2</code> and <code>v0.13.3</code> had tags but no release objects, so <code>/releases</code> stopped at
+v0.11.0 while the site advertised 0.13.x. All three are published from their changelog sections.</p>
 <h2 id="0133-2026-11-02">[0.13.3] - 2026-11-02</h2>
 <h3 id="added-ci-actually-runs">Added - CI actually runs</h3>
 <p>The <code>workflow</code> scope was the missing piece: GitHub refuses workflow files from a token without

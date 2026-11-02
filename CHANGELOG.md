@@ -9,6 +9,24 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.4] - 2026-11-02
+
+### Added - a way to ask whether the release, the remote and the site agree
+
+v0.13.3 was tagged, then one more commit landed, so the tag pointed a commit behind main while the
+README read as current. Nothing caught it, because every gate runs before the tag exists: the push
+that creates drift is the push the gates cannot see.
+
+`tools/release_state.py` is the post-release counterpart. It compares local HEAD, the newest tag,
+the newest CI run, the Pages build and the newest published release, and exits non-zero when they
+disagree. It is deliberately not a gate - it needs the network and a pushed tag, so its place is
+after a release, not before a push.
+
+### Fixed - releases existed only up to v0.11.0
+
+`v0.13.1`, `v0.13.2` and `v0.13.3` had tags but no release objects, so `/releases` stopped at
+v0.11.0 while the site advertised 0.13.x. All three are published from their changelog sections.
+
 ## [0.13.3] - 2026-11-02
 
 ### Added - CI actually runs
