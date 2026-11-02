@@ -73,6 +73,8 @@ PAGES = [
     ("report/THREAT_BEHAVIOR_MATRIX.md", "threat-behavior-matrix.html",
      "Behaviour to control", "Research"),
     ("report/TELEMETRY_MAP.md", "telemetry-map.html", "Telemetry map", "Research"),
+    ("report/THREAT_INTEL.md", "threatintel.html",
+     "Threat intelligence and disruption", "Analysis"),
     ("report/PERSISTENCE.md", "persistence.html", "Persistence detection", "Controls"),
     ("report/FINGERPRINTS.md", "fingerprints.html", "Family fingerprints", "Research"),
     ("SECURITY.md", "security-policy.html", "Security policy", "Assurance"),

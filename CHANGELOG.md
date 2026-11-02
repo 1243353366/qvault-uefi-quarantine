@@ -9,6 +9,31 @@ they deliberately do not mean.
 
 ---
 
+## [Unreleased] - feature/threatintel
+
+### Added - threat intelligence where the doctrine is code
+
+Three questions kept apart: what software is operating, what infrastructure it depends on, how the
+operation finances itself. `qvault/threatintel.py` collects graded observations, computes what they
+support from provenance rather than row count, and refuses the rest.
+
+Enforced rather than documented: collection sources (probe, forced rotation, credential use,
+purchase, wallet interaction, intrusion) are refused on intake and the module has no network code at
+all; per-claim ceilings cap operator, wallet and proxy attribution at HYPOTHESIS, with no identity
+field in the output; four observations derived from one report count once; `disruption_plan` emits
+report/notify/preserve/submit against named channels and refuses any other verb. A package without a
+competing explanation per hypothesis is refused.
+
+Also: `deleted_domains_are_not_enough` reports ledger-pointer dependency, so a domain takedown is not
+mistaken for a fix, and returns UNKNOWN rather than clean when no pointer is seen.
+
+Two self-inflicted bugs found by the tests: a derived observation hashed to its parent's id, so the
+provenance walk followed itself and the test **hung instead of failing** (identity now covers every
+field, and cycles are refused). Twenty-four tests, written from the analyst's side.
+
+Off `main`: naming wallets and channels is a different publication from quarantining firmware, and
+that legal reading should be settled on purpose.
+
 ## [0.13.12] - 2026-11-02
 
 ### Fixed - the two riskiest rows, hardened and re-graded
