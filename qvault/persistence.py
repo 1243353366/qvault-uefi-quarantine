@@ -1,148 +1,80 @@
-"""Windows autostart surface: what an ASEP snapshot shows, and what it cannot.
+"""Autostart persistence as a mechanism-by-mechanism detection matrix.
 
 Source: Daulaguphu, S. "11 Critical Malware Persistence Mechanisms You Should Be Familiar
-With", tech-zealots.com, 7 April 2022.
+With", tech-zealots.com, 7 April 2022 (bibliography 43).
 
-This module is read-only by construction. It contains no code that creates, modifies or
-enables an autostart entry; it takes a declarative snapshot and reports what the snapshot
-shows, what each finding could benignly be, and which control removes the mechanism. The
-defensive inversion of "write to Run" is "read Run and know what belongs there", which is
-what this file does.
+Every mechanism in the source list becomes a descriptor: what it is, where it is seen, what
+its benign twin is, what control removes it, and how to detect it. `assess()` then resolves
+each descriptor to exactly one result class:
 
-Three of the eleven mechanisms are marked not observable from a snapshot at all. Saying so
-is the point: a rootkit, a bootkit and fileless code are listed in the source article and a
-registry read cannot see any of them, so reporting "no entry found" for those would be a
-false clean.
+- ``detected``                 signals were found for this mechanism
+- ``benign``                   present, no signals: consistent with its benign twin
+- ``unknown_not_observable``   no snapshot can see it; the article lists it anyway
+- ``not_observed``             observable, but this snapshot did not contain it
+
+There is no CLEAN class, and ``CLEAN_STATES`` is empty on purpose. "not_observed" and
+"unknown_not_observable" are different states and are never collapsed: one means we did not
+look, the other means looking cannot work.
+
+Read-only by construction: nothing here creates, modifies or enables an autostart entry.
 """
 
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Callable
 
 from . import findings as F
+from . import grading as G
 from . import separation as S
 
 SOURCE = ("Daulaguphu, S. '11 Critical Malware Persistence Mechanisms You Should Be "
           "Familiar With', tech-zealots.com, 7 April 2022")
 
-# --- mechanisms ----------------------------------------------------------------------
+# --- result classes -------------------------------------------------------------------
 
-MECHANISMS: dict[str, dict] = {
-    "run_key": {
-        "title": "Registry Run / RunOnce keys",
-        "location": "HKCU|HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run(Once)",
-        "observable": True,
-        "benign": "installers and updaters legitimately register here; signed vendor paths "
-                  "under Program Files are the normal case",
-        "control": "compare against the golden image's autostart set; alert on new entries "
-                   "in a user-writable path rather than on the key being written at all",
-    },
-    "policies_run": {
-        "title": "Policies\\Explorer\\Run",
-        "location": "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
-        "observable": True,
-        "benign": "group policy login scripts can populate this key by design",
-        "control": "diff against the domain's declared policy; an entry here with no "
-                   "matching GPO is the finding, not the key's mere use",
-    },
-    "startup_folder": {
-        "title": "Startup folders / Shell Folders redirection",
-        "location": "Start Menu\\Programs\\Startup; Explorer\\Shell Folders and "
-                    "User Shell Folders",
-        "observable": True,
-        "benign": "vendors ship startup shortcuts; users add their own",
-        "control": "treat a Shell Folders value pointing at a user-writable directory as "
-                   "the signal, since it relocates every startup shortcut",
-    },
-    "scheduled_task": {
-        "title": "Scheduled tasks",
-        "location": "C:\\Windows\\System32\\Tasks; "
-                    "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree",
-        "observable": True,
-        "benign": "Windows and most agents schedule maintenance tasks; the TaskCache tree "
-                  "is full of legitimate entries on any normal system",
-        "control": "review for hidden flag, SYSTEM principal, and a command in a "
-                   "user-writable path; export task XML rather than reading the cache alone",
-    },
-    "service": {
-        "title": "Services and ServiceDll",
-        "location": "HKLM\\SYSTEM\\CurrentControlSet\\Services; svchost Parameters\\ServiceDll; "
-                    "RunServicesOnce / Run\\Services",
-        "observable": True,
-        "benign": "every driver and most agents are services; ServiceDll is the normal "
-                  "svchost mechanism, not a trick in itself",
-        "control": "check ImagePath and ServiceDll against signed vendor paths; a ServiceDll "
-                   "outside System32 under a shared svchost group is the anomaly",
-    },
-    "boot_execute": {
-        "title": "BootExecute (Session Manager)",
-        "location": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\BootExecute",
-        "observable": True,
-        "benign": "the default is exactly 'autocheck autochk *'; chkdsk schedules can add "
-                  "entries legitimately and temporarily",
-        "control": "record the default and alert on any addition; require a maintenance "
-                   "ticket for a non-default value because normal operation never needs one",
-    },
-    "hive_load": {
-        "title": "Hive loading at boot (smss.exe)",
-        "location": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\hivelist",
-        "observable": True,
-        "benign": "this key describes where hives live for every normal install",
-        "control": "alert on a hive path outside System32\\config, which is how a rogue hive "
-                   "gets loaded before the shell exists",
-    },
-    "bho": {
-        "title": "Browser Helper Objects",
-        "location": "HKLM|HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\"
-                    "Browser Helper Objects",
-        "observable": True,
-        "benign": "toolbars and accessibility add-ons register BHOs deliberately",
-        "control": "enumerate BHO CLSIDs to their InprocServer32 path and require a valid "
-                   "signature; the mechanism is legacy, so new BHOs are rare and notable",
-    },
-    "appinit_dll": {
-        "title": "AppInit_DLLs",
-        "location": "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_DLLs",
-        "observable": True,
-        "benign": "the key exists on every system and is empty; LoadAppInit_DLLs is 0",
-        "control": "treat any populated value with LoadAppInit_DLLs=1 as unexpected; modern "
-                   "Windows ships with this disabled by default",
-    },
-    "dll_search_order": {
-        "title": "DLL search order hijacking",
-        "location": "application directory; PATH; %TEMP%; current working directory",
-        "observable": True,
-        "benign": "portable applications legitimately ship their own DLLs beside the binary",
-        "control": "compare each signed binary's imported DLLs against its install manifest; "
-                   "a same-named DLL in a writable directory beside a signed EXE is the finding",
-    },
-    "rootkit_hiding": {
-        "title": "Rootkit hiding",
-        "location": "kernel; no registry location",
-        "observable": False,
-        "benign": "n/a: not observable from an autostart snapshot",
-        "control": "out-of-band comparison: an offline image read or memory acquisition "
-                   "against a golden reference, since anything a rootkit hides is absent "
-                   "from the very snapshot that would report it",
-    },
-    "bootkit_boot": {
-        "title": "Bootkit in MBR / bootloader",
-        "location": "MBR, VBR, EFI system partition",
-        "observable": False,
-        "benign": "n/a: not observable from an autostart snapshot",
-        "control": "measured boot with a hardware anchor, plus an out-of-band read of the "
-                   "boot chain; see qvault/firmware_integrity.py",
-    },
-    "fileless": {
-        "title": "Fileless execution",
-        "location": "memory only; script host or macro entry point",
-        "observable": False,
-        "benign": "n/a: no autostart artefact by definition",
-        "control": "process ancestry and script-block telemetry at execution time; a "
-                   "post-hoc filesystem snapshot cannot recover what never touched disk",
-    },
-}
+DETECTED = "detected"
+BENIGN = "benign"
+UNKNOWN_NOT_OBSERVABLE = "unknown_not_observable"
+NOT_OBSERVED = "not_observed"
 
-# --- signals -------------------------------------------------------------------------
+RESULT_CLASSES = (DETECTED, BENIGN, UNKNOWN_NOT_OBSERVABLE, NOT_OBSERVED)
+
+#: Deliberately empty. A persistence layer that can return CLEAN is a layer that has
+#: confused "nothing found here" with "nothing here".
+CLEAN_STATES: frozenset[str] = frozenset()
+
+BOOT_EXECUTE_DEFAULT = "autocheck autochk *"
+
+_HIVE_DEFAULT_ROOT = "system32\\config"
+
+
+class PersistenceError(ValueError):
+    """Raised when a snapshot or a descriptor is malformed."""
+
+
+def assert_not_clean(state: str) -> str:
+    """Guard for any code path that might invent a clean verdict for this layer."""
+    if state in CLEAN_STATES or state.upper() == "CLEAN":
+        raise PersistenceError(
+            f"{state!r} is not a state this layer may report; autostart observation "
+            f"cannot establish absence")
+    return state
+
+
+# --- snapshot model -------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class AutostartEntry:
+    """One artefact as observed. Described here, never created here."""
+
+    mechanism: str
+    name: str
+    command: str = ""
+    location: str = ""
+    signed: bool | None = None
+    hidden: bool = False
+
+
+# --- signals --------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Signal:
@@ -154,232 +86,330 @@ class Signal:
 
 SIGNALS: dict[str, Signal] = {
     "user_writable_location": Signal(
-        "user_writable_location",
-        "the payload sits in a directory the user can write to",
+        "user_writable_location", "payload sits in a directory the user can write to",
         "installers run from Downloads; portable apps and updaters live in AppData",
-        "alert on execution from user-writable paths for autostart entries, and keep "
-        "software in Program Files"),
+        "alert on autostart execution from user-writable paths; keep software in "
+        "Program Files"),
     "unsigned_binary": Signal(
-        "unsigned_binary",
-        "the payload carries no valid signature",
-        "in-house tools and freshly compiled binaries are unsigned by design",
-        "require a signature for anything registered as an autostart entry; allowlist the "
-        "exceptions explicitly rather than tolerating unsigned by default"),
+        "unsigned_binary", "payload carries no valid signature",
+        "in-house tools and fresh builds are unsigned by design",
+        "require a signature for autostart registration; allowlist exceptions explicitly"),
     "lolbin_proxy": Signal(
-        "lolbin_proxy",
-        "the entry launches a system binary rather than the payload directly",
-        "some legitimate installers use rundll32 for DLL entry points",
-        "record the full command line for system-binary launches; a proxy with a "
-        "user-writable argument is the finding"),
+        "lolbin_proxy", "a system binary launches on behalf of the entry",
+        "some installers use rundll32 for a DLL entry point",
+        "record the full command line for system-binary launches"),
     "encoded_command": Signal(
-        "encoded_command",
-        "the command line carries an encoded or obfuscated blob",
-        "rare legitimate deployment scripts encode arguments to survive quoting",
-        "treat encoded autostart command lines as requiring review; log the decoded text "
-        "rather than the blob"),
+        "encoded_command", "command line carries an encoded blob",
+        "deployment scripts occasionally encode arguments to survive quoting",
+        "treat encoded autostart command lines as review-required; log decoded text"),
     "hidden_task": Signal(
-        "hidden_task",
-        "the scheduled task is flagged hidden",
-        "some vendor agents hide their maintenance tasks from the console",
-        "enumerate tasks by XML export, which surfaces the hidden flag and the principal"),
+        "hidden_task", "scheduled task is flagged hidden",
+        "some vendor agents hide maintenance tasks from the console",
+        "enumerate tasks by XML export, which surfaces the flag and principal"),
     "service_outside_system32": Signal(
-        "service_outside_system32",
-        "a service binary or ServiceDll sits outside System32",
-        "third-party services are normally under Program Files",
-        "require signature and path for every service; alert when a shared svchost host "
-        "loads a ServiceDll from outside System32"),
+        "service_outside_system32", "service binary or ServiceDll outside System32",
+        "third-party services normally live under Program Files",
+        "require signature and path for every service; alert on ServiceDll outside "
+        "System32 in a shared svchost host"),
     "boot_execute_nonstandard": Signal(
-        "boot_execute_nonstandard",
-        "BootExecute carries an entry beyond the default",
-        "chkdsk and some storage drivers schedule boot-time scans deliberately",
-        "record the default value per image and alert on any addition; a boot-time "
-        "modification is invisible to the running OS if it is malicious"),
+        "boot_execute_nonstandard", "BootExecute is not the default value",
+        "chkdsk and storage drivers schedule boot-time scans deliberately",
+        "record the default per image and alert on any addition"),
     "hive_from_writable_path": Signal(
-        "hive_from_writable_path",
-        "a hive is loaded from outside System32\\config",
-        "some backup agents mount user hives for indexing",
-        "alert on hivelist paths outside System32\\config; a rogue hive loads before the "
-        "shell exists"),
+        "hive_from_writable_path", "a hive loads from outside System32\\config",
+        "backup agents mount user hives for indexing",
+        "alert on hivelist paths outside System32\\config"),
     "appinit_populated": Signal(
-        "appinit_populated",
-        "AppInit_DLLs is populated with loading enabled",
+        "appinit_populated", "AppInit_DLLs is populated with loading enabled",
         "legacy accessibility and IME components used this mechanism",
-        "treat as unexpected on modern Windows; it injects into every user32 process"),
+        "treat as unexpected: it injects into every user32 process"),
     "dll_shadowing": Signal(
-        "dll_shadowing",
-        "a same-named DLL sits in a writable directory ahead of the legitimate one",
-        "portable apps ship their own DLLs next to the binary",
-        "compare against the install manifest and prefer full-path or signed DLL loading"),
+        "dll_shadowing", "same-named DLL sits ahead of the legitimate one",
+        "portable apps ship their own DLLs beside the binary",
+        "compare against the install manifest; prefer full-path or signed loading"),
 }
-
-# --- snapshot model ------------------------------------------------------------------
-
-#: What each collection basis is worth. Reading a live host through itself is a self
-#: report: it cannot support a graded persistence finding, which is the host trust gap
-#: applied here rather than restated.
-BASIS_CLASSES: dict[str, tuple[str, ...]] = {
-    "synthetic": (S.SELF_REPORT,),
-    "live_host": (S.SELF_REPORT,),
-    "offline_image": (S.INDEPENDENT_MEASUREMENT,),
-    "attested_image": (S.INDEPENDENT_MEASUREMENT, S.HARDWARE_ANCHOR),
-}
-
-
-class PersistenceError(ValueError):
-    """Raised when a snapshot or a catalogue entry is malformed."""
-
-
-@dataclass(frozen=True)
-class AutostartEntry:
-    """One autostart artefact as observed. Never created here, only described."""
-
-    mechanism: str
-    name: str
-    command: str = ""
-    location: str = ""
-    signed: bool | None = None
-    hidden: bool = False
-
-
-_USER_WRITABLE = re.compile(
-    r"(\\AppData\\|\\Temp\\|\\Downloads\\|\\Users\\Public\\|\\ProgramData\\|"
-    r"\\Windows\\Temp\\|%temp%|%appdata%)", re.IGNORECASE)
-#: The only normal value. An extra entry appended to it still contains the default text,
-#: so the check is equality after whitespace normalisation, not a substring test.
-BOOT_EXECUTE_DEFAULT = "autocheck autochk *"
 
 _LOLBINS = ("rundll32", "regsvr32", "mshta", "powershell", "pwsh", "wscript", "cscript",
-            "certutil", "msiexec", "cmd.exe")
-_ENCODED = re.compile(r"(-enc(odedcommand)?\b|-e\s+[A-Za-z0-9+/=]{40,}|\bfrombase64string)", re.IGNORECASE)
+            "certutil", "msiexec")
+_ENCODED_HINT = ("-enc", "-encodedcommand", "frombase64string")
+_WRITABLE_HINTS = ("\\appdata\\", "\\temp\\", "\\downloads\\", "\\users\\public\\",
+                   "\\programdata\\", "%temp%", "%appdata%")
 
 
-def _signals_for(entry: AutostartEntry) -> list[str]:
+# --- detection predicates --------------------------------------------------------------
+#
+# A predicate is the mechanism's detection check. It is a function of one observed entry
+# and returns the signal ids it found. Keeping them separate from the descriptor table is
+# what makes "what it is" and "how we see it" reviewable in one place.
+
+def _generic(entry: AutostartEntry) -> tuple[str, ...]:
     found: list[str] = []
-    command = entry.command or ""
-    if _USER_WRITABLE.search(command) or _USER_WRITABLE.search(entry.location or ""):
+    text = f"{entry.command} {entry.location}".lower()
+    if any(hint in text for hint in _WRITABLE_HINTS):
         found.append("user_writable_location")
     if entry.signed is False:
         found.append("unsigned_binary")
-    if any(bin_name in command.lower() for bin_name in _LOLBINS):
+    if any(b in entry.command.lower() for b in _LOLBINS):
         found.append("lolbin_proxy")
-    if _ENCODED.search(command):
+    if any(hint in entry.command.lower() for hint in _ENCODED_HINT):
         found.append("encoded_command")
     if entry.hidden:
         found.append("hidden_task")
-    if entry.mechanism == "service" and command and "system32" not in command.lower():
+    return tuple(found)
+
+
+def _service(entry: AutostartEntry) -> tuple[str, ...]:
+    found = list(_generic(entry))
+    if entry.command and "system32" not in entry.command.lower():
         found.append("service_outside_system32")
-    if entry.mechanism == "boot_execute":
-        if " ".join(command.lower().split()) != BOOT_EXECUTE_DEFAULT:
-            found.append("boot_execute_nonstandard")
-    if entry.mechanism == "hive_load" and "system32\\config" not in (entry.location or "").lower():
+    return tuple(found)
+
+
+def _boot_execute(entry: AutostartEntry) -> tuple[str, ...]:
+    """Exact comparison, after whitespace normalisation.
+
+    A payload appended to the default keeps the default as a substring, so a containment
+    test passes it. Equality is what "has any value beyond the default" means.
+    """
+    normalised = " ".join(entry.command.lower().split())
+    return ("boot_execute_nonstandard",) if normalised != BOOT_EXECUTE_DEFAULT else ()
+
+
+def _hive(entry: AutostartEntry) -> tuple[str, ...]:
+    found = list(_generic(entry))
+    if _HIVE_DEFAULT_ROOT not in f"{entry.location} {entry.command}".lower():
         found.append("hive_from_writable_path")
-    if entry.mechanism == "appinit_dll" and command.strip():
+    return tuple(found)
+
+
+def _appinit(entry: AutostartEntry) -> tuple[str, ...]:
+    found = list(_generic(entry))
+    if entry.command.strip():
         found.append("appinit_populated")
-    return found
+    return tuple(found)
 
 
-def _ceiling_for(basis: str | tuple[str, ...]) -> str | None:
-    classes = BASIS_CLASSES[basis] if isinstance(basis, str) else tuple(basis)
-    return S.grade_ceiling(classes)
+def _dll_search_order(entry: AutostartEntry) -> tuple[str, ...]:
+    found = list(_generic(entry))
+    if any(hint in f"{entry.command} {entry.location}".lower() for hint in _WRITABLE_HINTS):
+        found.append("dll_shadowing")
+    return tuple(found)
 
 
-def assess(entries, *, basis: str = "synthetic",
-           scope: str = S.SYNTHETIC, isolated: bool = False,
-           attested: bool = False) -> dict:
-    """Grade the observable footprint of each entry, and state the coverage honestly."""
-    if basis not in BASIS_CLASSES:
-        raise PersistenceError(f"unknown basis {basis!r}; known: {sorted(BASIS_CLASSES)}")
-    S.assert_scope(scope, isolated=isolated, attested=attested)
+# --- mechanism descriptors --------------------------------------------------------------
 
-    ceiling = _ceiling_for(basis)
-    observations, seen = [], set()
-
-    for entry in entries:
-        if entry.mechanism not in MECHANISMS:
-            raise PersistenceError(f"unknown mechanism {entry.mechanism!r}")
-        meta = MECHANISMS[entry.mechanism]
-        seen.add(entry.mechanism)
-
-        if not meta["observable"]:
-            observations.append({
-                "mechanism": entry.mechanism, "name": entry.name, "grade": F.UNKNOWN,
-                "signals": [], "observable": False,
-                "statement": (
-                    f"{meta['title']} is not observable from an autostart snapshot; this "
-                    f"entry cannot be confirmed or excluded here"),
-                "benign": meta["benign"], "control": meta["control"],
-            })
-            continue
-
-        signals = _signals_for(entry)
-        if not signals:
-            grade = F.UNKNOWN
-            statement = ("no anomaly signals; this is consistent with legitimate software "
-                         "and is not evidence of anything")
-        else:
-            proposed = F.HYPOTHESIS if len(signals) == 1 else F.INFERRED
-            if ceiling is None:
-                grade = F.UNKNOWN
-                statement = (
-                    f"{len(signals)} signal(s) seen, but a {basis} read cannot support a "
-                    f"persistence finding: the subject reported its own state")
-            else:
-                grade = S.cap_grade(proposed, ceiling)
-                statement = (f"{len(signals)} signal(s) under a {basis} basis "
-                             f"(ceiling {ceiling})")
-
-        observations.append({
-            "mechanism": entry.mechanism, "name": entry.name, "grade": grade,
-            "signals": signals, "observable": True, "statement": statement,
-            "benign": [SIGNALS[s].benign for s in signals] or [meta["benign"]],
-            "hostile_when": ("weighed together with an out-of-band reference: signals "
-                             "alone describe a shape, not an actor"),
-            "control": meta["control"],
-        })
-
-    return {
-        "basis": basis,
-        "ceiling": ceiling,
-        "observations": sorted(observations, key=lambda o: (o["mechanism"], o["name"])),
-        "coverage": coverage(seen),
-    }
+@dataclass(frozen=True)
+class Mechanism:
+    id: str
+    name: str
+    observable_path: str
+    benign_default: str
+    control: str
+    predicate: Callable[[AutostartEntry], tuple[str, ...]] | None
+    observable: bool = True
 
 
-def coverage(seen: set[str]) -> dict:
-    """What this snapshot did and did not look at. Absence is never reported as clean."""
-    return {
-        "observed": sorted(m for m in MECHANISMS if m in seen),
-        "not_observed": sorted(m for m, v in MECHANISMS.items()
-                               if v["observable"] and m not in seen),
-        "not_observable": sorted(m for m, v in MECHANISMS.items() if not v["observable"]),
-        "statement": ("a mechanism that was not observed was not thereby shown to be "
-                      "absent; only the locations actually read are covered"),
-    }
+def _m(*args, **kwargs) -> Mechanism:
+    mech = Mechanism(*args, **kwargs)
+    if mech.observable and mech.predicate is None:
+        raise PersistenceError(f"mechanism {mech.id} is observable but has no predicate")
+    if not mech.observable and mech.predicate is not None:
+        raise PersistenceError(f"mechanism {mech.id} is not observable but has a predicate")
+    return mech
 
 
-def summarise(result: dict) -> dict:
-    grades: dict[str, int] = {}
-    for observation in result["observations"]:
-        grades[observation["grade"]] = grades.get(observation["grade"], 0) + 1
-    return {
-        "basis": result["basis"], "ceiling": result["ceiling"],
-        "by_grade": dict(sorted(grades.items())),
-        "entries": len(result["observations"]),
-        "never_claim_clean": True,
-    }
+_NOTHING_VISIBLE = "not observable from an autostart snapshot"
+_NOT_APPLICABLE = "n/a: no autostart artefact exists to compare against"
+
+MECHANISMS: dict[str, Mechanism] = {
+    m.id: m for m in (
+        _m("run_key", "Registry Run / RunOnce keys",
+           "HKCU|HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run(Once)",
+           "installers and updaters register here; signed vendor paths are the normal case",
+           "compare against the golden image's autostart set and alert on new entries in a "
+           "user-writable path, not on the key being written at all", _generic),
+        _m("policies_run", "Policies\\Explorer\\Run",
+           "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
+           "group policy login scripts populate this key by design",
+           "diff against the domain's declared policy; an entry with no matching GPO is "
+           "the finding", _generic),
+        _m("startup_folder", "Startup folders / Shell Folders redirection",
+           "Start Menu\\Programs\\Startup; Explorer\\Shell Folders and User Shell Folders",
+           "vendors ship startup shortcuts; users add their own",
+           "treat a Shell Folders value pointing at a user-writable directory as the "
+           "signal, since it relocates every startup shortcut", _generic),
+        _m("scheduled_task", "Scheduled tasks",
+           "C:\\Windows\\System32\\Tasks; Schedule\\TaskCache\\Tree",
+           "Windows and most agents schedule maintenance tasks",
+           "review for hidden flag, SYSTEM principal and a writable command; export task "
+           "XML rather than reading the cache alone", _generic),
+        _m("service", "Services and ServiceDll",
+           "CurrentControlSet\\Services; svchost Parameters\\ServiceDll",
+           "every driver and most agents are services; ServiceDll is how svchost works",
+           "require signature and path per service; a ServiceDll outside System32 in a "
+           "shared svchost host is the anomaly", _service),
+        _m("boot_execute", "BootExecute (Session Manager)",
+           "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\BootExecute",
+           "the default is exactly 'autocheck autochk *'; chkdsk schedules add entries "
+           "legitimately and temporarily",
+           "record the default per image and alert on any addition; boot-time changes are "
+           "invisible to the running OS if malicious", _boot_execute),
+        _m("hive_load", "Hive loading at boot (smss.exe)",
+           "HKLM\\SYSTEM\\CurrentControlSet\\Control\\hivelist",
+           "this key describes where hives live for every normal install",
+           "alert on a hive path outside System32\\config, which is how a rogue hive loads "
+           "before the shell exists", _hive),
+        _m("bho", "Browser Helper Objects",
+           "Explorer\\Browser Helper Objects",
+           "toolbars and accessibility add-ons register BHOs deliberately",
+           "enumerate BHO CLSIDs to InprocServer32 and require a valid signature", _generic),
+        _m("appinit_dll", "AppInit_DLLs",
+           "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_DLLs",
+           "the key exists on every system and is empty; LoadAppInit_DLLs is 0",
+           "treat a populated value with loading enabled as unexpected; modern Windows "
+           "ships this disabled", _appinit),
+        _m("dll_search_order", "DLL search order hijacking",
+           "application directory; PATH; %TEMP%; current working directory",
+           "portable applications ship their own DLLs beside the binary",
+           "compare a signed binary's imports against its install manifest; a same-named "
+           "DLL in a writable directory is the finding", _dll_search_order),
+        _m("rootkit_hiding", "Rootkit hiding", _NOTHING_VISIBLE, _NOT_APPLICABLE,
+           "out-of-band comparison: an offline image read or memory acquisition against a "
+           "golden reference, since what a rootkit hides is absent from the snapshot that "
+           "would report it", None, observable=False),
+        _m("bootkit_boot", "Bootkit in MBR / bootloader", _NOTHING_VISIBLE, _NOT_APPLICABLE,
+           "measured boot with a hardware anchor plus an out-of-band read of the boot "
+           "chain; see qvault/firmware_integrity.py", None, observable=False),
+        _m("fileless", "Fileless execution", _NOTHING_VISIBLE, _NOT_APPLICABLE,
+           "process ancestry and script-block telemetry at execution time; a post-hoc "
+           "filesystem snapshot cannot recover what never touched disk", None,
+           observable=False),
+    )
+}
 
 
 def assert_catalogue_integrity() -> None:
-    """Every mechanism states a source-derived control and a benign twin, or it is out."""
-    for key, meta in MECHANISMS.items():
-        for required in ("title", "location", "observable", "benign", "control"):
-            if required not in meta:
-                raise PersistenceError(f"mechanism {key} is missing {required}")
-        if meta["observable"] and not meta["benign"]:
-            raise PersistenceError(f"mechanism {key} has no benign explanation")
+    """Every descriptor is complete, and result classes contain no clean verdict."""
+    for mechanism in MECHANISMS.values():
+        for field_name in ("id", "name", "observable_path", "benign_default", "control"):
+            if not getattr(mechanism, field_name):
+                raise PersistenceError(f"mechanism {mechanism.id} has no {field_name}")
+        if mechanism.id != mechanism.id.strip():
+            raise PersistenceError(f"mechanism id {mechanism.id!r} has whitespace")
+    for state in RESULT_CLASSES:
+        assert_not_clean(state)
+    if RESULT_CLASSES.count(NOT_OBSERVED) != 1:
+        raise PersistenceError("not_observed must be exactly one state")
     for key, signal in SIGNALS.items():
         if not (signal.benign and signal.control):
             raise PersistenceError(f"signal {key} lacks a benign reading or a control")
 
 
 assert_catalogue_integrity()
+
+
+# --- assessment -----------------------------------------------------------------------
+
+def _group(entries) -> dict[str, list[AutostartEntry]]:
+    grouped: dict[str, list[AutostartEntry]] = {}
+    for entry in entries:
+        if entry.mechanism not in MECHANISMS:
+            # Coarse: the error names what was asked for, never what exists.
+            raise PersistenceError("unknown mechanism requested")
+        grouped.setdefault(entry.mechanism, []).append(entry)
+    return grouped
+
+
+def assess(entries, *, basis: str = "synthetic", attestation_state: str = "absent",
+           scope: str = S.SYNTHETIC, isolated: bool = False,
+           attested: bool = False) -> dict:
+    """Resolve every mechanism to one result class. One row per mechanism, always."""
+    S.assert_scope(scope, isolated=isolated, attested=attested)
+    limit = G.ceiling(basis, attestation_state)      # validates basis and state
+    grouped = _group(entries)
+
+    matrix = []
+    for mechanism in sorted(MECHANISMS.values(), key=lambda m: m.id):
+        row = {
+            "mechanism": mechanism.id,
+            "name": mechanism.name,
+            "observable": mechanism.observable,
+            "benign_default": mechanism.benign_default,
+            "control": mechanism.control,
+        }
+        if not mechanism.observable:
+            row.update({
+                "result": UNKNOWN_NOT_OBSERVABLE, "grade": F.UNKNOWN, "signals": [],
+                "entries": len(grouped.get(mechanism.id, [])),
+                "benign_readings": [mechanism.benign_default],
+                "statement": (f"{mechanism.name} leaves no autostart artefact; this "
+                              f"snapshot cannot confirm or exclude it"),
+            })
+            matrix.append(row)
+            continue
+
+        seen = grouped.get(mechanism.id, [])
+        if not seen:
+            row.update({
+                "result": NOT_OBSERVED, "grade": F.UNKNOWN, "signals": [], "entries": 0,
+                "benign_readings": [mechanism.benign_default],
+                "statement": ("this snapshot contained no entry for this mechanism; that "
+                              "is not evidence it is absent"),
+            })
+            matrix.append(row)
+            continue
+
+        signals = sorted({s for entry in seen for s in mechanism.predicate(entry)})
+        detail = G.explain(basis=basis, signal_count=len(signals),
+                           attestation_state=attestation_state)
+        row.update({
+            "result": DETECTED if signals else BENIGN,
+            "grade": detail["grade"],
+            "signals": signals,
+            "entries": len(seen),
+            "statement": (detail["reason"] if signals else
+                          "present with no anomaly signals; consistent with its benign twin"),
+            "benign_readings": [SIGNALS[s].benign for s in signals] or
+                               [mechanism.benign_default],
+        })
+        matrix.append(row)
+
+    return {
+        "basis": basis,
+        "attestation_state": attestation_state,
+        "ceiling": limit,
+        "matrix": matrix,
+        "coverage": coverage(grouped.keys()),
+        "result_classes": RESULT_CLASSES,
+        "clean_state_available": False,
+    }
+
+
+def coverage(seen) -> dict:
+    """Three states, never collapsed: observed, not observed, not observable."""
+    seen = set(seen)
+    return {
+        "observed": sorted(m for m, d in MECHANISMS.items() if d.observable and m in seen),
+        "not_observed": sorted(m for m, d in MECHANISMS.items()
+                               if d.observable and m not in seen),
+        "not_observable": sorted(m for m, d in MECHANISMS.items() if not d.observable),
+        "statement": ("a mechanism that was not observed was not thereby shown to be "
+                      "absent; only the locations actually read are covered"),
+    }
+
+
+def summarise(result: dict) -> dict:
+    by_result: dict[str, int] = {}
+    by_grade: dict[str, int] = {}
+    for row in result["matrix"]:
+        by_result[row["result"]] = by_result.get(row["result"], 0) + 1
+        by_grade[row["grade"]] = by_grade.get(row["grade"], 0) + 1
+    return {
+        "basis": result["basis"],
+        "attestation_state": result["attestation_state"],
+        "ceiling": result["ceiling"],
+        "by_result": dict(sorted(by_result.items())),
+        "by_grade": dict(sorted(by_grade.items())),
+        "mechanisms": len(result["matrix"]),
+        "clean_state_available": result["clean_state_available"],
+    }

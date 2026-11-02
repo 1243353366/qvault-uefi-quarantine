@@ -37,16 +37,46 @@ rootkit, measured boot with a hardware anchor for a bootkit (`firmware_integrity
 execution-time ancestry telemetry for fileless code. None of these are achievable after the
 fact on a dead image.
 
+## The matrix: four result classes, one row per mechanism
+
+`assess()` always returns one row per mechanism descriptor, whatever the snapshot contained.
+The row's `result` is exactly one of:
+
+| Result | Meaning |
+|--------|---------|
+| `detected` | signals were found for this mechanism; graded by the collection basis |
+| `benign` | present, no anomaly signals: consistent with its benign twin, not proven safe |
+| `unknown_not_observable` | no snapshot can see it; the article lists it anyway |
+| `not_observed` | observable, but this snapshot held no entry for it |
+
+There is no `CLEAN`. `CLEAN_STATES` is an empty frozenset and `assert_not_clean()` raises if
+any code path tries to invent one. `not_observed` and `unknown_not_observable` are separate
+strings, separate counts, and never merged: one means we did not look, the other means
+looking cannot work.
+
+Every row carries the same keys regardless of its result, because a key that appears only
+when an entry existed would be a shape oracle about the snapshot.
+
 ## Grading
 
-Findings are graded by the collection basis, not by how suspicious the entry looks:
+Grading lives in `qvault/grading.py`, which is the only path this layer uses. It takes a
+basis, a signal count and an attestation state, and returns a grade that cannot exceed what
+the collection method supports. The ceiling is derived from the evidence-class table in
+`separation.py`, so it moves automatically if a class is ever strengthened, rather than being
+asserted here.
 
 | Basis | Evidence class | Ceiling |
 |-------|----------------|---------|
 | `synthetic` | self_report | none: no graded finding |
 | `live_host` | self_report | none: the subject reported its own state |
 | `offline_image` | independent_measurement | CORROBORATED |
-| `attested_image` | independent + hardware anchor | CONFIRMED |
+| `attested_image`, attestation verified | independent + hardware anchor | CONFIRMED |
+| `attested_image`, attestation absent or unknown | independent only | CORROBORATED |
+
+Signal count proposes the grade: none is `UNKNOWN`, one is `HYPOTHESIS`, two or more are
+`INFERRED`. The ceiling caps it and never lifts it, so two signals from an attested image are
+still `INFERRED`, not `CONFIRMED`. An attestation that did not verify is downgraded to the
+offline ceiling before it is used for anything.
 
 One signal proposes `HYPOTHESIS`, two or more propose `INFERRED`, and the ceiling caps the
 result. A live registry read is a self-report and yields no graded finding at all, which is

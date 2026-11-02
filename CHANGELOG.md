@@ -165,6 +165,45 @@ whitespace normalisation, which is what "has any value beyond the default" actua
 
 30 tests in `test_persistence.py` (635 total).
 
+### Changed - persistence is a detection matrix, not a flag
+
+Restructured against the contract the source article implies, rather than a generic
+"autostart observed" boolean:
+
+- **Descriptors.** Each mechanism is a `Mechanism(id, name, observable_path,
+  benign_default, control, predicate, observable)`. `_m()` validates at construction that an
+  observable mechanism has a predicate and an unobservable one does not, so a descriptor
+  cannot claim detection it does not perform.
+- **Four result classes.** `detected`, `benign`, `unknown_not_observable`, `not_observed`.
+  One row per mechanism is returned for every snapshot, including mechanisms the snapshot
+  never mentioned.
+- **No clean state.** `CLEAN_STATES` is empty, `assert_not_clean()` raises on any attempt to
+  report one, and `summarise()` carries `clean_state_available: False`.
+- **Reviewable detection.** Predicates are separate, named functions (`_boot_execute`,
+  `_service`, `_hive`, `_appinit`, `_dll_search_order`) beside the descriptor table that
+  says what each mechanism is and what removes it.
+- **Row shape is constant.** Every matrix row carries the same keys whatever its result;
+  the earlier version only added `benign_readings` when an entry existed, which was a shape
+  oracle about the snapshot.
+
+### Added - `qvault/grading.py`, a public grade API
+
+`cap_grade(basis=..., signal_count=..., attestation_state=...)` plus `explain()` for the
+reasoning. The persistence layer no longer touches `separation._RANK` and no longer computes
+ceilings itself; a test asserts the module source contains neither `_RANK` nor
+`grade_ceiling`. Ceilings are derived from the evidence-class table, and an `attested_image`
+whose attestation did not verify is downgraded to the offline ceiling before use.
+
+### Added - ledger contract test
+
+Two mistakes were made while writing the previous commit: a URL in the numeric bibliography
+column, and a ninth column that shifted `tag` and `verification` out of place. Both were
+repaired in the data, and `test_the_claims_ledger_obeys_its_own_contract` now asserts the
+header width, every row width, the tag and verification vocabularies, and a numeric-or-n/a
+bibliography for independently verified rows.
+
+40 tests in `test_persistence.py` (645 total).
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.
