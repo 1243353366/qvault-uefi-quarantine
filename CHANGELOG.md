@@ -57,6 +57,28 @@ it refuses to say.
   architectural, and which are deployment properties. Assumption A1 (the principal's detail
   grant is not authenticated here) is stated rather than papered over.
 
+### Fixed - the gaps in the modules that make the claims
+
+- **firmware_integrity**: `grade_for` promoted any anchor with two independent sources
+  straight to `CONFIRMED`. Firmware that measured itself, measured twice, came out
+  confirmed. Promotion is now capped by the anchor's evidence class:
+  `pre_os_measured` stays `HYPOTHESIS` at fifty sources, `oob_flash_read` caps at
+  `CORROBORATED`, `os_mediated` stays `UNKNOWN`. Every anchor declares a class.
+- **store**: durability is declared, never guessed. `storage_class` reads
+  `storage.json` or `QVAULT_STORAGE_CLASS`, defaults to `not_worm`, and refuses an
+  unrecognised value rather than treating it as durable. `custody_summary` reports
+  whether an append-only claim is supported and why not.
+- **retrieve**: approvals are checked before the envelope is touched. Reading the envelope
+  first made "no such object" distinguishable from "not approved", so anyone holding an
+  object id could enumerate the vault without an approval. Both now return the same
+  refusal, proven by a test that fails if the envelope is read early.
+- **separation**: `certify_host` is granted to verification only and refused to
+  acquisition, analysis and storage; `claim_custody` belongs to analysis and storage and
+  not to verification. The duty matrix now covers the certification actions, so `may()`
+  answers for them.
+
+18 tests in `test_module_trust.py`, 554 in total.
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.

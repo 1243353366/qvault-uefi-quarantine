@@ -58,22 +58,26 @@ ROLES = (ACQUISITION, ANALYSIS, STORAGE, VERIFICATION)
 DUTIES: dict[str, dict] = {
     ACQUISITION: {
         "may": ["read_artifact", "emit_provenance", "seal_original"],
-        "must_not": ["grade_finding", "attest_own_coverage", "certify_own_integrity"],
+        "must_not": ["grade_finding", "attest_own_coverage", "certify_own_integrity",
+                     "certify_host", "claim_custody"],
     },
     ANALYSIS: {
-        "may": ["parse_artifact", "emit_observation", "emit_finding", "correlate"],
+        "may": ["parse_artifact", "emit_observation", "emit_finding", "correlate",
+                "claim_custody"],
         "must_not": ["write_original", "certify_own_integrity", "attest_own_version",
-                     "clear_own_audit_entry"],
+                     "clear_own_audit_entry", "certify_host"],
     },
     STORAGE: {
-        "may": ["hold_original", "hold_envelope", "append_audit", "read_manifest"],
+        "may": ["hold_original", "hold_envelope", "append_audit", "read_manifest",
+                "claim_custody"],
         "must_not": ["grade_finding", "certify_own_integrity",
-                     "attest_own_integrity", "rewrite_history"],
+                     "attest_own_integrity", "rewrite_history", "certify_host"],
     },
     VERIFICATION: {
-        "may": ["measure_artifact", "check_manifest", "verify_audit_chain", "attest"],
+        "may": ["measure_artifact", "check_manifest", "verify_audit_chain", "attest",
+                "certify_host"],
         "must_not": ["parse_artifact", "grade_finding", "modify_original",
-                     "certify_own_integrity"],
+                     "certify_own_integrity", "claim_custody"],
     },
 }
 

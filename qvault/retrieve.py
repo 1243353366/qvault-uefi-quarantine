@@ -143,10 +143,9 @@ def retrieve(
         raise AuthorizationError("requester is required")
     if isinstance(approvals_required, bool) or not isinstance(approvals_required, int) or approvals_required < 1:
         raise AuthorizationError("approvals_required must be a positive integer")
-    env = store.get_envelope(paths, object_id)
-    if env.get("state") != "sealed":
-        raise AuthorizationError(f"object state is {env.get('state')!r}, not sealed")
-
+    # Approvals are checked before the envelope is touched. Reading the envelope first
+    # made "no such object" distinguishable from "not approved", which lets anyone holding
+    # an object id enumerate the vault without an approval. Same answer either way now.
     approvals = load_approvals(paths, object_id)
     distinct = [a for a in approvals if a != requester]
     if len(distinct) < approvals_required:
@@ -154,6 +153,10 @@ def retrieve(
             f"dual control not satisfied: {len(distinct)} of {approvals_required} "
             "independent approvals (requester cannot approve)"
         )
+
+    env = store.get_envelope(paths, object_id)
+    if env.get("state") != "sealed":
+        raise AuthorizationError(f"object state is {env.get('state')!r}, not sealed")
 
     kek = rebuild_kek(shares, threshold, env["kek_id"])
 

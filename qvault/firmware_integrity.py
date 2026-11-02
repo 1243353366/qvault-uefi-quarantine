@@ -53,6 +53,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import findings as F
+from . import separation as S
 
 # --- verdicts -------------------------------------------------------------
 
@@ -147,14 +148,40 @@ def admits(name: str) -> bool:
     return name not in INADMISSIBLE_ANCHORS and bool(ANCHORS[name].establishes)
 
 
+#: Evidence class each anchor is. Repetition of one class is not a stronger class, so
+#: two self-measurements are still a self-measurement, however independently collected.
+EVIDENCE_CLASS_BY_ANCHOR: dict[str, str] = {
+    "os_mediated": S.SELF_REPORT,
+    "pre_os_measured": S.PEER_CLAIM,
+    "tpm_quote": S.INDEPENDENT_MEASUREMENT,
+    "hardware_boot_rom": S.INDEPENDENT_MEASUREMENT,
+    "oob_flash_read": S.INDEPENDENT_MEASUREMENT,
+}
+
+_RANK = {grade: i for i, grade in enumerate(reversed(F.GRADES))}
+
+
+def evidence_class_for(name: str) -> str:
+    anchor_rank(name)  # validates the anchor name
+    return EVIDENCE_CLASS_BY_ANCHOR[name]
+
+
 def grade_for(name: str, *, independent_sources: int = 1) -> str:
-    """Evidence grade an anchor can support, before read-equivalence penalties."""
+    """Evidence grade an anchor can support, before read-equivalence penalties.
+
+    Two independent sources can raise a grade, but never above the ceiling of the evidence
+    class they belong to. Firmware measuring itself twice is corroboration of a
+    self-report, not a confirmed finding.
+    """
     anchor = ANCHORS[name]
     if name in INADMISSIBLE_ANCHORS:
         return F.UNKNOWN
+    graded = anchor.grade
     if independent_sources >= 2 and anchor.grade in (F.INFERRED, F.CORROBORATED):
-        return F.CONFIRMED
-    return anchor.grade
+        ceiling = S.grade_ceiling([evidence_class_for(name)])
+        if ceiling is not None and _RANK[ceiling] > _RANK[graded]:
+            graded = ceiling
+    return graded
 
 
 @dataclass(frozen=True)
