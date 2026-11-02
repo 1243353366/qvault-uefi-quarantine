@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware test backlog · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html" class="current">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="unanswered-questions-that-require-hardware-testing">Unanswered questions that require hardware testing</h1>
+<p>Everything below cannot be settled by reading, by static analysis, or in a VM.
+Each entry states why hardware is required, what rig answers it, the cheapest
+experiment, and what result would confirm or refute the current assumption.</p>
+<p>These are the questions where this project is currently guessing. They are listed
+in the order that would most improve defensive decisions.</p>
+<p><strong>Safety constraints for every experiment here</strong></p>
+<ul>
+<li>Bench hardware only. Never a production machine, never a machine with data you
+  care about, never one holding credentials.</li>
+<li>Work only from stock vendor images obtained from the OEM. No experimental
+  firmware implants, no modified boot chains for persistence. Two questions below
+  would classically have required manufacturing a malicious module; both have an
+  observational substitute, noted inline, and the substitute is what is specified.</li>
+<li>Full external flash backup before the first power-on, and a verified restore
+  procedure, or the board is a write-off.</li>
+<li>Assume any SPI write may brick the board. Cost it before starting.</li>
+</ul>
+<hr />
+<h2 id="h1-does-a-full-region-firmware-update-actually-remove-an-unexpected-ffs-file">H1. Does a full-region firmware update actually remove an unexpected FFS file?</h2>
+<p><strong>Why documents cannot answer it.</strong> Vendor release notes describe features, not
+region coverage. Whether a capsule rewrites the entire BIOS region or preserves
+sectors is an implementation detail that differs per OEM and per update mechanism.</p>
+<p><strong>Rig.</strong> Two identical boards of one model with a known SPI-writeable path, a
+hardware SPI programmer with a clip, the OEM's latest capsule, and a way to flash
+a modified image that is not the running OS (programmer is fine).</p>
+<p><strong>Experiment.</strong> <em>(Observational substitute for implant testing.)</em> Read the flash
+and hash it per region and per FFS file. Apply the OEM capsule through the OEM's
+own update path. Read the flash again and diff. Then answer the real question:
+does the byte range the capsule touched cover the free space at the end of each
+DXE volume, where a foreign module would sit?</p>
+<p><strong>Confirm / refute.</strong> Confirms "a full-region update removes it" only if the whole
+BIOS region's free space is rewritten. Refutes the current claim if the capsule
+writes only changed files, leaving volume slack untouched.</p>
+<p><strong>Effort.</strong> 1 day per model. Directly decides whether "update the firmware" is
+remediation or theatre. This is the single most decision-relevant experiment here.</p>
+<hr />
+<h2 id="h2-which-bios-write-protection-bits-are-actually-set-per-oem-and-sku">H2. Which BIOS write-protection bits are actually set, per OEM and SKU?</h2>
+<p><strong>Why documents cannot answer it.</strong> <code>BIOSWE</code>, <code>BLE</code>, <code>SMM_BWP</code>, the <code>PR0</code>-<code>PR5</code>
+ranges, <code>FLOCKDN</code> and descriptor region permissions are firmware policy, not
+architecture. Two boards from the same vendor with different BIOS revisions may
+differ. No datasheet states what a shipping platform configures.</p>
+<p><strong>Rig.</strong> A live-boot CHIPSEC environment per model; a small fleet sample covering
+each generation in use.</p>
+<p><strong>Experiment.</strong> Run <code>chipsec_main</code> on the BIOS-write-protection and SPI-protection
+modules; record <code>BIOS_CNTL</code>, each <code>PRx</code>, <code>FLOCKDN</code>, the descriptor region table,
+and whether Boot Guard is enabled. Record BIOS version and date with each result.</p>
+<p><strong>Confirm / refute.</strong> Produces a per-model exposure table: which machines are one
+kernel bug away from a firmware implant. Refutes any assumption that "modern"
+implies "protected".</p>
+<p><strong>Effort.</strong> Hours per model, once. This is the metric that should appear on a risk
+register, and almost nowhere does it.</p>
+<hr />
+<h2 id="h3-does-the-ble-race-still-work-on-current-chipsets">H3. Does the <code>BLE</code> race still work on current chipsets?</h2>
+<p><strong>Why documents cannot answer it.</strong> The Speed Racer technique dates from 2015.
+Whether current PCHs close it by policy, by <code>SMM_BWP</code>, or not at all is an
+empirical question, and vendors have no incentive to publish the answer.</p>
+<p><strong>Rig.</strong> Bench boards spanning generations, with a programmer available to restore
+after failed attempts.</p>
+<p><strong>Experiment.</strong> In a laboratory setting, with the vendor image restorable, measure
+whether a write to the BIOS region can be completed while <code>BLE</code> is set. Record
+which of <code>SMM_BWP</code>, <code>PRx</code> and descriptor permissions blocked it, if any.</p>
+<p><strong>Confirm / refute.</strong> Confirms the mitigation hierarchy in report §2.4, or shows
+that <code>PRx</code>/<code>FLOCKDN</code> are now the only load-bearing controls.</p>
+<p><strong>Effort.</strong> 2-3 days, and genuinely risky for the board.</p>
+<hr />
+<h2 id="h4-does-measured-boot-actually-detect-a-modified-firmware-component-on-this-platform">H4. Does measured boot actually detect a modified firmware component on this platform?</h2>
+<p><strong>Why documents cannot answer it.</strong> Measurement coverage is a firmware
+implementation choice: which components are extended into which PCR, and whether
+that happens before or after the modification point, varies by vendor and by
+whether Boot Guard is in verified or measured mode.</p>
+<p><strong>Rig.</strong> One board, TPM 2.0 with a readable event log, two firmware states: stock,
+and stock plus a <em>vendor-supplied</em> optional module or a firmware setting change
+that alters the image.</p>
+<p><strong>Experiment.</strong> Capture the TCG log and a TPM quote (<code>pcrread</code> / <code>tpm2_quote</code>) in
+each state; diff the event log and the PCR values.</p>
+<p><strong>Confirm / refute.</strong> If PCR0/PCR4 do not change when a DXE component changes, then
+measured boot is not a detection control for firmware modification on that
+platform, and any architecture relying on it (including parts of §7.5 and the
+vault's own trust assumptions) needs the correction.</p>
+<p><strong>Effort.</strong> 1-2 days. High value: it either validates or demolishes a load-bearing
+assumption.</p>
+<hr />
+<h2 id="h5-does-a-nvram-reset-actually-clear-moklist-and-what-is-the-boot-outcome">H5. Does a NVRAM reset actually clear <code>MokList</code>, and what is the boot outcome?</h2>
+<p><strong>Why documents cannot answer it.</strong> The report states [INFERRED] that clearing
+NVRAM removes BlackLotus's trust anchor but leaves it unbootable. Whether a given
+firmware clears the MOK variable on a CMOS/NVRAM reset, and whether the machine
+then boots or bricks, is platform behaviour.</p>
+<p><strong>Rig.</strong> A bench machine with an ESP you control, and the ability to reflash/recover.</p>
+<p><strong>Experiment.</strong> Enroll a <em>test</em> MOK certificate of your own (a legitimate
+supported operation via <code>mokutil</code>), confirm it appears in <code>MokList</code>, then clear
+NVRAM both ways (CMOS battery / firmware menu option) and observe the variable and
+the boot result.</p>
+<p><strong>Confirm / refute.</strong> Determines whether the documented recovery step is safe in
+practice, and whether "clear NVRAM" is a viable emergency action during an
+incident.</p>
+<p><strong>Effort.</strong> 4 hours. Cheap, and it changes incident-response guidance.</p>
+<hr />
+<h2 id="h6-do-drtm-late-launch-measurements-exclude-a-compromised-dxesmm-environment">H6. Do DRTM late-launch measurements exclude a compromised DXE/SMM environment?</h2>
+<p><strong>Why documents cannot answer it.</strong> TXT and SKINIT are specified to establish a
+fresh measurement root after platform boot. Whether a specific platform's
+implementation gives a verifier a trustworthy statement in the presence of a
+modified DXE phase is exactly the question the enclave design depends on, and it
+is empirical.</p>
+<p><strong>Rig.</strong> A DRTM-capable board, TPM, and a known-good launch environment.</p>
+<p><strong>Experiment.</strong> Establish a baseline late-launch measurement on stock firmware.
+Then introduce a benign, vendor-documented change (an added option ROM, a firmware
+setting that alters the image) and re-measure.</p>
+<p><strong>Confirm / refute.</strong> If late-launch values are insensitive to pre-boot firmware
+state, DRTM cannot attest "the enclave host's firmware is clean" and the vault must
+not claim it does.</p>
+<p><strong>Effort.</strong> 3-5 days. This is the question that decides whether the enclave's trust
+story is real or aspirational.</p>
+<hr />
+<h2 id="h7-is-the-bios-region-writable-from-the-os-while-dma-protection-is-enabled">H7. Is the BIOS region writable from the OS while DMA protection is enabled?</h2>
+<p><strong>Why documents cannot answer it.</strong> The interaction between IOMMU/VT-d policy,
+<code>SMM_BWP</code>, and the SPI controller's write path is configuration-dependent.</p>
+<p><strong>Rig.</strong> Bench board with VT-d, a test OS, and CHIPSEC.</p>
+<p><strong>Experiment.</strong> With DMA remapping enforced, attempt a lab-controlled BIOS-region
+write from a kernel driver you control, and record which mechanism blocked it.</p>
+<p><strong>Confirm / refute.</strong> Determines whether "we enabled VT-d and HVCI" has any bearing
+on firmware persistence. The expectation is that it does not; proving it matters
+because the assumption is widespread.</p>
+<p><strong>Effort.</strong> 1 day.</p>
+<hr />
+<h2 id="h8-what-does-an-out-of-band-spi-read-back-actually-recover-on-a-live-ish-board">H8. What does an out-of-band SPI read-back actually recover on a live-ish board?</h2>
+<p><strong>Why documents cannot answer it.</strong> In-circuit reads are affected by the PCH being
+in a low-power state, by the flash chip's own protection bits, and by pin sharing.
+The practical question for forensics is whether a clip read gives a byte-identical
+image to a chip-off read.</p>
+<p><strong>Rig.</strong> Two identical boards, a clip programmer, a hot-air station, and a second
+recovery path.</p>
+<p><strong>Experiment.</strong> Read board A in circuit; read board B chip-off; compare hashes per
+region. Note any read that requires the board to be powered (which changes the
+evidence handling rules).</p>
+<p><strong>Confirm / refute.</strong> Validates or invalidates the acquisition procedure in §7.2 as
+an evidentiary method.</p>
+<p><strong>Effort.</strong> 1 day, moderate risk. This one has direct legal consequences if the
+answer is "close but not identical".</p>
+<hr />
+<h2 id="h9-does-the-spi-descriptor-ever-under-declare-the-physical-flash-size">H9. Does the SPI descriptor ever under-declare the physical flash size?</h2>
+<p><strong>Why documents cannot answer it.</strong> Some boards ship a flash part larger than the
+descriptor's regions account for. That space is outside every region, unmeasured
+by any region-based tool, and is a plausible hiding place. Whether it exists on a
+given model is a hardware fact.</p>
+<p><strong>Rig.</strong> Bench board, programmer, chip datasheet, and the descriptor dump.</p>
+<p><strong>Experiment.</strong> Compare physical chip capacity (SFDP / part number) against the
+declared regions and the BIOS region size. Compute the unexplained remainder, and
+read it directly.</p>
+<p><strong>Confirm / refute.</strong> If unexplained space exists, every "region hash" based
+detection in §7.3 has a blind spot, and the acquisition procedure must read the
+whole chip, not just declared regions.</p>
+<p><strong>Effort.</strong> 2 hours. Cheap, and it closes a real blind spot.</p>
+<hr />
+<h2 id="h10-which-windows-loader-builds-does-the-moonbounce-oslarchtransfertokernel-patch-survive-on">H10. Which Windows loader builds does the MoonBounce <code>OslArchTransferToKernel</code> patch survive on?</h2>
+<p><strong>Why documents cannot answer it.</strong> The implant scans <code>0x158878</code> bytes for a
+<code>retfq</code> tail at a fixed offset range. Whether that lands correctly depends on the
+specific <code>winload.efi</code> build. The published report describes one victim.</p>
+<p><strong>Rig.</strong> Bench machine with virtualisation, a matrix of Windows builds (legal
+images), and a debugger. No malware and no implant: the question is about the
+<em>loader's</em> structure, not about infecting it.</p>
+<p><strong>Experiment.</strong> For each build, disassemble <code>winload.efi</code>, locate
+<code>OslArchTransferToKernel</code>, record its offset and whether the tail is <code>48 CB</code>
+(<code>retfq</code>), and compute the distance from a <code>call ExitBootServices</code> return address.</p>
+<p><strong>Confirm / refute.</strong> Bounds the affected population: if most post-2019 builds no
+longer match, the implant is narrower than the "works on any Windows" framing
+implies. Answers open question 2 in report §15 without touching a sample.</p>
+<p><strong>Effort.</strong> 2 days, and entirely safe: it analyses Microsoft binaries.</p>
+<hr />
+<h2 id="h11-do-handle-protection-semantics-differ-across-windows-builds-and-edr-agents">H11. Do handle-protection semantics differ across Windows builds and EDR agents?</h2>
+<p><strong>Why documents cannot answer it.</strong> <code>ObSetHandleAttributes</code> with
+<code>ProtectFromClose</code>, and the resulting <code>ERROR_SHARING_VIOLATION</code> that Microsoft's
+IR guidance uses as a detection, interact with kernel version and with whichever
+security product is loaded.</p>
+<p><strong>Rig.</strong> Bench VMs across builds, plus the EDR agents in your estate. This is
+hardware-adjacent: it needs real agent versions, not a clean lab.</p>
+<p><strong>Experiment.</strong> Reproduce the handle-protection pattern with your own benign test
+driver, then attempt <code>certutil -hashfile</code> against the protected file under each
+agent version, recording the error.</p>
+<p><strong>Confirm / refute.</strong> Validates or invalidates the hunt in §7.6. If agents change
+the error code, the detection is silently 100% false-negative.</p>
+<p><strong>Effort.</strong> 2 days.</p>
+<hr />
+<h2 id="h12-does-a-vendor-recovery-path-restore-the-me-region-or-only-the-bios-region">H12. Does a vendor recovery path restore the ME region or only the BIOS region?</h2>
+<p><strong>Why documents cannot answer it.</strong> "BIOS Flashback"/dual-BIOS recovery is
+documented as user-facing behaviour, not as a region map. If it leaves the ME
+region untouched, then a compromise there survives recovery, and the recovery
+procedure in §8 is incomplete.</p>
+<p><strong>Rig.</strong> Bench board with a vendor recovery feature, programmer, and ME region
+hashes from the stock image.</p>
+<p><strong>Experiment.</strong> Hash all regions; run the recovery feature; hash again; diff.</p>
+<p><strong>Confirm / refute.</strong> Determines whether "recovered by the vendor tool" can be
+stated as eradication. On most platforms the honest answer will be "BIOS only".</p>
+<p><strong>Effort.</strong> 1 day.</p>
+<hr />
+<h2 id="h13-what-does-the-enclaves-isolation-look-like-against-a-dma-capable-attacker">H13. What does the enclave's isolation look like against a DMA-capable attacker?</h2>
+<p><strong>Why documents cannot answer it.</strong> IOMMU behaviour with a specific Thunderbolt or
+PCIe device, in a specific BIOS configuration, with a specific OS, is empirical.
+Every "the enclave is isolated" claim rests on it.</p>
+<p><strong>Rig.</strong> Enclave-class host, a DMA-capable device (a cheap PCIe attacker card or a
+Thunderbolt device), and a benign memory-scraping test you write yourself.</p>
+<p><strong>Experiment.</strong> With IOMMU on and off, and with pre-boot DMA enabled and disabled,
+attempt to read known memory from the host.</p>
+<p><strong>Confirm / refute.</strong> Produces the actual isolation boundary for zone 4, which the
+architecture currently asserts rather than measures.</p>
+<p><strong>Effort.</strong> 2-3 days.</p>
+<hr />
+<h2 id="h14-do-tpm-sealing-policies-survive-a-firmware-update-and-should-they">H14. Do TPM sealing policies survive a firmware update, and should they?</h2>
+<p><strong>Why documents cannot answer it.</strong> Sealing keys to PCR values is often proposed as
+"keys unseal only on a known-good machine". What happens on a legitimate firmware
+update is vendor- and policy-specific, and getting it wrong permanently destroys
+access to the vault.</p>
+<p><strong>Rig.</strong> Bench machine with TPM, a disposable vault instance, and a firmware update
+you are willing to apply.</p>
+<p><strong>Experiment.</strong> Seal a test key to a PCR policy; apply a signed vendor firmware
+update; attempt to unseal. Record whether access is lost and which policy would
+have survived.</p>
+<p><strong>Confirm or refute.</strong> Determines whether PCR sealing is a usable control for the
+KEK or a scheduled outage waiting to happen.</p>
+<p><strong>Effort.</strong> 1 day, and it protects against a self-inflicted catastrophic loss.</p>
+<hr />
+<h2 id="what-this-list-implies">What this list implies</h2>
+<p>Three of these (H1, H4, H7) would change the report's conclusions if they came out
+the other way. Two (H2, H9) would change the detection strategy. One (H14) is about
+not destroying the archive you built.</p>
+<p>None of them can be answered by reading more publications, which is precisely the
+point: the current document is a reconstruction of what others have published, and
+these are the places where the evidence runs out and the hardware has to speak.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threat model review · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html" class="current">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="threat-model-review-status-and-the-case-against-this-design">Threat model: review status and the case against this design</h1>
+<p><strong>Status: the gate is OPEN. This design has not survived independent criticism.</strong></p>
+<p>This document exists so that an independent reviewer has targets instead of
+impressions, and so nobody mistakes a self-authored failure analysis for review.
+Rule R2 of this project says implementation does not proceed until the threat
+model has been attacked by someone who did not write it. The code in <code>qvault/</code>
+was written before that rule was applied, so it is labelled <strong>prototype, not
+hardened</strong> in the README and in §13 of the main report.</p>
+<hr />
+<h2 id="1-what-must-be-reviewed">1. What must be reviewed</h2>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>The claim under review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1 Subject → appliance</td>
+<td>Bytes can be captured out of band without the subject influencing the capture</td>
+</tr>
+<tr>
+<td>B2 Appliance → vault</td>
+<td>Ciphertext and metadata can be produced by a semi-trusted host and still be trustworthy later</td>
+</tr>
+<tr>
+<td>B3 Vault → control plane</td>
+<td>Key material stays out of the storage host, and disclosure requires a quorum</td>
+</tr>
+<tr>
+<td>B4 Control plane → enclave</td>
+<td>Authorisation for a specific object, by specific people, for a specific purpose, is enforceable</td>
+</tr>
+<tr>
+<td>B5 Enclave → outside world</td>
+<td>Plaintext cannot leave except as authorised, reviewable results</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-assets">2. Assets</h2>
+<p>A1 preserved sample bytes · A2 custody record and audit history · A3 the
+organisation's production network · A4 the enclave's integrity · A5 key material ·
+A6 the analytical conclusions drawn from the evidence.</p>
+<p>An important ordering point: <strong>A1 is not the most valuable asset.</strong> For a
+containment system, A3 and A4 outrank it. A vault that leaks one sample into
+production has failed worse than one that loses a sample.</p>
+<h2 id="3-adversaries">3. Adversaries</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Adversary</th>
+<th>Capability assumed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T1</td>
+<td>The sample itself</td>
+<td>Executes at boot on the subject; may be a firmware implant; may exploit any parser it reaches</td>
+</tr>
+<tr>
+<td>T2</td>
+<td>Operator error</td>
+<td>Authorised, well-intentioned, in a hurry; opens the wrong file, "just checks something" on a workstation</td>
+</tr>
+<tr>
+<td>T3</td>
+<td>Single insider</td>
+<td>Authorised access to one zone; wants to exfiltrate a sample or destroy evidence</td>
+</tr>
+<tr>
+<td>T4</td>
+<td>Compromised ingestion host</td>
+<td>Root on the appliance before or during ingestion</td>
+</tr>
+<tr>
+<td>T5</td>
+<td>Compromised vault administrator</td>
+<td>Root on the storage host; can read and rewrite everything except keys and external anchors</td>
+</tr>
+<tr>
+<td>T6</td>
+<td>Supply chain</td>
+<td>Controls a dependency, build or release of the vault software</td>
+</tr>
+<tr>
+<td>T7</td>
+<td>Physical attacker</td>
+<td>Access to hardware; DMA-capable port; can steal drives</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-the-designs-falsifiable-claims">4. The design's falsifiable claims</h2>
+<p>Each claim is stated so an attacker has a specific thing to break. If any one of
+these falls, the corresponding boundary is decorative.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Claim</th>
+<th>Broken by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td>A sealed object cannot be executed without a retrieval authorisation</td>
+<td>Any path that produces plaintext without quorum + dual control</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>A modified stored object is always detected</td>
+<td>A byte change that passes <code>verify</code> <em>and</em> decrypts</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>A rewritten audit history is always detected</td>
+<td>Rewriting the log and re-signing it, undetectably, with anchors intact</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>Losing K-1 shares reveals nothing about the KEK</td>
+<td>Distinguishing K-1 shares from random bytes, or a share-combination oracle</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>Compromise of the vault host does not disclose samples</td>
+<td>Reading plaintext from the storage host</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>Approvals are attributable to distinct real people</td>
+<td>Self-approval under a second name, without leaving evidence</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>Retrieval targets only an enclave</td>
+<td>Writing plaintext outside a marked enclave</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>Ingestion cannot silently substitute the object</td>
+<td>Landing a different object without the audit or verify noticing</td>
+</tr>
+<tr>
+<td>C9</td>
+<td>Truncation of the log is detected</td>
+<td>Removing trailing entries and passing verification</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>The enclave cannot leak plaintext except as authorised results</td>
+<td>Any covert path out (network, DMA, side channel, human)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-self-critique-nine-weaknesses-found-on-re-reading-the-code">5. Self-critique: nine weaknesses found on re-reading the code</h2>
+<p>These are the author's own findings. They are recorded as findings, not as
+fixed issues. Severity is the author's judgement and is itself reviewable.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Weakness</th>
+<th>Severity</th>
+<th>Why it matters</th>
+<th>Cheapest credible fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>W1</td>
+<td>Approval files are plain JSON written by the vault process, and "requester ≠ approver" is a <strong>name comparison</strong></td>
+<td><strong>High</strong></td>
+<td>Anyone who can run the CLI can approve as <code>reviewer2</code>. Dual control is then theatre, and C6 falls immediately.</td>
+<td>Custodian-signed approval tokens (Ed25519, keys held off-host), verified by the vault; identity from SSO, not <code>--approver</code></td>
+</tr>
+<tr>
+<td>W2</td>
+<td>The audit signing key lives at <code>&lt;vault&gt;/audit-signing.key</code>, inside the same trust domain as the log</td>
+<td><strong>High</strong></td>
+<td>An attacker with write access rewrites history and re-signs it. C3 and C9 fall together.</td>
+<td>Key in HSM or offline; or sign with custodian smartcards at checkpoint time</td>
+</tr>
+<tr>
+<td>W3</td>
+<td>Whole-vault rollback is undetected</td>
+<td><strong>High</strong></td>
+<td>Restoring an older snapshot yields a chain that verifies. Deleted objects simply never existed.</td>
+<td>External anchor with a monotonic counter; verify must compare against an anchor it cannot edit, not the newest checkpoint file <em>inside</em> the vault</td>
+</tr>
+<tr>
+<td>W4</td>
+<td><code>verify</code> reads the newest checkpoint from the vault itself</td>
+<td><strong>High</strong></td>
+<td>An attacker deletes checkpoints and truncates; nothing compares against an outside value</td>
+<td>Checkpoints replicated to the control plane; verify refuses to pass without an external head</td>
+</tr>
+<tr>
+<td>W5</td>
+<td>The <code>.enclave</code> sentinel is forgeable: <code>touch .enclave</code> defeats it</td>
+<td>Medium</td>
+<td>It is a speed bump against T2, not a control against T3/T5</td>
+<td>Mount-option enforcement (<code>noexec</code>, separate filesystem), policy check against an allow-list of enclave hosts, not a marker file</td>
+</tr>
+<tr>
+<td>W6</td>
+<td>Retrieval writes plaintext to a <strong>file</strong>, not a pipe or memory</td>
+<td>Medium</td>
+<td>Plaintext persists inside the enclave; root there reads it, and a snapshot captures it</td>
+<td>Decrypt to a pipe consumed by the analysis tool, or to a tmpfs with <code>noexec,nosuid</code> and explicit teardown</td>
+</tr>
+<tr>
+<td>W7</td>
+<td><code>0400</code> permissions are asserted as immutability</td>
+<td>Medium</td>
+<td>Mode bits stop accidental writes, not root. The README says this; the code's <code>verify</code> only <em>warns</em> on writable objects</td>
+<td>Fail <code>verify</code> on a writable object in strict mode; rely on WORM storage for the real property</td>
+</tr>
+<tr>
+<td>W8</td>
+<td>No concurrency control on approvals or retrieval (TOCTOU)</td>
+<td>Low</td>
+<td>Two simultaneous retrievals can both pass a check that was true once; the audit shows both, but the second may reuse a stale state</td>
+<td>Per-object advisory lock with the lock itself audited</td>
+</tr>
+<tr>
+<td>W9</td>
+<td>No size or rate limits on ingest</td>
+<td>Low</td>
+<td>A trivial denial of service against the vault, or of the appliance's disk</td>
+<td>Hard cap per object and per day, enforced before the first byte is encrypted</td>
+</tr>
+</tbody>
+</table>
+<p>Two more that are not code defects but design assumptions a reviewer should
+attack: the appliance is assumed to be re-imaged per case (unverified), and the
+enclave is assumed to be physically isolated (unverified, and it is where
+plaintext lives).</p>
+<h2 id="6-reviewer-checklist">6. Reviewer checklist</h2>
+<p>Answering "no" to any of these is a finding.</p>
+<p><strong>Boundary B2 (appliance → vault)</strong>
+1. What stops the appliance from writing a different object than it reports?
+2. Where does the expected hash originate, and is that device independent?
+3. Can the appliance reach the enclave, the control plane, or the internet?
+4. What is the evidence that the appliance image was clean at capture time?</p>
+<p><strong>Boundary B3 (vault → control plane)</strong>
+5. Where does the KEK exist in plaintext, and for how long?
+6. Who can modify the verification policy, and is that change audited elsewhere?
+7. Is the audit head verifiable without trusting any host in this design?
+8. What happens to all objects if one custodian is unavailable for a month?
+9. What happens if a custodian leaves, and is that rehearsed?</p>
+<p><strong>Boundary B4 (control plane → enclave)</strong>
+10. How is an approval bound to a specific object and purpose?
+11. Can one person produce two identities that both approve?
+12. Is there a break-glass path, and what is logged when it is used?
+13. Can an approval be replayed for a later retrieval?</p>
+<p><strong>Boundary B5 (enclave → outside)</strong>
+14. Enumerate every byte path out of the enclave.
+15. Can the enclave host's own firmware be trusted, and how would you know?
+16. What reverts the enclave between cases, and is it verified?
+17. Can memory from case N be read during case N+1?</p>
+<p><strong>Adversary-specific</strong>
+18. T1: which parsers does the sample reach, and what happens when one crashes?
+19. T2: what is the easiest accidental-execution path, honestly?
+20. T3: what can one insider do alone, with only their own credentials?
+21. T4: which of the vault's guarantees survive a lying appliance? (Answer: none about provenance; state it.)
+22. T5: same question for the vault host. (Answer: confidentiality and anchored history, if W1-W4 are fixed.)
+23. T6: how is a release verified, and by whom?
+24. T7: what does an attacker with 30 minutes and a screwdriver get?</p>
+<h2 id="7-exit-criteria-for-the-gate">7. Exit criteria for the gate</h2>
+<p>The gate opens when all of the following are true, and not before:</p>
+<ol>
+<li>An independent reviewer has worked through §6 and every answer is recorded.</li>
+<li>Every <strong>High</strong> finding from review is either fixed with a test, or accepted in
+   writing with a named owner and a residual-risk statement.</li>
+<li>W1-W4 are resolved, because each of them individually reduces "dual control"
+   or "tamper-evident audit" to a claim rather than a property.</li>
+<li>The adversarial tests derived from the review exist in <code>qvault/tests/</code> and
+   fail against the current implementation, or pass against the fixed one.</li>
+<li>The residual-risk table in report §11 is updated with review findings, not
+   author findings.</li>
+</ol>
+<p>Until then: prototype. Used on synthetic fixtures only.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

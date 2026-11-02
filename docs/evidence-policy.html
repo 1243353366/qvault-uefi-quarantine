@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evidence policy · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html" class="current">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="evidence-policy-and-a-self-audit-of-this-project">Evidence policy, and a self-audit of this project</h1>
+<p>This document exists because the report's evidence tags, as originally published,
+were ambiguous in a way that mattered. It states the rules this project is held
+to, redefines the tags precisely, records where the author broke his own rules,
+and lists what would falsify the report.</p>
+<hr />
+<h2 id="1-the-three-rules">1. The three rules</h2>
+<p><strong>R1. No claim of reverse engineering where only vendor reports were read.</strong>
+Reading a technical publication is <em>secondary-source reconstruction</em>. It is
+legitimate and useful. It is not reverse engineering, and it must never be
+described as such.</p>
+<p><strong>R2. No implementation before the threat model has survived independent
+criticism.</strong> An architecture that has only been criticised by its author has not
+been criticised.</p>
+<p><strong>R3. Every technical conclusion carries evidence, a confidence classification,
+and reasoning another person can reproduce.</strong></p>
+<hr />
+<h2 id="2-what-the-tags-mean-revised">2. What the tags mean (revised)</h2>
+<p>The original §0.2 table defined the tags but did not say <em>whose</em> verification
+they describe. Corrected semantics:</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Means, precisely</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CONFIRMED</strong></td>
+<td>A primary source <em>directly demonstrates</em> the claim with technical evidence (decompilation, byte structure, named artifact, vendor specification). <strong>It does not mean the author verified it.</strong></td>
+</tr>
+<tr>
+<td><strong>CORROBORATED</strong></td>
+<td>Two or more <em>independent</em> sources agree, at least one of them technical.</td>
+</tr>
+<tr>
+<td><strong>INFERRED</strong></td>
+<td>A conclusion drawn by the author from confirmed material, via reasoning stated in the text. Not observed.</td>
+</tr>
+<tr>
+<td><strong>HYPOTHESIS</strong></td>
+<td>Plausible and consistent, unproven. Stated so it can be attacked.</td>
+</tr>
+<tr>
+<td><strong>UNKNOWN</strong></td>
+<td>Insufficient public evidence. Not guessed.</td>
+</tr>
+</tbody>
+</table>
+<p>And a second, orthogonal dimension that the first release lacked:</p>
+<table>
+<thead>
+<tr>
+<th>Verification status</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>none</strong></td>
+<td>Taken from a published source. Nobody in this project re-derived it. This covers every claim about LoJax, MoonBounce and BlackLotus.</td>
+</tr>
+<tr>
+<td><strong>partial</strong></td>
+<td>Derived here from published artifacts (e.g. signature sets, diff logic) but not validated against a real sample.</td>
+</tr>
+<tr>
+<td><strong>independent</strong></td>
+<td>Produced and checked inside this repository, with an executable test. Only used for <code>qvault</code>'s own behaviour.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Standing statement:</strong> this project performed no independent reverse
+engineering. No sample was obtained, unpacked, disassembled, emulated or
+executed. Any sentence implying otherwise is a defect to be corrected, not
+interpreted generously.</p>
+<hr />
+<p><strong>R4. Every finding carries an evidence grade.</strong> No finding exists as prose.</p>
+<p><strong>R5. Every finding considers at least one plausible benign explanation.</strong> Including
+the finding that says "this is fine", which is why the rule applies to all-clear
+results too.</p>
+<p><strong>R6. Missing telemetry lowers confidence; it never silently becomes a clean
+result.</strong> A surface that was not examined declares itself, and reduces the grade.</p>
+<p><strong>R7. Detection and attribution are separate.</strong> You may not be more certain who did
+something than that something happened, and the two are graded independently.</p>
+<p><strong>R8. The tool never calls a device clean because no known spyware was found.</strong>
+<code>clean</code> is not a value the verdict type can produce.</p>
+<p>R4-R8 are enforced in <code>qvault/findings.py</code> rather than reviewed by hand: <code>Finding</code>
+refuses to construct, confidence is computed rather than asserted, attribution is
+capped by detection, and <code>DeviceAssessment.verdict</code> has no branch that returns
+cleanliness. <code>tools/check_findings.py</code> applies the same checks to findings imported
+from other tools.</p>
+<p><strong>R9. Every collected artifact carries an eight-element envelope.</strong> Original source,
+acquisition timestamp, SHA-256, acquisition method, tool and reader versions,
+coverage and collection errors, chain of custody, and cryptographic protection at
+rest. Enforced in <code>qvault/provenance.py</code>: the envelope will not construct without
+them, the digest is computed from the bytes rather than supplied, custody is
+hash-chained from the acquisition event, and unauthenticated ciphers are refused.</p>
+<p>Two of these deserve explanation because they are routinely fudged:</p>
+<p><em>Coverage</em> is not a courtesy field. A read that covered 60% of the flash produces
+telemetry gaps automatically, which lower the confidence of anything resting on it
+(rule F3). Nobody has to remember to mention it.</p>
+<p><em>Tool version and reader version are separate</em> because they fail differently. A
+capture bug means the bytes are wrong; a reader bug means the bytes are right and
+the interpretation is wrong. One needs re-acquisition, the other re-parsing, and the
+envelope has to be able to tell them apart.</p>
+<h2 id="3-self-audit-where-this-work-broke-its-own-rules">3. Self-audit: where this work broke its own rules</h2>
+<p>Recorded rather than quietly fixed, because a report that hides its process is
+not evidence.</p>
+<h3 id="31-rule-1-violations">3.1 Rule 1 violations</h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Problem</th>
+<th>Correction applied</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Title and §0.1</td>
+<td>"A Reverse-Engineering Study" reads as first-hand analysis</td>
+<td>Title retained (the study <em>of</em> reverse-engineering literature) but §0.5 now states the limitation explicitly and every family section header carries the source</td>
+</tr>
+<tr>
+<td>§0.2 (original)</td>
+<td>Tags appeared to record the author's verification</td>
+<td>Redefined in §2 above with an explicit second dimension</td>
+</tr>
+<tr>
+<td>§3.8 heading</td>
+<td>"Function-level reconstruction" could imply independent RE</td>
+<td>Corrected to attribute the reconstruction to Kaspersky's document in the first line</td>
+</tr>
+<tr>
+<td>Chat / commit messages</td>
+<td>"the mechanism is now fully reconstructable"</td>
+<td>True of the <em>documented</em> mechanism only; overstated as a general claim</td>
+</tr>
+<tr>
+<td>§3.9</td>
+<td>Signature table presented without a verification-status column</td>
+<td>§3.9 now states that no signature has been validated against a live sample</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-rule-2-violations">3.2 Rule 2 violations</h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whole <code>qvault/</code> package</td>
+<td>Written <em>before</em> §11 (failure analysis) existed. The mitigations were retrofitted to existing code rather than driving its design.</td>
+</tr>
+<tr>
+<td>§11</td>
+<td>Self-authored criticism only. No independent reviewer.</td>
+</tr>
+<tr>
+<td>§12 roadmap</td>
+<td>Presented phases as if the design were settled, with no review gate</td>
+</tr>
+<tr>
+<td>README</td>
+<td>Presented the architecture as "reference implementation" without noting unreviewed status</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Correction:</strong> <code>qvault</code> is now labelled <strong>prototype, not hardened</strong> in the README
+and in §13, <code>report/THREAT_MODEL_REVIEW.md</code> exists as the artifact an independent
+critic needs, and §12 contains an explicit gate before Phase 1 hardening.</p>
+<h3 id="33-rule-3-gaps-found-on-re-reading">3.3 Rule 3 gaps found on re-reading</h3>
+<ol>
+<li><strong>CORROBORATED was over-applied.</strong> Several claims tagged CORROBORATED rest on
+   a single technical source plus author inference. The ledger below reclassifies
+   them as CONFIRMED (single source) or INFERRED, as appropriate.</li>
+<li><strong>Falsifiers were absent.</strong> No claim stated what evidence would refute it, so
+   none could be attacked. <code>CLAIMS_LEDGER.csv</code> now requires a falsifier per row,
+   enforced by <code>tools/check_claims.py</code>.</li>
+<li><strong>Section references were not machine-checkable.</strong> The validator confirms that
+   every claim points at a section that actually exists in the report.</li>
+<li><strong>Timeline inference was presented with component facts.</strong> §3.8's 2018 build
+   dates are CONFIRMED; the conclusion "built late 2018, deployed after" is
+   INFERRED and is now a separate ledger row.</li>
+</ol>
+<hr />
+<h2 id="4-what-would-falsify-this-report">4. What would falsify this report</h2>
+<p>Stated so a critic has targets rather than impressions.</p>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Falsified by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LoJax survives a full-region firmware update</td>
+<td>A hardware test showing survival after a complete BIOS-region rewrite</td>
+</tr>
+<tr>
+<td>A partial firmware update cannot remove an implanted FFS file</td>
+<td>A vendor capsule that preserves free space yet removes a foreign file</td>
+</tr>
+<tr>
+<td>Secure Boot does not attest firmware volume contents</td>
+<td>A platform whose Secure Boot verification demonstrably covers its own DXE volumes</td>
+</tr>
+<tr>
+<td>MoonBounce leaves no structural firmware fingerprint</td>
+<td>A structural (non-byte-diff) detector that reliably finds an in-place DXE patch</td>
+</tr>
+<tr>
+<td><code>0x6F4EB841</code> is unique to this implant</td>
+<td>Any legitimate firmware component containing that immediate</td>
+</tr>
+<tr>
+<td>Encryption at ingestion prevents execution of the stored object</td>
+<td>Any path that executes a sealed object without a retrieval authorisation</td>
+</tr>
+<tr>
+<td>The audit chain detects truncation</td>
+<td>A log rewrite that passes <code>verify</code> including checkpoint comparison</td>
+</tr>
+<tr>
+<td>BlackLotus is fully removed by OS + ESP reformat</td>
+<td>Survival of the bootkit after a reformat with ESP wipe and MOK revocation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-reproduction-instructions">5. Reproduction instructions</h2>
+<pre><code class="language-bash">pip install -r requirements.txt
+python -m pytest qvault/tests -q          # 30 tests, all vault/fwdiff behaviour
+python tools/check_claims.py              # validates the claims ledger
+</code></pre>
+<p><code>check_claims.py</code> fails if any claim lacks a source, a valid tag, a falsifier, or
+points at a section that does not exist. Any claim about the three malware
+families must carry <code>verification=none</code>; only claims about this repository's own
+code may be <code>independent</code>.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

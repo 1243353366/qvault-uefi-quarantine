@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg)](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml)
 
-**Version 0.5.0** · [CHANGELOG](CHANGELOG.md) · [credits](CREDITS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -26,6 +26,26 @@ ingest ──► hash ──► AES-256-GCM (chunked) ──► seal 0400 ──
 
 retrieve ──► K-of-N shares ──► 2-person approval ──► enclave sentinel ──► 0400 plaintext
 ```
+
+## Documentation
+
+The full documentation is published at
+**<https://1243353366.github.io/qvault-uefi-quarantine/>**, generated from this repository by
+`tools/build_docs.py`, so the site cannot claim more than the code does.
+
+| Page | What it answers |
+|------|-----------------|
+| [Deep dive](https://1243353366.github.io/qvault-uefi-quarantine/deep-dive) | LoJax, MoonBounce and BlackLotus, with the architecture and the bibliography |
+| [Zero-days in the wild](https://1243353366.github.io/qvault-uefi-quarantine/in-the-wild) | The pinned Project Zero reference set, and why the overlap with this boundary is 2 of 70 |
+| [Behaviour to control](https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix) | 17 attacker behaviours, the control that answers each, and the gaps named |
+| [Telemetry map](https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map) | What feeds each detection: Sysmon, Windows events, script blocks, TPM log |
+| [Persistence](https://1243353366.github.io/qvault-uefi-quarantine/persistence) | Fourteen autostart mechanisms and four result classes |
+| [Trust model](https://1243353366.github.io/qvault-uefi-quarantine/trust-model) · [Limitations](https://1243353366.github.io/qvault-uefi-quarantine/limitations) | What is programmatically enforced, and what is deployment-dependent |
+| [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations) | All 68 sources, each with where it is used |
+
+Every claim in the reports carries a source, a tag, a status and a falsifier in
+`report/CLAIMS_LEDGER.csv`; gate G3 fails if a claim has no source and gate G12 fails if the
+published site is stale.
 
 ## Read this before trusting any claim in here
 

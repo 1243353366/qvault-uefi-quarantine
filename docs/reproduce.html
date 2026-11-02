@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reproduce the results · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html" class="current">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="reproducing-the-release-assessment">Reproducing the release assessment</h1>
+<p>A fresh checkout needs CPython 3.11 and the pinned dependencies. Nothing else: no network
+access, no vendor account, no prior state.</p>
+<pre><code>git clone &lt;repo&gt; &amp;&amp; cd qvault-uefi-quarantine
+python3 -m pip install -r requirements-lock.txt
+tools/reproduce.sh
+</code></pre>
+<p><code>reproduce.sh</code> runs every gate in order and stops at the first disagreement.</p>
+<h2 id="what-a-correct-run-prints">What a correct run prints</h2>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>python3 -m qvault --version</code></td>
+<td><code>qvault 0.9.0</code></td>
+</tr>
+<tr>
+<td><code>pytest qvault/tests -q</code></td>
+<td>465 passed</td>
+</tr>
+<tr>
+<td><code>tools/smoke.py</code></td>
+<td>SMOKE OK: 62 checks passed</td>
+</tr>
+<tr>
+<td><code>tools/check_claims.py</code></td>
+<td>OK: every claim has a source, a tag, a status and a falsifier</td>
+</tr>
+<tr>
+<td><code>tools/gen_fingerprints.py</code></td>
+<td>no diff against <code>report/FINGERPRINTS.md</code></td>
+</tr>
+<tr>
+<td><code>pillars.audit()</code></td>
+<td>8 capabilities, 0 with a required gap</td>
+</tr>
+</tbody>
+</table>
+<h2 id="using-the-numbers-honestly">Using the numbers honestly</h2>
+<p>These counts describe <em>this</em> tree. They are not a security claim: the capability map lists
+every remainder, and <code>report/CLAIMS_LEDGER.csv</code> records which claims are independently
+verified and which are reasoning over secondary sources.</p>
+<p>If a gate disagrees with the table above, the tree is not the release. Do not adjust the
+table.</p>
+<h2 id="installation-as-a-package">Installation as a package</h2>
+<p><code>pip install .</code> installs <code>qvault</code>, the CLI entry point and the pinned <code>vendor</code> tree. The
+vendored detection engine must ship with the package: <code>qvault/zbt_bridge.py</code> raises an
+explanatory ImportError if <code>vendor/zbtriage</code> is missing rather than failing obscurely.</p>
+<h2 id="pre-merge-gates">Pre-merge gates</h2>
+<pre><code>python3 tools/gates.py          # all gates, exit non-zero on any failure
+python3 tools/gates.py --list   # name the gates
+python3 tools/gates.py G4 G7    # run a subset
+</code></pre>
+<p>G4 validates the wire contract in Python and in node, so a second runtime has to agree with
+the first about the shape of a verdict.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

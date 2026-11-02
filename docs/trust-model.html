@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trust model · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html" class="current">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="trust-model">Trust model</h1>
+<p>Six weaknesses are treated as must-fix before deployment. Only some of them are closable
+in code. The rest are properties of where the software runs, and the honest response is to
+refuse the stronger claim rather than to invent a control that cannot exist.</p>
+<p>Status terms used below:</p>
+<ul>
+<li><strong>Enforced</strong> - the code refuses the unsupported conclusion and the refusal is tested.</li>
+<li><strong>Architectural</strong> - no amount of code closes it. The code can only cap its own claims
+  and require evidence it cannot produce.</li>
+<li><strong>Deployment</strong> - a property of the installation, checked by the code when declared and
+  otherwise assumed.</li>
+</ul>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Status</th>
+<th>What the code does now</th>
+<th>What it still cannot do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Host trust gap</td>
+<td>Architectural</td>
+<td>Caps every conclusion at the ceiling of its best evidence class and refuses the rest</td>
+<td>Prove the integrity of the host it is running on</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Self-scan</td>
+<td>Architectural</td>
+<td><code>self_report</code> supports no conclusion at all, so a self-scan cannot produce a grade</td>
+<td>Certify the evidence source from inside that source</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Oracle in denials</td>
+<td>Enforced</td>
+<td>Coarse, byte-identical refusal for unprivileged callers; detail only behind a granted principal</td>
+<td>Authenticate that principal (see assumption A1)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Separation of duties</td>
+<td>Enforced</td>
+<td>Refuses an identity holding observer and verifier roles in the same pipeline</td>
+<td>Stop an operator wiring it anyway outside the API</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Local storage</td>
+<td>Deployment</td>
+<td>Refuses an append-only custody claim on non-WORM storage</td>
+<td>Make a local filesystem append-only</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Live samples</td>
+<td>Enforced</td>
+<td>Refuses live capture unless the acquisition path is isolated and attested</td>
+<td>Verify that isolation from the inside</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-host-trust-gap">1. Host trust gap</h2>
+<p>A privileged read on the subject cannot establish the integrity of the subject: whatever
+compromised the firmware could be what answers the read. This is stated in the README and
+it is not a defect, it is the shape of the problem.</p>
+<p>Enforcement lives in <code>separation.grade_ceiling</code> and <code>assert_claim_supported</code>. Each
+evidence class has a ceiling, and a claim above it raises <code>EvidenceCeilingError</code> naming the
+class that would be needed:</p>
+<table>
+<thead>
+<tr>
+<th>Evidence class</th>
+<th>Strongest grade supported</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self_report</code></td>
+<td>none: supports no conclusion</td>
+</tr>
+<tr>
+<td><code>peer_claim</code></td>
+<td><code>HYPOTHESIS</code></td>
+</tr>
+<tr>
+<td><code>independent_measurement</code> (physical flash read, bus capture)</td>
+<td><code>CORROBORATED</code></td>
+</tr>
+<tr>
+<td><code>signed_manifest</code></td>
+<td><code>CORROBORATED</code></td>
+</tr>
+<tr>
+<td><code>hardware_anchor</code> (TPM quote, DICE)</td>
+<td><code>CONFIRMED</code></td>
+</tr>
+</tbody>
+</table>
+<p>So a host-mediated scan of an image can support <code>INFERRED</code> at best, a physical SPI read
+can support <code>CORROBORATED</code>, and only a hardware-rooted measurement corroborating that read
+reaches <code>CONFIRMED</code>. Volume does not substitute: fifty independent measurements of one
+class still cap at that class.</p>
+<h2 id="2-self-scan">2. Self-scan</h2>
+<p><code>self_report</code> maps to no grade, so a component describing its own state cannot support any
+finding. This is the machine-checkable form of "the engine cannot certify itself" in the
+README. A self-scan is still useful for metadata and internal consistency; it is simply
+not evidence of trust, and the model will not let it be graded as such.</p>
+<h2 id="3-oracle-safe-denials">3. Oracle-safe denials</h2>
+<p>The previous denial logic was an oracle. <code>DENY_UNKNOWN_RESOURCE</code> against
+<code>DENY_INSUFFICIENT_CUSTODY</code> told an unauthenticated caller both that a resource existed and
+which condition was close to passing, and the resource name was echoed back.</p>
+<p>Now:</p>
+<ul>
+<li>The default answer is <code>{"allowed": false, "denial": "refused", "remedy": ...}</code>, byte
+  identical for a real resource, a forbidden one, and one that does not exist.</li>
+<li>Evaluation always runs the same rules first, so a refusal does not take a cheaper path
+  than an allowed request.</li>
+<li>Detail requires a <code>Principal</code> with a name, a role and a granted <code>sees_detail</code> flag.</li>
+<li>Bulk results for unprivileged callers report only whether everything was allowed, not
+  how many requests failed or which.</li>
+</ul>
+<p>Residual: an allowed request still returns <code>allowed</code>, because a caller must know whether
+to proceed. Probe-and-permit therefore reveals which operations are permitted, though never
+why a refusal happened.</p>
+<h3 id="assumption-a1">Assumption A1</h3>
+<p><code>Principal.sees_detail</code> is not authenticated by this code. Until a deployment wires it to
+its own authentication, every principal is unverified and only the coarse path is safe.
+This is recorded in the claims ledger with that wording rather than described as solved.</p>
+<h2 id="4-separation-of-duties">4. Separation of duties</h2>
+<p>Roles were separated per component but a pipeline could still assign one identity several
+of them, which is how a single compromised host both observes and decides.
+<code>pipeline_conflicts</code> refuses these pairs:</p>
+<table>
+<thead>
+<tr>
+<th>Pair</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>acquisition + verification</td>
+<td>the observer would be judging what it observed</td>
+</tr>
+<tr>
+<td>analysis + verification</td>
+<td>the analyst would be verifying its own parsing</td>
+</tr>
+<tr>
+<td>storage + verification</td>
+<td>the holder would be certifying the evidence it holds</td>
+</tr>
+</tbody>
+</table>
+<p>The refusal names the shared identity. A fully separated pipeline is
+<code>acquisition -&gt; analysis -&gt; storage</code>, with <code>verification</code> held by a fourth identity on a
+different host.</p>
+<h2 id="5-local-storage">5. Local storage</h2>
+<p><code>assert_custody_claim</code> refuses an append-only claim on <code>not_worm</code> storage and says what to
+do instead: object-lock buckets or a compliance-mode mount. The audit chain detects
+tampering; it does not prevent rewriting, and the code no longer implies otherwise.</p>
+<h2 id="6-live-samples">6. Live samples</h2>
+<p><code>assert_scope</code> refuses <code>live_capture</code> unless the acquisition path is both isolated and
+attested, and names which of the two is missing. Synthetic fixtures need neither.</p>
+<h2 id="what-a-pilot-should-look-like">What a pilot should look like</h2>
+<ol>
+<li>Acquire out of band: physical read or an attested acquisition path.</li>
+<li>Analyse in a separate identity realm from the one under examination.</li>
+<li>Verify from a fourth identity, on a different host, against a reference the subject
+   cannot write.</li>
+<li>Store on WORM media, and claim append-only only there.</li>
+<li>Report observed and inferred separately, with the evidence class behind each grade.</li>
+<li>Refuse the verdict when the evidence class cannot carry it, and say which class would.</li>
+</ol>
+<h2 id="the-honest-split">The honest split</h2>
+<p>Two kinds of problem, and they should not be described in the same voice.</p>
+<p><strong>Cheap and reproducible</strong>, at the authorization boundary: one constant-shaped refusal, a
+single public denial code, unknown treated as forbidden, denials recorded rather than
+returned, evaluation failure denying, and monotonicity checked against an explicit
+allowance table. All of it black-box, unit-testable, and now tested in
+<code>test_policy_semantics.py</code> (25 tests).</p>
+<p><strong>Architectural</strong>, and not patchable: a host cannot certify itself, a self-scan is not
+proof, out-of-band evidence is required for a firmware claim, and a local filesystem is not
+WORM. The code's contribution there is limited to refusing the stronger conclusion and
+naming what would support it. Calling those "bugs" would misdescribe them, and claiming
+they are fixed because a test passes would be worse.</p>
+<h2 id="the-probe-contract">The probe contract</h2>
+<p><code>qvault/probe.py</code> is the instrument side of the boundary, and it is deliberately unable to
+answer anything but "what did I observe":</p>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>How it is met</th>
+<th>How it is tested</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No new way to learn hidden facts</td>
+<td>One token per request; identical for forbidden and absent</td>
+<td><code>test_a_forbidden_resource_and_a_missing_one_are_indistinguishable</code></td>
+</tr>
+<tr>
+<td>No behaviour on the target</td>
+<td>No connections, no execution, no files</td>
+<td>source scan for socket/urllib/subprocess/eval/exec/open; empty tmpdir</td>
+</tr>
+<tr>
+<td>No remote resource use</td>
+<td>Pure local evaluation of an existing decision</td>
+<td>no imports that can reach out</td>
+</tr>
+<tr>
+<td>No unauthorised distinctions</td>
+<td>Closed token vocabulary; gate labels only for the caller's own context</td>
+<td><code>test_the_vocabulary_is_closed</code></td>
+</tr>
+<tr>
+<td>Bounded</td>
+<td><code>Budget</code>, one attempt, no retries or recursion</td>
+<td><code>test_a_second_call_gives_unknown_not_another_attempt</code></td>
+</tr>
+<tr>
+<td>Refuses on ambiguity</td>
+<td>Missing attestation outranks a denial; incomplete context is <code>PARTIAL</code>, never "absent"</td>
+<td><code>test_incomplete_context_is_partial_not_absent</code></td>
+</tr>
+<tr>
+<td>No timing signal</td>
+<td>Every gate computed for every request</td>
+<td>evaluation trace plus a 3x timing bound</td>
+</tr>
+</tbody>
+</table>
+<p>What it cannot do: prove the host, establish an evidence class it was not given, or make a
+local filesystem append-only. Those remain in the architectural column.</p>
+<h2 id="running-the-checks">Running the checks</h2>
+<pre><code class="language-bash">python3 -m pytest qvault/tests/test_trust_model.py -q    # 38 tests
+bash tools/reproduce.sh                                   # every gate
+</code></pre>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

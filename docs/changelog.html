@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html" class="current">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="changelog">Changelog</h1>
+<p>All notable changes to qvault. Format follows <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>;
+versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<p>Evidence grades appear throughout: <strong>CONFIRMED</strong>, <strong>CORROBORATED</strong>, <strong>INFERRED</strong>,
+<strong>HYPOTHESIS</strong>, <strong>UNKNOWN</strong>. See <code>report/EVIDENCE_POLICY.md</code> for what they mean and what
+they deliberately do not mean.</p>
+<hr />
+<h2 id="unreleased-policy-denial-branch-featurepolicy-denial">[Unreleased] - policy denial (branch: feature/policy-denial)</h2>
+<p>The policy matrix said what the settings are. Nothing said what happens to a caller that
+asks for something else, so an operator received a settings dict and no way to tell
+"refused" from "allowed but empty".</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><code>netpolicy.authorize()</code> returns a verdict carrying structured denials rather than a
+  boolean: <code>DENY_EGRESS</code>, <code>DENY_UNSEALED_WRITE</code>, <code>DENY_OVERCOLLECTION</code>,
+  <code>DENY_OVER_RETENTION</code>, <code>DENY_INSUFFICIENT_CUSTODY</code>, <code>DENY_NO_ATTESTATION</code>,
+  <code>DENY_UNKNOWN_RESOURCE</code>.</li>
+<li>Each denial names the requirement, the observation, and the remedy, so a refusal is
+  actionable instead of final.</li>
+<li>Unknown resources are refused rather than permitted: a request nobody wrote a rule for
+  is not thereby allowed.</li>
+<li>Observations are counts and labels only. No share material, key identifier or
+  credential reaches a denial, so the refusal cannot become the leak the oracle tests
+  exist to prevent.</li>
+<li><code>authorize_all()</code> aggregates several requests deterministically, so two runs over the
+  same inputs diff cleanly.</li>
+<li>19 tests, including monotonicity against a more permissive policy and a check that a
+  denial's text carries no material.</li>
+</ul>
+<h3 id="fixed-the-denial-was-an-oracle">Fixed - the denial was an oracle</h3>
+<p>The first version of this denial logic leaked. <code>DENY_UNKNOWN_RESOURCE</code> versus
+<code>DENY_INSUFFICIENT_CUSTODY</code>, plus the echoed resource name, told an unauthenticated caller
+that a resource existed and which condition was nearly satisfied. Refusals are now coarse
+and byte-identical for a real, a forbidden, and a nonexistent resource; detail requires a
+principal with a granted flag, and bulk results do not report counts to unprivileged
+callers. Rule-engine tests moved to <code>_evaluate</code>, and the public surface is tested for what
+it refuses to say.</p>
+<h3 id="added-trust-model-enforcement">Added - trust model enforcement</h3>
+<ul>
+<li><code>separation.grade_ceiling</code> and <code>assert_claim_supported</code>: a claim above what its evidence
+  class can support is refused, naming the class that would be enough. A self-report
+  supports no conclusion at all; volume of one class is not a stronger class.</li>
+<li><code>pipeline_conflicts</code> / <code>assert_pipeline_separated</code>: one identity may not hold acquisition
+  and verification, analysis and verification, or storage and verification.</li>
+<li><code>assert_custody_claim</code>: append-only history cannot be claimed on non-WORM storage.</li>
+<li><code>assert_scope</code>: live capture is refused unless the acquisition path is isolated and
+  attested.</li>
+<li><code>report/TRUST_MODEL.md</code> maps all six gaps, marking which are enforced in code, which are
+  architectural, and which are deployment properties. Assumption A1 (the principal's detail
+  grant is not authenticated here) is stated rather than papered over.</li>
+</ul>
+<h3 id="fixed-the-gaps-in-the-modules-that-make-the-claims">Fixed - the gaps in the modules that make the claims</h3>
+<ul>
+<li><strong>firmware_integrity</strong>: <code>grade_for</code> promoted any anchor with two independent sources
+  straight to <code>CONFIRMED</code>. Firmware that measured itself, measured twice, came out
+  confirmed. Promotion is now capped by the anchor's evidence class:
+  <code>pre_os_measured</code> stays <code>HYPOTHESIS</code> at fifty sources, <code>oob_flash_read</code> caps at
+  <code>CORROBORATED</code>, <code>os_mediated</code> stays <code>UNKNOWN</code>. Every anchor declares a class.</li>
+<li><strong>store</strong>: durability is declared, never guessed. <code>storage_class</code> reads
+  <code>storage.json</code> or <code>QVAULT_STORAGE_CLASS</code>, defaults to <code>not_worm</code>, and refuses an
+  unrecognised value rather than treating it as durable. <code>custody_summary</code> reports
+  whether an append-only claim is supported and why not.</li>
+<li><strong>retrieve</strong>: approvals are checked before the envelope is touched. Reading the envelope
+  first made "no such object" distinguishable from "not approved", so anyone holding an
+  object id could enumerate the vault without an approval. Both now return the same
+  refusal, proven by a test that fails if the envelope is read early.</li>
+<li><strong>separation</strong>: <code>certify_host</code> is granted to verification only and refused to
+  acquisition, analysis and storage; <code>claim_custody</code> belongs to analysis and storage and
+  not to verification. The duty matrix now covers the certification actions, so <code>may()</code>
+  answers for them.</li>
+</ul>
+<p>18 tests in <code>test_module_trust.py</code>, 554 in total.</p>
+<h3 id="added-policy-semantics-on-the-authorization-boundary">Added - policy semantics on the authorization boundary</h3>
+<p>The cheap, testable half of the trust problem, closed with black-box tests:</p>
+<ul>
+<li><strong>One public denial code.</strong> <code>PUBLIC_DENIAL_CODE = policy_denied</code> is the only code an
+  unprivileged caller ever sees. A richer taxonomy would be a partition function: which
+  code returned would say whether the resource existed and which gate was close to passing.</li>
+<li><strong>Uniform unknown handling.</strong> A made-up resource, an empty resource and a genuine
+  forbidden one produce byte-identical answers under every policy.</li>
+<li><strong>Denials are recorded, not returned.</strong> <code>authorize(..., audit=callable)</code> receives
+  resource, policy, codes and caller; the caller's answer is unchanged by recording.</li>
+<li><strong>Fail closed.</strong> An evaluator exception denies with the same shape as any other refusal,
+  is recorded by exception <em>type</em> (never message), and surfaces as
+  <code>DENY_EVALUATION_ERROR</code> only to an operator.</li>
+<li><strong>Explicit allowance lattice.</strong> <code>allowance(policy)</code> and <code>at_least_as_permissive</code> make
+  monotonicity a property of a table rather than a belief; a swept test asserts that a
+  dominating policy never refuses what a dominated one allows, across every request form.</li>
+<li>25 tests in <code>test_policy_semantics.py</code> (581 total).</li>
+</ul>
+<h3 id="added-the-probe-contract-qvaultprobepy">Added - the probe contract (<code>qvault/probe.py</code>)</h3>
+<p>A read-only view of one policy decision, built so it cannot become an attack surface:</p>
+<ul>
+<li><strong>Passive.</strong> No mutation, no filesystem, no connection, no command execution. Tested by
+  importing the module source and asserting it contains no socket, urllib, subprocess,
+  eval, exec or open, and by snapshotting <code>POLICIES</code> around a batch of probes.</li>
+<li><strong>Coarse.</strong> <code>ask(resource)</code> returns one token: <code>ALLOW</code>, <code>DENY</code> or <code>UNKNOWN</code>.
+  <code>context()</code> reports the caller's own gates by label. Neither names a resource the caller
+  did not supply.</li>
+<li><strong>Bounded.</strong> <code>Budget(max_seconds, max_calls)</code>, one attempt by default, no retries, no
+  recursion, no discovery loop. An exhausted budget or a slow evaluation returns <code>UNKNOWN</code>.</li>
+<li><strong>Fail closed.</strong> Any evaluator exception returns <code>UNKNOWN</code> after exactly one attempt.
+  "I could not observe" never becomes "it is absent".</li>
+<li><strong>Non-oracular.</strong> Forbidden and nonexistent resources return the same token <em>and</em> the
+  same work: every gate is evaluated regardless of what was asked, verified by an
+  evaluation trace and a loose timing ratio.</li>
+</ul>
+<h3 id="fixed-uniform-evaluation-work">Fixed - uniform evaluation work</h3>
+<p><code>_evaluate</code> returned early for an unknown resource. The words were uniform; the work was
+not, and a difference in work is a timing oracle. Every gate is now computed for every
+request. That change surfaced a genuine crash: <code>requested="minimal"</code> reached the retention
+gate and <code>int()</code> threw, so a caller could turn a type error into a 500. Request fields are
+now coerced with <code>_as_int</code>, and a wrong-typed field yields <code>DENY_INVALID_REQUEST</code> with the
+requirement and a remedy.</p>
+<h3 id="changed-token-precedence">Changed - token precedence</h3>
+<p><code>UNATTESTED</code> could never surface: every policy that requires attestation also denies
+egress, so a denial always came first. Missing attestation now outranks a denial, because
+nothing can be concluded from an evidence class that was never established. The individual
+gate verdicts remain visible in <code>context()</code>, so the denial is not hidden.</p>
+<p>24 tests in <code>test_probe.py</code> (605 total).</p>
+<h3 id="added-autostart-surface-assessment-qvaultpersistencepy">Added - autostart surface assessment (<code>qvault/persistence.py</code>)</h3>
+<p>Implements the eleven persistence mechanisms in Daulaguphu, "11 Critical Malware
+Persistence Mechanisms" (tech-zealots.com, 7 April 2022) as detection, never as technique.
+The module has no code that creates or enables an autostart entry.</p>
+<ul>
+<li>Thirteen catalogue entries covering the article's eleven mechanisms (Run/RunOnce,
+  Policies\Explorer\Run, startup folders, scheduled tasks, services and ServiceDll,
+  BootExecute, hive loading, BHOs, AppInit_DLLs, DLL search order, plus rootkit, bootkit
+  and fileless).</li>
+<li>Seven behavioural signals: user-writable location, unsigned binary, LOLBin proxy,
+  encoded command, hidden task, service outside System32, nonstandard BootExecute,
+  hive outside config, populated AppInit_DLLs.</li>
+<li>Grading follows the collection basis, not the suspicion: <code>live_host</code> is a self-report and
+  yields no graded finding, <code>offline_image</code> caps at CORROBORATED, <code>attested_image</code> at
+  CONFIRMED. A ceiling is a limit, not a target.</li>
+<li>Rootkit, bootkit and fileless are marked <code>not observable</code> rather than silently clean: a
+  snapshot cannot see what hides from it.</li>
+<li><code>coverage()</code> reports observed / not_observed / not_observable and states that a mechanism
+  not observed was not thereby shown to be absent. Nothing is ever reported CLEAN.</li>
+<li>Every observation carries a benign twin and a control, enforced by
+  <code>assert_catalogue_integrity()</code> at import.</li>
+</ul>
+<h3 id="fixed-bootexecute-detection">Fixed - BootExecute detection</h3>
+<p>The first version tested whether the default string appeared in the value, so a payload
+appended to <code>autocheck autochk *</code> passed as normal. It is now an equality check after
+whitespace normalisation, which is what "has any value beyond the default" actually means.</p>
+<p>30 tests in <code>test_persistence.py</code> (635 total).</p>
+<h3 id="changed-persistence-is-a-detection-matrix-not-a-flag">Changed - persistence is a detection matrix, not a flag</h3>
+<p>Restructured against the contract the source article implies, rather than a generic
+"autostart observed" boolean:</p>
+<ul>
+<li><strong>Descriptors.</strong> Each mechanism is a <code>Mechanism(id, name, observable_path,
+  benign_default, control, predicate, observable)</code>. <code>_m()</code> validates at construction that an
+  observable mechanism has a predicate and an unobservable one does not, so a descriptor
+  cannot claim detection it does not perform.</li>
+<li><strong>Four result classes.</strong> <code>detected</code>, <code>benign</code>, <code>unknown_not_observable</code>, <code>not_observed</code>.
+  One row per mechanism is returned for every snapshot, including mechanisms the snapshot
+  never mentioned.</li>
+<li><strong>No clean state.</strong> <code>CLEAN_STATES</code> is empty, <code>assert_not_clean()</code> raises on any attempt to
+  report one, and <code>summarise()</code> carries <code>clean_state_available: False</code>.</li>
+<li><strong>Reviewable detection.</strong> Predicates are separate, named functions (<code>_boot_execute</code>,
+  <code>_service</code>, <code>_hive</code>, <code>_appinit</code>, <code>_dll_search_order</code>) beside the descriptor table that
+  says what each mechanism is and what removes it.</li>
+<li><strong>Row shape is constant.</strong> Every matrix row carries the same keys whatever its result;
+  the earlier version only added <code>benign_readings</code> when an entry existed, which was a shape
+  oracle about the snapshot.</li>
+</ul>
+<h3 id="added-qvaultgradingpy-a-public-grade-api">Added - <code>qvault/grading.py</code>, a public grade API</h3>
+<p><code>cap_grade(basis=..., signal_count=..., attestation_state=...)</code> plus <code>explain()</code> for the
+reasoning. The persistence layer no longer touches <code>separation._RANK</code> and no longer computes
+ceilings itself; a test asserts the module source contains neither <code>_RANK</code> nor
+<code>grade_ceiling</code>. Ceilings are derived from the evidence-class table, and an <code>attested_image</code>
+whose attestation did not verify is downgraded to the offline ceiling before use.</p>
+<h3 id="added-ledger-contract-test">Added - ledger contract test</h3>
+<p>Two mistakes were made while writing the previous commit: a URL in the numeric bibliography
+column, and a ninth column that shifted <code>tag</code> and <code>verification</code> out of place. Both were
+repaired in the data, and <code>test_the_claims_ledger_obeys_its_own_contract</code> now asserts the
+header width, every row width, the tag and verification vocabularies, and a numeric-or-n/a
+bibliography for independently verified rows.</p>
+<p>40 tests in <code>test_persistence.py</code> (645 total).</p>
+<h3 id="added-the-wire-contract-contractverdictschemajson-qvaultcontractpy">Added - the wire contract (<code>contract/verdict.schema.json</code>, <code>qvault/contract.py</code>)</h3>
+<p>The interface other runtimes are allowed to see, and nothing more:</p>
+<ul>
+<li>One payload: mechanism, basis, attestation state, observed signals and counts, verdict
+  token, cap grade, denial codes, remedy, statement.</li>
+<li><strong><code>subject.resource</code> is always null in a policy payload.</strong> The type has no field in which
+  to echo what the caller asked about, so a refusal cannot become a probe about what exists.
+  A payload that fills it in is rejected by both validators.</li>
+<li><code>denial_codes</code> is a closed vocabulary with exactly one public value, so no adapter can
+  invent a taxonomy that partitions resources by which gate nearly passed.</li>
+<li>Persistence payloads must carry a basis and a cap grade and no denial codes; policy payloads
+  must carry neither, because an authorisation answer is not an evidence claim.</li>
+<li>Validation runs in two runtimes: <code>qvault/contract.py</code> (no dependencies) and
+  <code>adapters/verdict_lint.mjs</code> (node). Both reject a payload with no remedy, and the test suite
+  asserts the Python constants and the schema enums have not drifted apart.</li>
+</ul>
+<h3 id="added-pre-merge-gates-toolsgatespy">Added - pre-merge gates (<code>tools/gates.py</code>)</h3>
+<p>G1 tests, G2 smoke, G3 evidence ledger, G4 wire contract in two runtimes, G5 single owner,
+G6 no clean state, G7 denial invariance, G8 scope gate. Merge requires all eight.
+<code>assert_single_owner()</code> fails if an engine module contains a process, socket or shell call or
+imports an adapter; the forbidden tokens are assembled rather than written literally so the
+checker does not trip on its own source.</p>
+<h3 id="fixed-gate-g7-compared-an-allow-with-a-refusal">Fixed - gate G7 compared an allow with a refusal</h3>
+<p>The denial-invariance sweep included <code>retention</code>, which an untrusted policy permits with no
+requested value, so the gate reported two shapes and looked like an oracle. It now compares
+refusals only, and fails if the sweep produces fewer than two of them.</p>
+<h3 id="added-reportoperating_modelmd">Added - <code>report/OPERATING_MODEL.md</code></h3>
+<p>Scrum for backlog, sprints, acceptance and release gates; explicit gates for architecture,
+threat model and evidence. Epics E1-E5 mapped to modules and tests, the polyglot boundary as a
+table, and the statement that a red gate moves the release rather than the gate.</p>
+<p>24 tests in <code>test_contract.py</code> (669 total).</p>
+<h3 id="added-attacker-behaviour-to-control-qvaultbehaviorspy">Added - attacker behaviour to control (<code>qvault/behaviors.py</code>)</h3>
+<p>Seventeen behaviours, each naming its ATT&amp;CK technique, the evidence it leaves, the control
+here that answers it, and the limit of that control. Coverage is <code>implemented</code> (7),
+<code>partial</code> (6) or <code>absent</code> (4), and <code>absent</code> is a normal value.</p>
+<ul>
+<li>Every row resolves to a real module and symbol; <code>resolve()</code> raises if it does not, so the
+  matrix cannot describe code that no longer exists.</li>
+<li>Every row cites a bibliography number, and a test asserts the cited entry names the same
+  ATT&amp;CK identifier the row claims.</li>
+<li>Kernel exploitation, browser sandbox escapes, LPE, WMI subscriptions, fileless execution
+  and DLL side-loading are recorded as <code>absent</code> rather than implied to be covered.</li>
+<li><code>report/THREAT_BEHAVIOR_MATRIX.md</code> is generated by <code>tools/gen_behavior_matrix.py</code>; a test
+  and gate G9 fail if the document and the catalogue disagree.</li>
+</ul>
+<h3 id="added-ifeo-from-the-source-review">Added - IFEO, from the source review</h3>
+<p><code>T1546.012</code> Image File Execution Options injection was in ATT&amp;CK and absent from the
+catalogue, so <code>persistence.ifeo</code> and an <code>ifeo_debugger</code> signal were added: a Debugger value
+outside Program Files, or on a security-relevant image, is detected; appcompat shims are the
+benign twin. Fourteen mechanisms now.</p>
+<h3 id="verified-technique-identifiers">Verified - technique identifiers</h3>
+<p>Each ATT&amp;CK identifier in the bibliography was confirmed by reading the page title, not from
+memory. Two consequences: <code>T1574.001</code> is now titled <em>Hijack Execution Flow: DLL</em>, not the
+older "DLL Search Order Hijacking", and <code>T1574.002</code> and <code>T1562.001</code> could not be verified and
+were left out rather than guessed.</p>
+<h3 id="added-15-bibliography-entries">Added - 15 bibliography entries</h3>
+<p><code>44</code>-<code>58</code> in <code>report/UEFI_Malware_Deep_Dive_Report.md</code>, one per cited technique, each with
+the URL and the reason it is cited.</p>
+<p>15 tests in <code>test_behaviors.py</code> (684 total), gate G9 added.</p>
+<h3 id="added-telemetry-map-qvaulttelemetrypy">Added - telemetry map (<code>qvault/telemetry.py</code>)</h3>
+<p>Every mechanism now names the telemetry that would carry its evidence: 11 sources across
+Sysmon, Windows Security and System logs, PowerShell script-block logging and the TPM event
+log, with the fields to inspect for each.</p>
+<ul>
+<li>Sysmon event semantics were read from the Microsoft documentation, not recalled:
+  1 process create, 7 image load, 11 file create, 12/13/14 registry, 19/20/21 WMI.</li>
+<li>Sigma families are cited with real identifiers read from the SigmaHQ repository, and the
+  module notes they are hunting content rather than a dependency.</li>
+<li><code>rootkit_hiding</code> and <code>bootkit_boot</code> carry no host telemetry at all, because a host cannot
+  testify about what runs before it or hides from it. Both state where the answer does come
+  from instead.</li>
+<li><code>fileless</code> is classified separately as execution-time only: telemetry exists (process
+  ancestry, script blocks), but no autostart artefact does. An earlier version put it in the
+  "no telemetry" set, and the consistency check caught the contradiction.</li>
+<li>EDR field names follow the Defender XDR schema so the map stays vendor-neutral.</li>
+</ul>
+<h3 id="verified-sources-for-this-round">Verified - sources for this round</h3>
+<p>ATT&amp;CK v20 uses Detection Strategy, Analytics and Data Components; the older "Data Sources"
+vocabulary no longer applies. Bibliography entries 59-66 cover Sysmon, the 4698 event, script
+block logging, the TPM 2.0 specification, the SigmaHQ repository, the Defender XDR schema,
+the MSRC update guide and Mandiant's threat-intelligence blog. Entries 62-66 were added only
+after the URLs resolved; a candidate measured-boot page returned 404 and was not cited.</p>
+<h3 id="added-gate-g10-and-generated-map">Added - gate G10 and generated map</h3>
+<p><code>report/TELEMETRY_MAP.md</code> is rendered from the mapping, and G10 fails if the map is stale or
+if the mapping is incomplete. 16 tests in <code>test_telemetry.py</code> (700 total).</p>
+<h3 id="added-the-in-the-wild-reference-set-vendorp0_0days-qvaultwildpy">Added - the in-the-wild reference set (<code>vendor/p0_0days</code>, <code>qvault/wild.py</code>)</h3>
+<p>Google Project Zero's <code>0days-in-the-wild</code> is merged in as a pinned, hash-verified index:
+70 root-cause analyses, 2019-2024, 28 products, at commit <code>e21be4bb</code>, Apache-2.0.</p>
+<ul>
+<li>The 18 MB of upstream markdown is not vendored; <code>index.json</code> records each RCA's CVE, year
+  folder, title, product, disclosure date, upstream path, size and SHA-256, so an edited
+  upstream document is visible at the next audit.</li>
+<li>Upstream is never read at run time. Updating means a new commit, a regenerated index and a
+  reviewed diff, the same rule the vendored triage engine follows.</li>
+<li>The linked tracking spreadsheet reports "Last updated: 2023-04-20" and is not
+  commit-pinnable, so it is not used.</li>
+<li><code>year_is_exploitation_year()</code> records that <code>CVE-2019-17026</code> is filed under 2020: upstream
+  files by year of exploitation, not year of CVE assignment.</li>
+<li>One RCA (<code>CVE-2021-30858</code>) has no heading title upstream. Recorded as an upstream gap
+  rather than silently defaulted.</li>
+</ul>
+<h3 id="honest-result-the-overlap-is-small-and-that-is-the-point">Honest result - the overlap is small and that is the point</h3>
+<p>Of 70 entries, 2 mention persistence or boot artefacts and none are firmware cases.
+<code>boundary_assessment()</code> states that QVault does not detect exploitation, that the layer bounds
+blast radius and preserves evidence for the persistence cases, and that the remainder is out of
+scope and not counted as coverage. The corpus is not used to tune any rule.</p>
+<h3 id="refused-adding-google-project-zero-as-a-collaborator">Refused - adding Google Project Zero as a collaborator</h3>
+<p>GitHub only supports user accounts as outside collaborators. The API refused with
+<code>"googleprojectzero is not a user"</code> (404). Attribution is recorded in <code>CONTRIBUTORS.md</code> and
+<code>NOTICE</code> instead, which also satisfies Apache-2.0 notice retention. No invitation is pending,
+and no individual at Google was invited.</p>
+<h3 id="added-gate-g11">Added - gate G11</h3>
+<p><code>test_wild.py</code> (18 tests) plus G11: the index is intact and <code>report/IN_THE_WILD.md</code> is current.
+718 tests total.</p>
+<h3 id="released-merged-to-main">Released - merged to main</h3>
+<p><code>main</code> moves from v0.11.0 to v0.12.0. The branch carried the policy-denial hardening, the
+probe contract, the persistence detection matrix, the wire contract with gates, and the
+behaviour and telemetry maps. All ten gates pass on main after the merge.</p>
+<h2 id="0110-2026-11-02">[0.11.0] - 2026-11-02</h2>
+<p>Plane errors, the third class, and the one that makes the other two compound: an
+operator acts on evidence produced by the party under investigation.</p>
+<h3 id="fixed-plane">Fixed (plane)</h3>
+<ul>
+<li><strong>correlate</strong> trusted a plane <em>label</em> as a source of truth. One compromised collector
+  could write three labels and manufacture corroboration, which the fingerprint rule did
+  not stop because fingerprints are optional. Independence now requires a named collector
+  per plane; unattributed planes cannot raise a grade. Three existing tests had asserted
+  the grade this used to hand out for free, and were corrected to supply attribution
+  rather than weakened to keep passing.</li>
+<li><strong>lan</strong> accepted <code>{"trusted": true}</code> as evidence that an enforcement plane is sound.
+  Containment moves to an attacker-controlled plane exactly when that claim is wrong, so
+  a boolean is no longer accepted: attestation requires <code>attested_by</code>, <code>evidence</code> and
+  <code>at</code>, and a plane may not attest to itself. The refusal now names which of those failed.</li>
+<li><strong>verify</strong> judged a disk it had read, and said nothing about it. Every report now
+  carries <code>attestation: host_only</code> and states that a clean verdict is consistency, not
+  independent evidence of integrity.</li>
+</ul>
+<h3 id="fixed-pilot">Fixed (pilot)</h3>
+<ul>
+<li><code>LICENSE</code> contained the MIT text while <code>pyproject.toml</code> declared Apache-2.0 and the
+  vendored engine is Apache-2.0. Resolved to Apache-2.0 with the full text; the
+  discrepancy is recorded here rather than quietly overwritten.</li>
+<li><code>MANIFEST.in</code>: an sdist now carries <code>report/</code>, <code>tools/</code> and the lock file, which
+  reproduction needs and which the wheel correctly omits.</li>
+</ul>
+<h3 id="added_1">Added</h3>
+<ul>
+<li>13 plane tests (479 total), covering unattributed planes, one collector in three
+  labels, boolean and self-attestation refusal, the host-derived verdict, licence
+  consistency and sdist completeness.</li>
+</ul>
+<h3 id="oracle-sweep">Oracle sweep</h3>
+<p>No new oracle defect was found this round. The four previously closed (uniform
+authentication failure, uniform store absence, constant-time key-id comparison, no
+secret-derived comparison) are pinned by 9 tests, including a guard that fails the suite
+if the class returns.</p>
+<h2 id="0100-2026-11-02">[0.10.0] - 2026-11-02</h2>
+<p>Packaging is now proven rather than declared, and CI enforces it.</p>
+<h3 id="added_2">Added</h3>
+<ul>
+<li><code>python -m build</code> produces a wheel containing the vendored detector (74 files,
+  <code>vendor/zbtriage/</code> included), an entry point, and <code>qvault/lan.py</code>. Verified by
+  installing the wheel into a clean virtualenv and running the CLI from <code>/tmp</code>, not
+  from the checkout.</li>
+<li>GitHub Actions CI (<code>.github/workflows/ci.yml</code>, prepared and validated, not yet pushed:
+  GitHub requires the <code>workflow</code> OAuth scope to create files under <code>.github/workflows/</code>,
+  and the current token does not have it), four jobs: <code>test</code> (3.11 and 3.12 against <code>requirements-lock.txt</code>,
+  then unit tests, smoke tests, claims ledger, fingerprint drift), <code>package</code> (wheel
+  build, install, detector import, console script exercised outside the repo),
+  <code>static</code> (compileall plus error-only ruff), <code>reproduce</code> (<code>tools/reproduce.sh</code>).</li>
+<li><code>.gitignore</code> for bytecode, build output and virtualenvs.</li>
+<li>An oracle guard test: any short-circuiting comparison on a digest derived from a
+  secret fails the suite, so the class of bug cannot return quietly.</li>
+</ul>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><code>rebuild_kek</code> compared the derived <code>kek_id</code> with <code>!=</code>. That value is derived from the
+  secret KEK, and a caller can vary the reconstructed KEK freely by choosing shares, so
+  the comparison leaked how many leading hex characters matched. Now <code>hmac.compare_digest</code>.</li>
+</ul>
+<h3 id="verified">Verified</h3>
+<ul>
+<li>CI jobs simulated locally before pushing: 466 tests, 62 smoke checks, ledger valid,
+  fingerprint drift clean, wheel built and installed.</li>
+<li><code>requirements-lock.txt</code> installs and the gates pass in a virtualenv with no repo on
+  <code>sys.path</code>.</li>
+</ul>
+<h2 id="090-2026-11-02">[0.9.0] - 2026-11-02</h2>
+<p>Two problem classes, worked line by line.</p>
+<h3 id="oracle-problems-interfaces-that-answer-questions-they-should-not">Oracle problems (interfaces that answer questions they should not)</h3>
+<ul>
+<li><code>crypto</code> reported <code>authentication failed at chunk {idx}</code>. The index let an attacker bisect
+  where their edit was detected; wrong-key and tampered-ciphertext failures also read
+  differently. All authentication paths now raise one constant, <code>AUTH_FAILED</code>, carrying no
+  position, no key property and no failure class.</li>
+<li><code>store</code> distinguished "no envelope" from "object not found", which reveals an aborted
+  ingest: ciphertext written, envelope missing. Both now answer <code>object &lt;id&gt; not available</code>.</li>
+<li><code>verify</code> contained a <code>hasattr(store, "sha256_file")</code> fallback that silently masked a
+  missing import. The import is explicit and the branch is gone.</li>
+</ul>
+<h3 id="pilot-problems-whether-a-fresh-checkout-can-be-deployed-and-reproduced">Pilot problems (whether a fresh checkout can be deployed and reproduced)</h3>
+<ul>
+<li>No packaging existed: <code>pip install</code> was impossible and <code>vendor.zbtriage</code> would not travel.
+  Added <code>pyproject.toml</code> packaging <code>qvault</code>, <code>vendor</code> and <code>vendor.zbtriage</code>, with the
+  <code>qvault</code> console script.</li>
+<li><code>requirements.txt</code> used <code>&gt;=</code>, so a pilot environment could drift from the tree the numbers
+  describe. Added <code>requirements-lock.txt</code> (CPython 3.11.18, cryptography 50.0.2,
+  pytest 9.2.0).</li>
+<li>The CLI had no way to say what it was: added <code>qvault --version</code>.</li>
+<li>Reproduction was undocumented and unverifiable. Added <code>tools/reproduce.sh</code> and
+  <code>report/REPRODUCE.md</code> with the exact expected output of every gate, verified by running
+  from a clean copy of the tree rather than from git.</li>
+<li><code>tools/gen_fingerprints.py --check</code> replaces the <code>git diff</code> drift check, which failed
+  falsely in a checkout without <code>.git</code>.</li>
+<li>A missing vendor tree raised a bare ImportError; it now names the cause and the fix.</li>
+</ul>
+<h3 id="added_3">Added</h3>
+<ul>
+<li><code>qvault/tests/test_oracle_resistance.py</code>: 8 tests asserting indistinguishability, not just
+  that an error occurred. 465 tests, 62 smoke checks.</li>
+</ul>
+<h3 id="known-limitation-not-fixed">Known limitation, not fixed</h3>
+<ul>
+<li>Dual control counts approver <em>names</em>; nothing binds a name to a person, so one operator
+  holding two names satisfies it. Fixing this needs an identity source the tool does not
+  have, and pretending otherwise would be the failure this project documents against.</li>
+</ul>
+<h2 id="080-2026-11-02">[0.8.0] - 2026-11-02</h2>
+<p>The LAN layer existed but was unreachable: no fusion function, no CLI verb, no smoke
+coverage. This release connects it to the other layers and makes it runnable.</p>
+<h3 id="added_4">Added</h3>
+<ul>
+<li><code>lan.cross_layer()</code> fuses firmware attestation, endpoint findings, network deviation,
+  authentication events and provenance into one graded assessment.</li>
+<li><code>lan.load_case()</code> parses a case file strictly: an unknown role or malformed flow is
+  refused by field name, because silently dropping hostile records under-reports.</li>
+<li><code>qvault lan --case FILE</code> prints verdict, grade, identity verdict, gaps and the
+  containment plan (offered steps and refused steps with alternatives).</li>
+<li>Smoke section 7: 8 end-to-end checks over the verb, the dedupe, the anchor gating and
+  the enforcement refusals. 62 checks total.</li>
+</ul>
+<h3 id="fixed_1">Fixed</h3>
+<ul>
+<li>Role violation and identity assertion were graded as one claim, so a missing firmware
+  anchor dragged real network evidence down to UNKNOWN and the tool under-reported.
+  They are now separate: "this host violated its role" needs no anchor, "this device is
+  inconsistent with its authenticated identity" does. Gaps cost one step, never erasure.</li>
+<li><code>load_case</code> passed the wrong field names into <code>Flow</code> and <code>DiscoveryEvent</code>, and called
+  <code>infrastructure_integrity</code> with a list where it expects the index.</li>
+</ul>
+<h2 id="070-2026-11-02">[0.7.0] - 2026-11-02</h2>
+<p>LAN layer (P8): a network is a communication environment, not a machine. Adds
+<code>qvault/lan.py</code>, 30 tests and <code>report/LAN_LAYER.md</code>.</p>
+<h3 id="added_5">Added</h3>
+<ul>
+<li>Device identity bound to an authenticated credential; <code>identity_key</code> refuses a wireless
+  label and refuses an address-only device. BSSID kept as context, never as identity.</li>
+<li>Per-role least-privilege service policy with out-of-role detection carrying a
+  suspicion floor (lateral services grade higher than the rest).</li>
+<li>Traffic baseline and deviation reporting (new peer, new service, first contact), every
+  entry with a benign reading.</li>
+<li>Discovery monitoring for mDNS, LLMNR, NetBIOS, SSDP and UPnP: an unsanctioned response
+  is treated as a claim of authority over a name.</li>
+<li>East-west correlation graded by independent layers with flow deduplication.</li>
+<li>Infrastructure integrity for router, AP, switch, DNS and DHCP, including MAC-only
+  identity as a weakness.</li>
+<li>Graded containment ladder, device-scoped by construction, refusing switch-dependent
+  steps when the enforcement plane is untrusted, and refusing any step that propagates
+  credentials, keys, config or binaries to other hosts.</li>
+<li><code>identity_inconsistency()</code>: the cross-layer verdict, requiring a firmware anchor.</li>
+</ul>
+<h3 id="fixed_2">Fixed</h3>
+<ul>
+<li><code>identity_inconsistency()</code> counted <code>True</code> inside a list of layer names, so the gate
+  never fired and every case returned "insufficient". A containment gate that is
+  silently always-negative is worse than no gate.</li>
+</ul>
+<h2 id="060-2026-11-02">[0.6.0] - 2026-11-02</h2>
+<p>Published-source fingerprints and their defensive inversion, for LoJax, MoonBounce and
+BlackLotus.</p>
+<p><strong>No sample of any family was handled.</strong> Nothing in this repository contains malware, and no
+entry is primary-sourced. Each fingerprint carries the published analysis it came from, a
+benign explanation for the same artifact, the corroboration needed before it means anything,
+and the control that defeats the mechanism.</p>
+<h3 id="added_6">Added</h3>
+<ul>
+<li><code>qvault/fingerprints.py</code>: 11 fingerprints across three families, with <code>scan_text</code>,
+  <code>check_image</code> (unnamed PE section, entry point outside sections), <code>check_config</code>
+  (security-state combinations) and <code>defender_inversion</code>. A textual match is capped at
+  INFERRED, and <code>assert_catalogue_integrity()</code> refuses a CONFIRMED grade, because claiming
+  primary analysis of a sample that was never handled would be false.</li>
+<li><code>tools/gen_fingerprints.py</code> + <code>report/FINGERPRINTS.md</code>: the document is generated from the
+  code, so a fingerprint cannot exist in one and not the other.</li>
+<li>20 tests, including that the rpcnetp lead carries its Absolute/Computrace false positive.</li>
+</ul>
+<h3 id="note">Note</h3>
+<p><code>LOJAX-1</code> is the honest centre of this release: the same artifact is the legitimate
+anti-theft agent on a great many OEM machines. Detection without corroboration there is a
+false positive by construction, which is why every entry carries <code>benign</code> and <code>hostile_when</code>.</p>
+<h2 id="050-2026-11-02">[0.5.0] - 2026-11-02</h2>
+<p>Adversarial testing found four defects. All four were the same failure inverted: something
+unreadable, impossible or duplicated being treated as evidence.</p>
+<h3 id="fixed_3">Fixed</h3>
+<ul>
+<li><strong>The parser returned an empty image instead of admitting failure.</strong> <code>parse_firmware</code>
+  skipped malformed volumes silently, so garbage input produced <code>files=0</code> and looked like
+  a clean read. It now records diagnostics (no <code>_FVH</code> signature, declared length beyond the
+  data, invalid header length, file extending past its volume, size below its own header,
+  <code>MAX_FILES</code> cap hit), counts rejected volumes, and exposes <code>parse_status()</code> and
+  <code>parse_gaps()</code>. Unreadable and partial are distinct from parsed, and the gaps feed
+  confidence.</li>
+<li><strong>An artifact timestamped in the future was accepted.</strong> A future <code>acquired_at_ms</code> is a
+  clock error, a fabricated envelope or a timezone mistake, and evidence that cannot be
+  ordered is useless. Now refused beyond a 300s skew; zero and negative refused outright.</li>
+<li><strong>Duplicate evidence could manufacture independence.</strong> Two copies of one record labelled
+  with different plane names counted as two independent sources and raised a cluster's
+  grade. Events now carry a <code>fingerprint</code>, duplicates collapse regardless of label, and a
+  single fingerprint caps a cluster at INFERRED.</li>
+<li><strong>Two distinct upstreams were reported as <code>single_source</code></strong>, which is a false statement
+  about the evidence. New <code>uncorroborated</code> standing: agreement between resellers is weak
+  evidence, not corroboration. <code>supports_malicious_claim</code> stays false.</li>
+</ul>
+<h3 id="added_7">Added</h3>
+<ul>
+<li><code>qvault/tests/test_adversarial.py</code>: 29 tests across the five attack classes — forged
+  evidence, duplicated sources, malformed firmware, parser exhaustion, misleading
+  timestamps. They assert refusal behaviour; a test passing because the tool said "clean"
+  is treated as a bug in the test.</li>
+<li><code>tools/smoke.py</code> section 6: 16 new end-to-end checks over the fixed paths, including a
+  copied tree with one injected line being detected against its own published digest.</li>
+<li><code>parse_status()</code> / <code>parse_gaps()</code>, <code>CustodyLog</code> unchanged, <code>MAX_CLOCK_SKEW_MS</code>.</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li>Test suite 364 -&gt; 398; smoke 38 -&gt; 54 checks.</li>
+</ul>
+<h2 id="040-2026-11-02">[0.4.0] — 2026-11-02</h2>
+<p>Current version. The release where the tool stopped taking its own word for anything.</p>
+<h3 id="added_8">Added</h3>
+<ul>
+<li><strong><code>qvault/integrity.py</code></strong> — self-integrity and impersonation detection. <code>build_manifest()</code>
+  digests an installation; <code>verify_tree()</code> compares it against a digest supplied from
+  outside the tree, and refuses a digest stored inside it (<code>SELF_EMBEDDED</code>) because an
+  attacker who edits the module edits the recorded hash in the same change. Impersonation
+  checks cover <code>sitecustomize.py</code>/<code>usercustomize.py</code> shipped inside the package, <code>.pth</code>
+  execution hooks, import shadowing, world-writable code, and bytecode with no source.</li>
+<li><strong>Self-scan</strong> — <code>self_scan()</code> runs the manifest and impersonation checks over the tool's
+  own installation, so the scan covers the scanner and not only the device.</li>
+<li><strong><code>combine()</code></strong> — reads a device verdict through the scanner's own status: a finding from
+  an unattested instrument stands but is capped at INFERRED, and an <em>absence</em> of findings
+  from one yields INCONCLUSIVE. Silence from an unverified tool is not evidence.</li>
+<li><strong><code>qvault/calibration.py</code></strong> — measures false positives and false negatives instead of
+  asserting them away. Confusion matrix over a labelled corpus, Wilson intervals,
+  abstentions counted against accuracy, and the rule of three for a clean run (0 errors in
+  40 cases is "at most 7.2%", not zero). <code>refuse_zero_claim()</code> rejects the sentence.</li>
+<li><strong><code>qvault/separation.py</code></strong> — four roles (acquisition, analysis, evidence storage, trust
+  verification), one per component; self-certification refused; attestation grade capped by
+  evidence class; <code>find_circular_trust()</code> catches two components vouching for each other.</li>
+<li><strong><code>qvault/revoke.py</code></strong> — credential revocation planning. Refresh grants and OAuth grants
+  are revoked first because they mint other credentials; a request is not a revocation
+  (issuer confirmation required); credentials with no revocation channel are reported as
+  needing replacement rather than as revoked.</li>
+<li><strong><code>qvault/budgets.py</code></strong> — resource isolation per component: wall time, memory, output
+  bytes, open files, artifact size. Output is capped as well as input, and a budget kill
+  produces telemetry gaps that degrade the finding rather than yielding a partial result
+  presented as complete.</li>
+<li><strong><code>qvault/pillars.py</code></strong> — the seven capabilities traced to a real symbol and a real test,
+  generating <code>report/CAPABILITY_MAP.md</code>. A pillar holding a gap cannot be labelled
+  implemented.</li>
+<li><strong><code>qvault/correlate.py</code></strong> — temporal evidence graph. Grade comes from independence, not
+  volume: 4 contacts in one plane stay INFERRED, while install + execution + contact across
+  three planes reaches CONFIRMED. Proximity alone never raises a grade.</li>
+<li><strong><code>qvault/zbt_bridge.py</code></strong> — binds the vendored detector's fourteen evidence classes to the
+  local plane model, converting hits into graded observations. Detector output can never be
+  a finding on its own.</li>
+<li><strong><code>tools/smoke.py</code></strong> — 38 end-to-end checks over the shipped CLI surfaces.</li>
+<li><strong><code>tools/check_claims.py</code></strong>, <strong><code>tools/check_findings.py</code></strong> — validators that make the
+  evidence rules bind imported data, not just code paths written here.</li>
+<li>Report material: <code>report/EVIDENCE_POLICY.md</code>, <code>report/ARCHITECTURAL_LIMITATIONS.md</code>,
+  <code>report/NETOBS_MODULE.md</code>, <code>report/THREAT_MODEL_REVIEW.md</code>,
+  <code>report/HARDWARE_TEST_QUESTIONS.md</code>, <code>report/CLAIMS_LEDGER.csv</code> (53 claims, each with a
+  source, a grade and a falsifier), <code>report/CAPABILITY_MAP.md</code>.</li>
+</ul>
+<h3 id="fixed_4">Fixed</h3>
+<ul>
+<li>Merged the repository owner's hardening commit <code>38235ea</code> (2026-11-01): boundary validation
+  in stream headers and Shamir share parsing, path-traversal rejection in <code>retrieve</code>, and
+  single-pass ingest. Their 5 files and 75 new tests are in this release unchanged; my
+  changes sit on top and did not conflict. Total suite is 369 tests after the merge.</li>
+<li><code>audit-signing.key</code> was written by <code>init</code> and then never found: every command constructed
+  <code>AuditLog</code> without a <code>key_path</code>, so <code>checkpoint</code> failed with "signing key not
+  initialised" on a vault that had one. The path is now derived from the log location.</li>
+<li><code>retrieve</code> refuses an output directory without an <code>.enclave</code> sentinel, but nothing created
+  a marked directory, so the documented workflow was unreachable. Added the <code>enclave</code> verb.</li>
+<li><code>verify_tree()</code> reported a digest computed over a different tree as <code>MISMATCH</code>, i.e. as
+  suspicion. A wrong reference now reports <code>INCOMPARABLE</code> and says so; a 113-file
+  disagreement was never evidence of tampering.</li>
+<li>Process identity was <code>strip().lower()</code>, so <code>chrome.exe</code> and
+  <code>/opt/google/chrome/chrome</code> never merged — the case correlation exists for. Now basename,
+  case-folded, separators unified, extended-length prefix and Windows trailing dots removed.
+  Stated limit: two binaries sharing a basename still merge.</li>
+<li>Hit counting undercounted by 2,910x on the exact incident upstream documents: 291,000
+  matches on one indicator were counted as the 100 that fit in the listing. Totals now come
+  from the module's counters; truncation is a telemetry gap; verdicts separate
+  <code>serious_hits</code> from <code>listed_hits</code>.</li>
+<li>Benign truncation (a cache referencing one domain thousands of times) was pushing verdicts
+  to "inconclusive", which trains readers to ignore the verdict. Only serious evidence
+  truncation creates a coverage gap.</li>
+<li>A normal <code>__pycache__</code> was flagged as source-less bytecode because the source was sought
+  beside the <code>.pyc</code> instead of in the parent directory.</li>
+<li>An installation absent from <code>sys.path</code> was reported as shadowed; shadowing is unanswerable
+  from there, so it is now an explicit unknown.</li>
+<li><code>calibration.evaluate()</code> raised <code>AttributeError</code> on a bare list. It now refuses the input
+  and explains that a list of verdicts has no truth to measure against.</li>
+<li>Placeholder citations in the capability map named symbols and test files that do not exist;
+  all seven pillars now resolve to real code.</li>
+</ul>
+<h3 id="changed_1">Changed</h3>
+<ul>
+<li><strong>Merged with Zero-Breach-Toolkit v2.0.2</strong> (<a href="https://github.com/interplains/Zero-Breach-Toolkit/releases/tag/v2.0.2">release</a>,
+  commit <code>90148ea</code>), credited to <strong>@interplains</strong>. The library is vendored at
+  <code>vendor/zbtriage/</code> (Apache-2.0, LICENSE and NOTICE preserved), byte-identical to the
+  release tree and pinned by digest in <code>vendor/UPSTREAM.sha256</code> with a test enforcing it.
+  Not a fork and not a rewrite: upstream owns detection, this repository owns grading.</li>
+<li>Version reported as <code>0.4.0</code> rather than <code>1.0.0</code>. The capability map records 0 of 7 pillars
+  fully implemented and 7 partial, with every remainder named; claiming 1.0 while that is
+  true would be the same overclaim the rest of this release exists to prevent.</li>
+</ul>
+<h3 id="known-gaps">Known gaps</h3>
+<ul>
+<li>Acquisition from a device that cannot be read (locked, encrypted, physically inaccessible).</li>
+<li>Indicator corpus not embedded locally: feed freshness is upstream's.</li>
+<li>Permission-versus-behaviour comparison not implemented.</li>
+<li>Hardware-backed key custody (TPM/HSM) not implemented; keys are software KEK shares.</li>
+<li>In-circuit versus chip-off read equivalence unverified (open question H8).</li>
+<li>Zone isolation and resource budgets are specified in Python and not verified to be
+  enforced by the substrate. Until something outside Python enforces them, they are a
+  specification rather than a control.</li>
+<li>No calibrated confidence from real outcomes: <code>calibration.py</code> measures, but no labelled
+  corpus of real spyware samples ships here, and none will.</li>
+</ul>
+<hr />
+<h2 id="030-2026-11-01">[0.3.0] — 2026-11-01</h2>
+<h3 id="added_9">Added</h3>
+<ul>
+<li><code>qvault/firmware_integrity.py</code> — a separate subsystem for firmware, because an OS scan
+  cannot certify the hardware hosting it. Anchor lattice from OS-mediated reads (rank 0,
+  establishes nothing) to out-of-band flash reads (rank 4); host trust requires
+  <code>flash_image</code> and <code>crtm</code> established by anchors that do not ask the subject.
+  <code>certify_host()</code> refuses and names the missing subject.</li>
+<li><code>qvault/findings.py</code> — mandatory evidence grade, at least one plausibly benign
+  explanation with a disposition, telemetry gaps that lower confidence and never become a
+  clean result, detection and attribution graded separately, and no <code>clean</code> value in the
+  verdict type at all.</li>
+<li><code>qvault/provenance.py</code> — the eight-element artifact envelope: original source,
+  acquisition timestamp, SHA-256, acquisition method, tool and reader version, coverage and
+  collection errors, hash-chained custody, and authenticated encryption at rest. The digest
+  is computed by <code>capture()</code>, never accepted from a caller.</li>
+<li><code>qvault/isolation.py</code> — zone placement with deny-by-default data flow for evidence
+  readers, database parsers, indicator processing, report generation and AI-assisted
+  analysis. Plaintext never flows toward the AI zone.</li>
+<li><code>qvault/limitations.py</code> — the four architectural limitations as evidence planes, with
+  adversarial confidence: an <code>on-disk</code> fingerprint read through the OS is not defensible
+  against a capable subject.</li>
+<li><code>qvault/netobs.py</code> — DNS, flow metadata, process ancestry and destination classification,
+  reported as attribution divergences rather than a log of agreements.</li>
+<li><code>qvault/netpolicy.py</code> — BSSID and network context as a fail-safe policy selector, with the
+  rule that a BSSID may only ever lose trust and standards encoded as tests.</li>
+<li><code>qvault/containment.py</code> — the six capability denials scored per enforcement plane and per
+  subject posture, with claim auditing.</li>
+<li><code>qvault/fwdiff.py</code> — module-level FFS/PE diff against an OEM image: added and removed
+  modules, changed sections, unnamed appended sections, prologue-to-call replacement, W+X
+  sections and implant immediates.</li>
+<li>Version 0.3.0 released.</li>
+</ul>
+<hr />
+<h2 id="020-2026-11-01">[0.2.0] — 2026-11-01</h2>
+<h3 id="added_10">Added</h3>
+<ul>
+<li>Function-level MoonBounce reconstruction in the report, from Kaspersky's technical-details
+  document: the three patched boot-service prologues, the <code>0x158878</code>-byte scan for the
+  <code>retfq</code> tail of <code>OslArchTransferToKernel</code>, shellcode at physical <code>0x98000</code>, the
+  relocation-directory code cave, forced W+X kernel sections, and the two name-hash
+  algorithms with their constants.</li>
+<li>Detection signatures derived from that reconstruction, with fidelity ratings, and 14
+  hardware-test questions no document can answer.</li>
+</ul>
+<h3 id="fixed_5">Fixed</h3>
+<ul>
+<li>The report previously marked the hooked loader and kernel functions <code>UNKNOWN</code>; that claim
+  was retracted once the primary source was obtained.</li>
+</ul>
+<hr />
+<h2 id="010-2026-11-01">[0.1.0] — 2026-11-01</h2>
+<h3 id="added_11">Added</h3>
+<ul>
+<li>Initial vault: AES-256-GCM streaming encryption, Shamir KEK shares, write-once object
+  storage, hash-chained audit log with Ed25519 checkpoints, dual-control retrieval gated on
+  the <code>.enclave</code> sentinel, and <code>verify</code>.</li>
+<li><code>report/UEFI_Malware_Deep_Dive_Report.md</code> — LoJax, MoonBounce and BlackLotus with per-claim
+  evidence grades, plus the cryptographic quarantine design and its failure analysis.</li>
+</ul>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

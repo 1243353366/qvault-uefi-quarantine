@@ -1,0 +1,3315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UEFI malware deep dive · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html" class="current">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="below-the-operating-system-a-reverse-engineering-study-of-lojax-moonbounce-and-blacklotus-and-the-design-of-a-cryptographic-quarantine-vault">Below the Operating System: A Reverse-Engineering Study of LoJax, MoonBounce and BlackLotus, and the Design of a Cryptographic Quarantine Vault</h1>
+<p><strong>Classification:</strong> defensive security research
+<strong>Evidence basis:</strong> secondary sources only. No sample was obtained, unpacked,
+disassembled or executed, and no independent reverse engineering was performed.
+Every tag in this document describes the <em>source's</em> evidence, not the author's
+verification. See §0.5 and <code>report/EVIDENCE_POLICY.md</code>.
+<strong>Date:</strong> November 2026
+<strong>Companion code:</strong> <code>qvault/</code> (this repository, MIT licence)
+<strong>Analyst:</strong> prepared for aadi shankar</p>
+<hr />
+<h2 id="0-scope-method-and-how-to-read-the-evidence-tags">0. Scope, method, and how to read the evidence tags</h2>
+<h3 id="01-what-this-document-is">0.1 What this document is</h3>
+<p>Three independent reverse-engineering studies, a comparison of the resulting
+architectures, and the design and implementation of a quarantine system that can
+hold these threats as evidence without ever letting them run.</p>
+<p>The three families are not variants of one another and are not treated as such:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Class</th>
+<th>Year disclosed</th>
+<th>Actor</th>
+<th>Lives in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LoJax</strong></td>
+<td>Firmware implant (UEFI rootkit)</td>
+<td>2018</td>
+<td>Sednit / APT28</td>
+<td>SPI flash, BIOS region</td>
+</tr>
+<tr>
+<td><strong>MoonBounce</strong></td>
+<td>Firmware implant (UEFI rootkit)</td>
+<td>2022</td>
+<td>APT41 (vendor assessment)</td>
+<td>SPI flash, <code>CORE_DXE</code></td>
+</tr>
+<tr>
+<td><strong>BlackLotus</strong></td>
+<td>UEFI bootkit</td>
+<td>2023</td>
+<td>Commodity, sold on forums</td>
+<td>EFI System Partition + NVRAM</td>
+</tr>
+</tbody>
+</table>
+<p>The single most important distinction in this whole document, and the one most
+often blurred in secondary reporting: <strong>BlackLotus is not a firmware implant.</strong>
+It never writes to flash. LoJax and MoonBounce do. That difference determines
+whether replacing the disk helps, whether a firmware update helps, and whether
+the machine can be trusted again without physical intervention.</p>
+<h3 id="02-evidence-grading">0.2 Evidence grading</h3>
+<p>Every non-trivial claim carries one of these tags. This is the discipline that
+keeps vendor summaries from being mistaken for reverse-engineering evidence.</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>[CONFIRMED]</strong></td>
+<td>Directly supported by technical evidence: decompilation, byte-level structure, a named artifact in a published analysis.</td>
+</tr>
+<tr>
+<td><strong>[CORROBORATED]</strong></td>
+<td>Supported by two or more independent sources that agree.</td>
+</tr>
+<tr>
+<td><strong>[INFERRED]</strong></td>
+<td>A reasonable technical conclusion drawn from confirmed behaviour, but not itself directly observed.</td>
+</tr>
+<tr>
+<td><strong>[HYPOTHESIS]</strong></td>
+<td>Plausible and consistent with evidence, but unproven. Stated so it can be attacked.</td>
+</tr>
+<tr>
+<td><strong>[UNKNOWN]</strong></td>
+<td>Insufficient public evidence. Explicitly not guessed.</td>
+</tr>
+</tbody>
+</table>
+<p>A claim that a vendor's <em>marketing summary</em> makes and that no technical
+publication supports stays at <strong>[HYPOTHESIS]</strong> no matter how often it is
+repeated. Where I could not obtain a sample, the text distinguishes <em>documented</em>
+behaviour from <em>independently verified</em> behaviour, and most of this study is the
+former: no live samples were executed at any point.</p>
+<h3 id="03-sources-actually-used">0.3 Sources actually used</h3>
+<p>Primary technical publications, read in full rather than skimmed:
+ESET's 24-page LoJax whitepaper; Kaspersky's MoonBounce report; ESET's BlackLotus
+analysis; Microsoft's Defender Experts incident-response guidance; the CVE-2022-21894
+exploitation write-up and PoC repository; NSA's mitigation guide (referenced, not
+quoted - see §11 for the access note); NIST SP 800-193/155/147B for firmware
+resiliency and integrity measurement. Full list with links in §12.</p>
+<h3 id="04-a-note-on-what-was-not-done">0.4 A note on what was not done</h3>
+<p>No sample was downloaded, unpacked, or executed. No exploit was built. This study
+reconstructs mechanisms from published reverse engineering and then builds a
+<em>defensive</em> system. Everything executable in this repository is custody software;
+the test fixtures are synthetic byte strings.</p>
+<h3 id="05-verification-status-and-what-these-tags-do-not-mean">0.5 Verification status, and what these tags do not mean</h3>
+<p>The tags in §0.2 record what a <strong>source</strong> demonstrates. They do not record that
+the author independently confirmed anything, because the author did not.</p>
+<table>
+<thead>
+<tr>
+<th>Verification status</th>
+<th>Applies to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>none</strong></td>
+<td>Every claim about LoJax, MoonBounce and BlackLotus. Taken from published analysis. Nobody here re-derived it from a sample.</td>
+</tr>
+<tr>
+<td><strong>partial</strong></td>
+<td>Signature sets and diff logic derived here from published artifacts, not validated against a live sample.</td>
+</tr>
+<tr>
+<td><strong>independent</strong></td>
+<td>Only this repository's own behaviour, backed by an executable test.</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences a reader should hold onto:</p>
+<ol>
+<li><strong>The word "reconstruction" throughout this document means "reconstruction from
+   published technical analysis".</strong> Where a source published function names, byte
+   patterns and offsets, they are quoted and attributed. Where it did not, the text
+   says <code>UNKNOWN</code> rather than filling the gap.</li>
+<li><strong>No signature in §3.9 or in <code>qvault/fwdiff.py</code> has been run against real
+   malware.</strong> They are derived from documented bytes and will have false positives
+   and false negatives until someone validates them.</li>
+<li><strong>Confidence in a claim is capped by its source, not by repetition.</strong> A fact
+   that three blog posts paraphrase from one vendor report is still one source.</li>
+</ol>
+<p>Three artefacts make this auditable rather than assertable:</p>
+<ul>
+<li><code>report/EVIDENCE_POLICY.md</code> — the rules, the revised tag semantics, and a
+  self-audit listing where this work broke its own rules.</li>
+<li><code>report/CLAIMS_LEDGER.csv</code> — 48 significant claims, each with source, locator,
+  tag, verification status and a <strong>falsifier</strong>: the observation that would refute it.</li>
+<li><code>tools/check_claims.py</code> — validates the ledger. It fails if a claim lacks a
+  source, uses an invalid tag, has no attackable falsifier, points at a section
+  that does not exist, or claims independent verification for a malware family.</li>
+</ul>
+<pre><code class="language-bash">python tools/check_claims.py     # exits non-zero on any violation
+</code></pre>
+<hr />
+<h2 id="1-executive-technical-summary">1. Executive technical summary</h2>
+<p><strong>1. The three threats occupy different layers, and the layer decides the
+remediation.</strong> LoJax and MoonBounce live in SPI flash and survive OS reinstall,
+disk replacement and (for partial updates) firmware update. BlackLotus lives on
+the EFI System Partition and in a UEFI variable; reformatting the OS partition
+<em>and</em> the ESP removes it, which is why Microsoft's recovery guidance is a
+reformat rather than a reflash.</p>
+<p><strong>2. Two of the three did not exploit anything.</strong> LoJax and MoonBounce both
+required the attacker to already hold kernel-level access and then abused
+<em>legitimate</em> firmware-write interfaces. LoJax carried a signed, legitimate
+driver (RWEverything's <code>RwDrv</code>) to reach the flash. Neither needed a firmware
+vulnerability; they needed a <em>misconfigured platform</em> - BIOS write protections
+left off. BlackLotus is the inverse: it is not privileged at the firmware layer
+at all, and instead exploits a <em>software</em> trust failure (CVE-2022-21894, "baton
+drop") to defeat Secure Boot, then uses the Linux shim's MOK mechanism exactly as
+designed to make its unsigned bootkit load forever after.</p>
+<p><strong>3. Persistence quality is not the same as stealth.</strong> LoJax leaves a structural
+fingerprint: a new FFS file named <code>SecDxe</code>, a deleted AMI NTFS driver, and a
+changed free-space layout. MoonBounce leaves <em>none</em> - it inline-hooks an existing,
+legitimate <code>CORE_DXE</code> so the firmware volume list is byte-identical in structure
+and differs only in content. §3.8 reconstructs that mechanism end to end: five
+bytes of three boot-service prologues replaced by a <code>call</code>, a <code>retfq</code> tail patched
+in <code>winload.efi</code> to jump to shellcode at physical <code>0x98000</code>, and an
+<code>ExAllocatePool</code> hook placed in <code>ntoskrnl</code>'s relocation directory after forcing
+every kernel section to write-and-execute. BlackLotus leaves a great deal: files on the ESP,
+a <code>MokList</code> entry, and Measured Boot deltas. Detection difficulty therefore runs
+MoonBounce &gt; LoJax &gt; BlackLotus, while deployment ease runs the opposite way.</p>
+<p><strong>4. Secure Boot is not a firmware integrity control.</strong> This is the most
+valuable correction to make. Secure Boot governs what the <em>firmware</em> is willing
+to load from disk: boot managers, option ROMs, loaders. It does not, by itself,
+attest that the firmware in the SPI flash is the firmware the vendor shipped.
+LoJax added an unsigned DXE driver to firmware and ESET's own recommendation to
+enable Secure Boot [CONFIRMED, ESET §6] should be read as <em>one</em> layer, not the
+mechanism that stops a firmware implant. The mechanisms that actually constrain
+flash writes are the platform's own: <code>BIOSWE</code>/<code>BLE</code>/<code>SMM_BWP</code>, the descriptor's
+region permissions, protected ranges (PR0-PR5), <code>FLOCKDN</code>, and Boot Guard.</p>
+<p><strong>5. Eradication is a hardware procedure, not a software one.</strong> For LoJax and
+MoonBounce: reflash the SPI flash from a trusted image with a hardware programmer,
+or replace the board; a vendor firmware update removes it only if the update
+rewrites the entire BIOS region, which is not guaranteed [CONFIRMED, ESET §6].
+For BlackLotus: reformat OS + ESP, revoke the attacker's MOK, apply <code>dbx</code>
+revocations, and remove the third-party UEFI CA where it is not needed
+[CONFIRMED, Microsoft; ESET].</p>
+<p><strong>6. Encryption is containment, not eradication, and it is weaker than it
+looks.</strong> A vault that encrypts at ingestion prevents <em>casual</em> execution: backups,
+AV crawlers, file previewers, an analyst double-clicking the wrong file. It does
+not prevent execution that happens <em>before</em> encryption, and it does not reach
+code already resident in firmware, which runs at boot regardless of what is on
+disk. The design in §9 is therefore layered so that no single mechanism is
+load-bearing: per-object keys, split-knowledge KEK, dual control, enclave-only
+decryption, hash-chained custody, and an ingestion appliance that has no
+writable path for plaintext.</p>
+<p><strong>7. The defensible conclusion.</strong> A quarantine system can guarantee that a
+preserved sample is <em>unmodified</em> and <em>unexecuted between ingestion and retrieval</em>.
+It cannot guarantee that the machine that produced the sample was clean, nor that
+the analysis host is clean. Those remain human and physical controls, and a
+design that claims otherwise is selling something.</p>
+<hr />
+<h2 id="2-lojax-the-first-in-the-wild-uefi-rootkit">2. LoJax: the first in-the-wild UEFI rootkit</h2>
+<p><em>Primary source: ESET Research, "LoJax: First UEFI rootkit found in the wild,
+courtesy of the Sednit group", September 2018, 24 pp.</em></p>
+<h3 id="21-what-it-is">2.1 What it is</h3>
+<p>LoJax is the name ESET gave to two things that arrived together: a <strong>trojanized
+build of an old (2008-era) Absolute Software LoJack/Computrace small agent</strong>, and
+a <strong>malicious UEFI DXE driver</strong> (<code>SecDxe</code>) whose only job is to keep dropping
+that agent onto the machine. The pairing matters: the agent is ordinary Windows
+crimeware-grade code, and the driver is what makes it survive everything.</p>
+<p>Attribution to Sednit/APT28 is based on co-located Sednit tooling and C2
+infrastructure overlap, stated at "high confidence" by ESET [CONFIRMED as ESET's
+assessment]. Victims were government entities in the Balkans and Central/Eastern
+Europe, in small numbers [CONFIRMED].</p>
+<p>The strategic insight Sednit had is the one defenders still under-rate: the
+LoJack anti-theft agent is <em>designed</em> to survive disk wipes and reinstalls,
+because that is what anti-theft software must do. Its architecture was already a
+rootkit. Sednit did not have to invent firmware persistence; they had to steal
+an existing, signed, OEM-blessed persistence channel.</p>
+<h3 id="22-why-the-lojack-architecture-was-abusable">2.2 Why the LoJack architecture was abusable</h3>
+<p>Computrace's circa-2008 design, as documented by ESET:</p>
+<ol>
+<li>A UEFI/BIOS module runs at boot.</li>
+<li>It finds a FAT/FAT32/NTFS partition, backs up <code>autochk.exe</code>, and overwrites it
+   with a dropper.</li>
+<li><code>autochk.exe</code> runs early in Windows initialisation (<code>BootExecute</code>), drops
+   <code>rpcnetp.exe</code> and registers it as a service, then restores the original.</li>
+<li><code>rpcnetp.exe</code> is a tiny agent that converts itself to a DLL in memory,
+   injects into <code>svchost.exe</code> and <code>iexplore.exe</code>, and talks to Absolute's server.</li>
+<li>That server can instruct it to download and install the full recovery agent.</li>
+</ol>
+<p>Two design flaws made this a gift to an attacker [CONFIRMED]:</p>
+<ul>
+<li><strong>No authentication on the C2 channel.</strong> ESET quotes prior research: if an
+  adversary controls the server the small agent talks to, they can make it
+  download and run arbitrary code.</li>
+<li><strong>The C2 address is in a config file obfuscated with a single-byte XOR
+  (key <code>0xB5</code>, identical across agents), with no integrity validation.</strong> Anyone
+  with write access to <code>%WINDIR%</code> can repoint the agent.</li>
+</ul>
+<p>That is the whole "initial infection" story for the userland half: no exploit, no
+memory corruption, just a writable configuration file and a trusting client.</p>
+<h3 id="23-the-toolchain-how-they-reached-the-flash">2.3 The toolchain: how they reached the flash</h3>
+<p>ESET recovered the actual operator tooling, which is what makes this report
+unusually well-evidenced. Three named binaries [CONFIRMED]:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Role</th>
+<th>ESET detection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>info_efi.exe</code></td>
+<td>Enumerate/dump firmware, wraps a kernel driver</td>
+<td>Win32/Agent.ZXZ</td>
+</tr>
+<tr>
+<td><code>ReWriter_read.exe</code></td>
+<td>Dump the SPI flash to a file</td>
+<td>Win32/SPIFlash.A</td>
+</tr>
+<tr>
+<td><code>ReWriter_binary.exe</code></td>
+<td>Patch the dumped image and write it back</td>
+<td>Win32/SPIFlash.A</td>
+</tr>
+</tbody>
+</table>
+<p>Both flash tools ride on <strong>RWEverything's <code>RwDrv</code></strong>, a legitimately signed
+kernel driver shipped with a hardware-inspection utility. This is a textbook
+BYOVD (bring your own vulnerable driver) move, in 2018, for firmware access.</p>
+<p><strong>The read path</strong> [CONFIRMED]: locate the Root Complex Register Block base by
+reading PCI configuration offset <code>0xF0</code> via <code>RwDrv</code> IOCTL <code>0x22840</code>; then drive
+the chipset's SPI controller registers (<code>HSFS</code>/<code>HSFC</code>/<code>FDATAX</code>) through the
+canonical sequence - set cycle type to read, program the flash address, set the
+byte count, set <code>FGO</code>, poll <code>SCIP</code>, read data - looping over the region. This is
+the same primitive CHIPSEC exposes today, which is why CHIPSEC is the right
+detection and acquisition tool.</p>
+<p>Then the tool <strong>validates its own dump</strong> by parsing the flash descriptor and
+summing the BIOS, GbE and ME region sizes, comparing the total against the BIOS
+Flash Primary region register. A careful, engineering-minded implementation: this
+is not script-kiddie firmware work [CONFIRMED].</p>
+<p><strong>The patch path</strong> [CONFIRMED]: parse FFS volumes, looking for four anchors -</p>
+<ul>
+<li><code>Ip4Dxe</code> <code>{8f92960f-2880-4659-b857-915a8901bdc8}</code> - used only as a <em>marker</em>
+  that this volume holds DXE drivers;</li>
+<li>DXE Core - a second candidate volume;</li>
+<li><code>NtfsDxe</code> <code>{768bedfd-7b4b-4c9f-b2ff-6377e3387243}</code> - the AMI NTFS DXE driver,
+  which gets <strong>deleted</strong>;</li>
+<li><code>SmiFlash</code> <code>{bc327dbd-b982-4f55-9f79-056ad7e987c5}</code> - noted, stored, never used.</li>
+</ul>
+<p>It then constructs an <code>EFI_FFS_FILE_HEADER</code>, embeds a compressed PE image plus a
+UI section naming the file <strong><code>SecDxe</code></strong>, and writes it into the free space at the
+end of the chosen volume. It removes the AMI NTFS driver by overwriting it with
+<code>0xFF</code> and sliding the trailing volume contents down - because the AMI driver is
+read-only, and the attacker needs a <em>write</em>-capable NTFS driver.</p>
+<p>The <code>SmiFlash</code> finding deserves a note. ESET writes that this image is vulnerable
+and that "we believe that Sednit's operators might be working on some exploit for
+these vulnerabilities" [ESET's own wording: <strong>HYPOTHESIS</strong>]. In its observed
+state, the tool only works on systems whose BIOS region write protections are
+misconfigured or absent, on hardware older than the PCH generation introduced
+around 2008 [CONFIRMED].</p>
+<h3 id="24-the-write-protection-story-which-is-the-real-lesson">2.4 The write-protection story, which is the real lesson</h3>
+<p>ESET's explanation of why this worked is the most reusable part of the paper:</p>
+<ul>
+<li><strong><code>BIOSWE</code></strong> (BIOS Write Enable) in <code>BIOS_CNTL</code> must be 1 to write the BIOS
+  region at all.</li>
+<li><strong><code>BLE</code></strong> (BIOS Lock Enable) is supposed to protect it: setting <code>BIOSWE</code> raises
+  an SMI, and the SMI handler clears it. But the handler is firmware's
+  responsibility - if the vendor never wrote it, <code>BLE</code> is decorative. And there
+  is a <strong>race condition</strong> (Kallenberg &amp; Wojtczuk, "Speed Racer") that bypasses it
+  entirely: one thread continuously sets <code>BIOSWE</code> while another writes flash.</li>
+<li><strong><code>SMM_BWP</code></strong> (SMM BIOS Write Protect Disable), introduced with the PCH, fixes
+  the race by requiring all cores to be in SMM for the BIOS region to be
+  writable - but again, only if firmware sets it.</li>
+</ul>
+<p>So the security of the SPI flash was, and largely still is, a <strong>firmware
+configuration property</strong>, not a platform guarantee. <code>ReWriter_binary</code> reads
+<code>BIOS_CNTL</code> and branches on what it finds: it takes the easy path when <code>BIOSWE</code>
+is already set, and otherwise attempts to exploit the configuration it meets.
+It does not check protected ranges (<code>PRx</code>) at all, which is exactly why <code>PRx</code> is
+the control that actually stops this class [INFERRED from ESET's note that
+"other existing mechanisms, like BIOS Range Write Protection, are left aside
+since they are not checked by ReWriter_binary"].</p>
+<h3 id="25-the-rootkit-itself-secdxe">2.5 The rootkit itself: <code>SecDxe</code></h3>
+<p><code>SecDxe</code> is a DXE driver. The DXE Dispatcher loads it during the Driver Execution
+Environment phase, before the OS loader exists, which is what makes it early
+enough to matter [CONFIRMED].</p>
+<p><strong>It embeds a whole NTFS driver.</strong> ESET's evidence that Sednit did not write it
+is strong: strings reference <code>c:\edk2\NtfsPkg\NtfsDxe\ntfs\*.c</code> - <code>mft.c</code>,
+<code>inode.c</code>, <code>volume.c</code>, <code>logfile.c</code>, <code>lcnalloc.c</code>, <code>security.c</code> and more - which
+is the directory layout of <strong>Hacking Team's leaked <code>vector-edk</code></strong> project, a thin
+wrapper around <code>ntfs-3g</code>. Function-by-function comparison, including the same
+<code>LockedByMe</code> lock variable, matches the leaked source [CONFIRMED].</p>
+<p><strong>What it does at boot</strong> [CONFIRMED]:</p>
+<pre><code>UEFI DXE phase
+  └─ SecDxe (malicious, in BIOS region of SPI flash)
+       ├─ loads embedded NTFS DXE driver (Hacking Team / ntfs-3g)
+       ├─ mounts the Windows NTFS volume
+       ├─ writes  %WINDIR%\SysWOW64\rpcnetp.exe      (System32 on 32-bit)
+       ├─ writes  %WINDIR%\SysWOW64\autoche.exe
+       └─ patches the SYSTEM registry hive FILE on disk:
+            HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\BootExecute
+            &quot;autocheck autochk *&quot;   -&gt;   &quot;autocheck autoche *&quot;
+                 (single byte: the 'k' of autochk becomes 'e')
+
+Windows early boot
+  └─ smss.exe executes BootExecute -&gt; autoche.exe
+       ├─ creates a service for rpcnetp.exe (reusing the legitimate Computrace service name)
+       └─ restores BootExecute to &quot;autocheck autochk *&quot;
+
+Windows running
+  └─ rpcnetp.exe (service, trojanized 2008 Computrace agent)
+       ├─ self-converts to DLL in memory, injects into svchost.exe and iexplore.exe
+       └─ contacts attacker-controlled C2, can download/execute further modules
+</code></pre>
+<p>Note the elegance of the registry edit: it is a <strong>one-byte file-level patch of a
+hive file</strong>, performed from firmware, at a point where no OS security product
+exists to see it. <code>autoche.exe</code> then cleans up after itself, so the registry is
+correct again by the time anyone logs in [CONFIRMED].</p>
+<p>ESET never observed the agent actually downloading additional modules, but states
+the functionality exists [CONFIRMED as an observation of absence; the capability
+is <strong>INFERRED</strong> from the inherited Computrace code path].</p>
+<h3 id="26-persistence-properties">2.6 Persistence properties</h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Survives?</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS reinstall</td>
+<td><strong>Yes</strong></td>
+<td>Code is in SPI flash, not on disk [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Disk replacement</td>
+<td><strong>Yes</strong></td>
+<td>Same [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Firmware update</td>
+<td><strong>Only if the update rewrites the whole BIOS region</strong></td>
+<td>ESET: "may remove the rootkit given that the update rewrites the whole BIOS region" [CONFIRMED]</td>
+</tr>
+<tr>
+<td>CMOS clear / NVRAM reset</td>
+<td><strong>Yes</strong></td>
+<td>Only settings live in NVRAM; the driver is in the flash region [INFERRED, mechanically certain]</td>
+</tr>
+<tr>
+<td>Secure Boot toggle</td>
+<td><strong>Yes</strong></td>
+<td>Secure Boot does not unload an already-present DXE driver; it governs what firmware loads from disk [INFERRED]</td>
+</tr>
+<tr>
+<td>Motherboard swap</td>
+<td>No</td>
+<td>Trivially [INFERRED]</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Remediation [CONFIRMED, ESET §6]:</strong> reflash the SPI flash; a full-region vendor
+firmware update <em>may</em> suffice; otherwise replace the motherboard. ESET is blunt
+that this "is not a recommended procedure for the average computer owner".</p>
+<h3 id="27-why-lojax-was-detectable">2.7 Why LoJax was detectable</h3>
+<p>Paradoxically, the crudest implant is the easiest to spot structurally. Its
+fingerprint is a <em>firmware volume that does not match the vendor's image</em>:</p>
+<ul>
+<li>an FFS file named <strong><code>SecDxe</code></strong> with a UI section, in a volume that should not
+  contain it;</li>
+<li>a <strong>missing</strong> <code>NtfsDxe</code> (<code>768bedfd-...</code>) where the OEM shipped one;</li>
+<li>free space at the end of a volume that no longer matches the vendor build;</li>
+<li>an embedded <strong>NTFS DXE driver</strong> inside a file that has no business carrying one;</li>
+<li>strings <code>c:\edk2\NtfsPkg\NtfsDxe\...</code> that exist in no shipping OEM firmware;</li>
+<li>firmware volumes whose total size or checksums disagree with the vendor
+  release for that exact model and version.</li>
+</ul>
+<p>That is a diff against a known-good image, which is tractable at fleet scale if
+you have vendor images per SKU. §7 turns this into a procedure.</p>
+<h3 id="28-lojax-indicators-from-esets-ioc-appendix">2.8 LoJax indicators (from ESET's IOC appendix)</h3>
+<p>Hashes are SHA-1 as published by ESET [CONFIRMED as published indicators; not
+independently re-verified here].</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>ESET name</th>
+<th>SHA-1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ReWriter_read.exe</code></td>
+<td>Win32/SPIFlash.A</td>
+<td><code>ea728abe26bac161e110970051e1561fd51db93b</code></td>
+</tr>
+<tr>
+<td><code>ReWriter_binary.exe</code></td>
+<td>Win32/SPIFlash.A</td>
+<td><code>cc217342373967d1916cb20eca5ccb29caaf7c1b</code></td>
+</tr>
+<tr>
+<td><code>SecDxe</code></td>
+<td>EFI/LoJax.A</td>
+<td><code>f2be778971ad9df2082a266bd04ab657bd287413</code></td>
+</tr>
+<tr>
+<td><code>info_efi.exe</code></td>
+<td>Win32/Agent.ZXZ</td>
+<td><code>4b9e71615b37aea1eaeb5b1cfa0eee048118ff72</code></td>
+</tr>
+<tr>
+<td><code>autoche.exe</code></td>
+<td>Win32/LoJax.A</td>
+<td><code>700d7e763f59e706b4f05c69911319690f85432e</code></td>
+</tr>
+<tr>
+<td>small agent (EXE)</td>
+<td>Win32/Agent.ZQE/.ZTU</td>
+<td><code>1771e435ba25f9cdfa77168899490d87681f2029</code>, <code>ddaa06a4021baf980a08caea899f2904609410b9</code>, <code>10d571d66d3ab7b9ddf6a850cb9b8e38b07623c0</code>, <code>2529f6eda28d54490119d2123d22da56783c704f</code>, <code>e923ac79046ffa06f67d3f4c567e84a82dd7ff1b</code>, <code>8e138eecea8e9937a83bffe100d842d6381b6bb1</code>, <code>ef860dca7d7c928b68c4218007fb9069c6e654e9</code>, <code>e8f07caafb23eff83020406c21645d8ed0005ca6</code>, <code>09d2e2c26247a4a908952fee36b56b360561984f</code>, <code>f90ccf57e75923812c2c1da9f56166b36d1482be</code></td>
+</tr>
+<tr>
+<td>small agent (DLL only)</td>
+<td>Win32/Agent.ZQE</td>
+<td><code>397d97e278110a48bd2cb11bb5632b99a9100dbd</code></td>
+</tr>
+</tbody>
+</table>
+<p>C2 domains: <code>secao[.]org</code>, <code>ikmtrust[.]com</code>, <code>sysanalyticweb[.]com</code>,
+<code>lxwo[.]org</code>, <code>jflynci[.]com</code>, <code>remotepx[.]net</code>, <code>rdsnets[.]com</code>,
+<code>rpcnetconnect[.]com</code>, <code>webstp[.]com</code>, <code>elaxo[.]org</code>.
+C2 IPs: <code>185.77.129[.]106</code>, <code>185.144.82[.]239</code>, <code>93.113.131[.]103</code>,
+<code>185.86.149[.]54</code>, <code>185.86.151[.]104</code>, <code>103.41.177[.]43</code>, <code>185.86.148[.]184</code>,
+<code>185.94.191[.]65</code>, <code>86.106.131[.]54</code>.</p>
+<p>Host artifacts: <code>%WINDIR%\SysWOW64\rpcnetp.exe</code>,
+<code>%WINDIR%\SysWOW64\autoche.exe</code>, service name matching the legitimate Computrace
+service, and a <code>BootExecute</code> value that has been seen as <code>autocheck autoche *</code>
+at any point in the past (it self-repairs, so absence proves nothing).</p>
+<hr />
+<h2 id="3-moonbounce-the-implant-that-changed-nothing-and-everything">3. MoonBounce: the implant that changed nothing and everything</h2>
+<p><em>Primary source: Kaspersky GReAT (Lechtik, Berdnikov, Legezo, Borisov),
+"MoonBounce: the dark side of UEFI firmware", 20 January 2022.</em></p>
+<h3 id="31-what-it-is-and-why-it-is-the-real-technical-milestone">3.1 What it is, and why it is the real technical milestone</h3>
+<p>MoonBounce is a <strong>modification of an existing, legitimate firmware component</strong> -
+<code>CORE_DXE</code>, the DXE Foundation - rather than the <em>addition</em> of a new module.
+That single design choice is the most important advance in this whole family
+tree, and it is why the detection section of this report looks the way it does.</p>
+<p>LoJax added a file. A file can be enumerated. MoonBounce added <em>nothing</em>: it took
+a module the platform already ships, patched its function prologues with inline
+hooks, and appended shellcode to the end of the same PE image. Enumerate the
+firmware volumes and you see exactly what the OEM shipped, with the same file
+count, same GUIDs, same names, same sizes-on-disk. You only see it if you
+<strong>compare bytes against a known-good image</strong>, or if something at runtime notices
+that <code>AllocatePool</code> does not start with the instructions it should
+[CONFIRMED, Kaspersky].</p>
+<h3 id="32-discovery-path">3.2 Discovery path</h3>
+<p>Detected through Kaspersky's <strong>Firmware Scanner</strong>, integrated into their products
+since 2019, acting on logs from an inspected machine; the implant itself was
+noticed in spring 2021 [CONFIRMED]. This is itself a finding: the victim did not
+detect it. A security product that logs firmware-component hashes and diffs them
+against a vendor baseline did. That is the operational model §7 recommends.</p>
+<h3 id="33-architecture">3.3 Architecture</h3>
+<p><code>CORE_DXE</code> is loaded early in the DXE phase and is responsible for initialising
+core data structures - among them the <code>EFI_BOOT_SERVICES</code> table, a struct of
+function pointers to routines inside <code>CORE_DXE</code> itself [CONFIRMED].</p>
+<p>MoonBounce hooks three of those pointers, redirecting them into shellcode
+appended to the <code>CORE_DXE</code> image [CONFIRMED]:</p>
+<table>
+<thead>
+<tr>
+<th>Hooked boot service</th>
+<th>Why that one</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AllocatePool</code></td>
+<td>Position and control memory allocations, so attacker-controlled buffers land where the next stage will look for them</td>
+</tr>
+<tr>
+<td><code>CreateEventEx</code></td>
+<td>Gain a callback at chosen boot events rather than polling</td>
+</tr>
+<tr>
+<td><code>ExitBootServices</code></td>
+<td>The exact handoff point from firmware to the OS loader - the last moment firmware code can touch the machine before Windows owns it</td>
+</tr>
+</tbody>
+</table>
+<p>From there the chain continues in the loader and the kernel:</p>
+<pre><code>SPI flash (BIOS region)
+  └─ CORE_DXE  ── inline hooks in AllocatePool / CreateEventEx / ExitBootServices
+                  + appended shellcode
+        │
+        ├─ at ExitBootServices: hook functions inside the Windows loader
+        │
+        ├─ place a malicious driver into the kernel's address space
+        │     (runs in early kernel init, before most security software)
+        │
+        ├─ driver injects the user-mode stage into svchost.exe
+        │     (legitimate process, expected network behaviour)
+        │
+        └─ user-mode stage fetches  hxxp://mb.glbaitech[.]com/mboard.dll
+                                    and runs it in memory
+</code></pre>
+<p>[CONFIRMED, Kaspersky public report. An earlier revision of this document left
+the loader and kernel hook targets as <strong>UNKNOWN</strong> because they are not in the
+public blog. They are resolved at function level in §3.8, from Kaspersky's
+separate technical-details document, which is now cited in §14 as a primary
+source.]</p>
+<h3 id="34-the-parts-that-matter-for-defenders">3.4 The parts that matter for defenders</h3>
+<p><strong>Nothing touches the disk.</strong> The entire chain - shellcode, driver, user-mode
+stage, downloaded payload - is memory-resident. There is no dropped file, no
+service, no registry value, no scheduled task [CONFIRMED]. Every conventional
+DFIR artifact is absent by construction. If you image the disk of a MoonBounce
+victim and find nothing, you have learned nothing.</p>
+<p><strong>The payload is fetched, not embedded.</strong> The implant is a loader: it exists to
+get a small user-mode stage running in a trusted process with a network path.
+That keeps the flash modification small - important, because space in a firmware
+volume is limited and large appended blobs are easier to spot.</p>
+<p><strong>The infection vector is unknown.</strong> Kaspersky states plainly that they lack
+sufficient evidence to retrace how the firmware was infected, and assume it was
+remote [<strong>UNKNOWN</strong>, explicitly stated by the source]. Given that producing this
+implant requires reading the original image, parsing it, patching it and writing
+it back, the attacker needed <strong>kernel-level code execution plus a working SPI
+write path</strong>, and (unless they used an exploit) the same permissive
+<code>BIOSWE</code>/<code>BLE</code>/<code>SMM_BWP</code>/<code>PRx</code> configuration that LoJax needed [INFERRED].</p>
+<p><strong>Same-network context is unusually rich.</strong> Kaspersky also found, on the same
+network, the in-memory implant <strong>ScrambleCross/SideWalk</strong>, loaded by a C++ DLL
+called <strong>StealthVector</strong> which decrypts its shellcode with a modified ChaCha20.
+One StealthVector variant arrived via a <strong>patched <code>wbemcomn.dll</code></strong> (MD5
+<code>c3b153347aed27435a18e789d8b67e0a</code>) whose import address table had been extended
+to load <code>wmiwk.dll</code> whenever the WMI service started [CONFIRMED]. Sample loader
+<code>wbwkem.dll</code> (MD5 <code>4d5eb9f6f501b4f6edf981a3c6c4d6fa</code>) fetched <code>compwm.bin</code> from
+<code>dev.kinopoisksu[.]com</code>. This matters for triage: a MoonBounce case is not one
+artifact, it is a network-wide intrusion where the firmware implant is the
+persistence of last resort.</p>
+<h3 id="35-persistence-properties">3.5 Persistence properties</h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Survives?</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS reinstall</td>
+<td><strong>Yes</strong></td>
+<td>Implant is in SPI flash [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Disk replacement</td>
+<td><strong>Yes</strong></td>
+<td>Same [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Firmware update</td>
+<td>Likely <strong>yes</strong>, unless the update rewrites the entire BIOS region</td>
+<td>Same caveat as LoJax; a partial/region-preserving update would leave it [INFERRED]</td>
+</tr>
+<tr>
+<td>CMOS clear</td>
+<td><strong>Yes</strong></td>
+<td>Code, not configuration [INFERRED]</td>
+</tr>
+<tr>
+<td>Secure Boot changes</td>
+<td><strong>Yes</strong></td>
+<td>Secure Boot does not verify firmware volume contents [INFERRED]</td>
+</tr>
+<tr>
+<td>Full SPI reflash / board swap</td>
+<td>No</td>
+<td>The only reliable eradication [INFERRED]</td>
+</tr>
+</tbody>
+</table>
+<h3 id="36-detection-difficulty-the-honest-assessment">3.6 Detection difficulty: the honest assessment</h3>
+<p>MoonBounce is the hardest of the three to detect, and the reason is structural,
+not obfuscation:</p>
+<ol>
+<li><strong>No added or removed file.</strong> FFS enumeration produces a clean inventory.</li>
+<li><strong>No size change visible to a naive scanner.</strong> Shellcode is appended inside
+   the existing PE's padding/slack; the FFS file size may be unchanged.</li>
+<li><strong>Hooks are small.</strong> A 5-byte relative <code>JMP</code> at a function prologue, or a
+   pointer swap in the boot services table, is invisible to string scanning and
+   to signature databases that key on known-bad bytes.</li>
+<li><strong>Nothing on disk, ever.</strong> Host forensics has nothing to find.</li>
+<li><strong>It runs before every defensive control you own.</strong> Any EDR that depends on
+   the OS being intact is downstream of the compromise.</li>
+</ol>
+<p>The only robust detection is <strong>known-good comparison</strong>: hash every firmware
+volume, module and section at acquisition, and compare against the OEM's signed
+release for that exact model and firmware version. That requires an asset
+inventory that records firmware versions per machine - which most organisations
+do not have, and which is the actual gap to close.</p>
+<h3 id="37-indicators">3.7 Indicators</h3>
+<p>The <code>CORE_DXE</code> image differs from the vendor release. Concretely, look for:</p>
+<ul>
+<li>a <code>CORE_DXE</code> PE whose section data extends beyond the vendor image's section
+  layout, or whose padding contains non-<code>0xFF</code>/non-zero bytes;</li>
+<li>function prologues in <code>CORE_DXE</code> that begin with a jump instead of the vendor's
+  expected instructions (a byte-level diff finds this in seconds; nothing else does);</li>
+<li>an <code>EFI_BOOT_SERVICES</code> table whose entries point outside the <code>CORE_DXE</code> image
+  range at runtime;</li>
+<li>network: <code>mb.glbaitech[.]com</code>, <code>/mboard.dll</code>;</li>
+<li>memory: a driver in kernel space with no corresponding file on disk, injected
+  into <code>svchost.exe</code>.</li>
+</ul>
+<p>No file hashes are published for the MoonBounce flash modification itself,
+because it is a patch to a vendor-specific image and therefore differs per
+platform [CONFIRMED as an absence: Kaspersky publishes infrastructure IOCs and a
+Malpedia rule set, not a universal module hash].</p>
+<h3 id="38-function-level-reconstruction">3.8 Function-level reconstruction</h3>
+<p><em>Source: Kaspersky, "Technical details of MoonBounce's implementation", 12 pp.
+This is the document that converts everything above from "documented behaviour"
+into "here is the mechanism".</em></p>
+<p><strong>The infected component, as published</strong> [CONFIRMED]:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File name</td>
+<td><code>CORE_DXE</code></td>
+</tr>
+<tr>
+<td>File type</td>
+<td>64-bit <code>EFI_BOOT_SERVICES_DRIVER</code></td>
+</tr>
+<tr>
+<td>Size</td>
+<td>1,698,000 bytes</td>
+</tr>
+<tr>
+<td>Link time</td>
+<td>Friday, 18 July 2014, 03:29:55 UTC (the <em>legitimate vendor build</em>)</td>
+</tr>
+<tr>
+<td>MD5</td>
+<td><code>d94962550b90ddb3f80f62bd96bd9858</code></td>
+</tr>
+<tr>
+<td>SHA-1</td>
+<td><code>6bfb3634f6b6c5a114121fe53279331ff821ee1e</code></td>
+</tr>
+<tr>
+<td>SHA-256</td>
+<td><code>74b75b1a1375ba58a51436c02eb94d5adcd49f284744cf2015e03da036c2cf1a</code></td>
+</tr>
+</tbody>
+</table>
+<p>The payload is appended to <strong>an unnamed section that follows <code>.reloc</code></strong>, and
+contains both the shellcode and the malicious kernel driver. That single sentence
+explains why file-level inventory fails: a UI section can be renamed, but an
+<em>unnamed</em> section appended to a legitimate module does not change the file's GUID,
+name, or its place in the volume.</p>
+<p><strong>The hook discipline.</strong> All three boot-service hooks are installed identically:
+the <strong>first 5 bytes of the function prologue are replaced with a <code>call</code></strong> to one
+shared hook routine. That routine identifies which function was called by
+examining the bytes immediately after the <code>call</code>, matches them against known
+patterns, and dispatches to the relevant handler [CONFIRMED]. This is compact,
+position-independent, and requires no import table, which is exactly what you
+want inside a firmware module.</p>
+<p>Each handler follows the same three-step shape: restore the original prologue,
+save <code>rcx, rdx, r8, r9, rsi, rdi</code> (argument registers), do one piece of malicious
+work by <em>calling the now-unhooked function</em>, then restore registers and re-enter
+the original function with the caller's original arguments. To the rest of
+firmware, <code>AllocatePool</code> still works.</p>
+<table>
+<thead>
+<tr>
+<th>Boot service</th>
+<th>Original prologue bytes restored</th>
+<th>Malicious work inside the handler</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AllocatePool</code></td>
+<td><code>48 89 5C 24 08</code> (<code>mov [rsp+8], rbx</code>)</td>
+<td>Calls the real <code>AllocatePool</code> to allocate a buffer holding the later-stage shellcode</td>
+</tr>
+<tr>
+<td><code>CreateEventEx</code></td>
+<td><code>48 8B C4 48 89</code> (<code>mov rax, rsp</code> / <code>mov [rax+8], rbx</code>)</td>
+<td>Calls the real <code>CreateEventEx</code> to register a callback for <code>gEfiEventLegacyBootGuid</code> <code>{2A571201-4966-47F6-8B86-F31E41F32F10}</code>; the callback passes control to the shellcode from the previous step</td>
+</tr>
+<tr>
+<td><code>ExitBootServices</code></td>
+<td><code>48 89 5C 24 08</code></td>
+<td>Patches the OS loader in memory (below)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The transition into Windows.</strong> The <code>ExitBootServices</code> handler takes its own
+return address from the stack and scans forward <strong>0x158878 bytes</strong> for the byte
+pattern <code>41 55 48 CB</code> (<code>push r13</code>; <code>retfq</code>) - the tail of
+<strong><code>OslArchTransferToKernel</code></strong> in <code>winload.efi</code> (or <code>osloader.exe</code>). It then:</p>
+<ol>
+<li>copies <strong>0x229 bytes</strong> of shellcode to physical address <strong>0x98000</strong>;</li>
+<li>overwrites the <code>48 CB</code> (<code>retfq</code>) at the end of <code>OslArchTransferToKernel</code> with
+   <code>E9 &lt;rel32&gt;</code> - a jump to <code>0x98000</code>;</li>
+<li>restores registers and re-enters the unhooked <code>ExitBootServices</code>.</li>
+</ol>
+<p>The hook depends on a <em>specific structural feature</em> of one Windows loader build
+(the <code>retfq</code> tail), which is why it is version-sensitive and why Kaspersky found
+it on a specific victim rather than universally [INFERRED from the fixed offsets].</p>
+<p><strong>Escalation inside the kernel.</strong> The <code>OslArchTransferToKernel</code> hook resolves
+exports from <code>ntoskrnl.exe</code> with a <strong>custom name-hash</strong> rather than by string:</p>
+<pre><code class="language-python"># hash #1, used in the loader-stage shellcode
+def fn_name_hash(name):
+    name_hash = 0
+    index = 1
+    for ch in name:
+        index += ord(ch)
+        name_hash += index
+    return (name_hash &lt;&lt; 16) | index
+
+# hash #2, used in the driver-mapping shellcode (ROR13 variant)
+def fn_name_hash_ror13(f_name):
+    f_hash = 0
+    for ch in f_name:
+        f_hash = ror13(f_hash)
+        f_hash += ord(ch)
+    return ror13(f_hash)
+</code></pre>
+<p>Resolved in stage one [CONFIRMED]: <code>0x42790710 → ExRegisterCallback</code>,
+<code>0x2802057D → ExAllocatePool</code>, <code>0x1C88047D → MmMapIoSpace</code>.</p>
+<p>It then makes <code>ntoskrnl.exe</code> do something it should never do: for <strong>every section
+header in the mapped image</strong> it clears <code>IMAGE_SCN_MEM_DISCARDABLE</code> and sets
+<code>IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_NOT_PAGED</code>. That is
+a system-wide <strong>W+X</strong> condition, created at boot, before any integrity policy can
+object. It copies <strong>0xCC bytes</strong> of shellcode into the virtual address of
+<code>ntoskrnl</code>'s <strong>relocation directory</strong> - memory that is executable, never
+pageable, and not covered by a code-integrity hash - and installs an <code>E8 &lt;rel32&gt;</code>
+inline hook at the start of <code>ExAllocatePool</code>.</p>
+<p>When the kernel first calls <code>ExAllocatePool</code>, the hook (guarded by a one-shot
+global flag) calls <code>MmMapIoSpace</code> to map the shellcode allocated back in stage
+one, and jumps to it with three arguments: a pointer to the saved <code>ExAllocatePool</code>
+prologue, the <code>ntoskrnl</code> base, and the address of <code>ExAllocatePool</code>.</p>
+<p><strong>Loading the driver without a loader.</strong> The mapped shellcode performs the last
+firmware-to-kernel transition:</p>
+<ul>
+<li>compares the saved prologue against the immediate <strong><code>0x6F4EB841</code></strong>; if it
+  matches, it clears the <strong><code>WP</code> bit in <code>CR0</code></strong>, restores the original
+  <code>ExAllocatePool</code> bytes (unhooking), and restores <code>CR0</code>;</li>
+<li>resolves <code>ExAllocatePool</code>, <code>RtlInitAnsiString</code>, <code>RtlAnsiStringToUnicodeString</code>
+  and <code>MmGetSystemRoutineAddress</code> by ROR13 hash (<code>0x0311B83F</code>, <code>0x41EBE619</code>,
+  <code>0x1C4F5B64</code>, <code>0x0ADC68C7</code>);</li>
+<li>manually maps the embedded driver PE: allocate, copy headers and sections,
+  apply relocations, resolve imports through
+  <code>RtlInitAnsiString</code> → <code>RtlAnsiStringToUnicodeString</code> →
+  <code>MmGetSystemRoutineAddress</code>, free the string with <code>RtlFreeUnicodeString</code>;</li>
+<li>jumps to the driver's entry point.</li>
+</ul>
+<p>Note the deliberate un-hooking before doing the heavy work: once the driver is
+mapped, <code>ExAllocatePool</code> is pristine again. The implant spends as little time as
+possible in a modified state.</p>
+<p><strong>The driver</strong> [CONFIRMED]:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>x86</th>
+<th>x64</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MD5</td>
+<td><code>2228e682b2686dbe0330835b58a6f2bf</code></td>
+<td><code>934d06720f4cb74069a870d382ac5045</code></td>
+</tr>
+<tr>
+<td>SHA-1</td>
+<td><code>22a4bd6bfd580c3a2025b1a91f8ef1677feca360</code></td>
+<td><code>3d2e6f0c3b6fd0fb44966adb4f13679e4091d851</code></td>
+</tr>
+<tr>
+<td>SHA-256</td>
+<td><code>707b8684009665742b9c6d801c12b9803f33fc518cb6bf513b4fa15a9e72e106</code></td>
+<td><code>f17c1f644cef38d7083cd6ddeb52bfda2d36d0376ea38cc3f413cab2ca16ca7d</code></td>
+</tr>
+<tr>
+<td>Link time</td>
+<td>18 Dec 2018, 03:48:33 UTC</td>
+<td>18 Dec 2018, 03:48:24 UTC</td>
+</tr>
+<tr>
+<td>Size</td>
+<td>34.63 KB</td>
+<td>37 KB</td>
+</tr>
+</tbody>
+</table>
+<p>It registers a <strong><code>PsSetLoadImageNotifyRoutine</code></strong> callback and waits for a very
+specific event: an image load where the image is <strong><code>kernel32.dll</code></strong> and the
+owning process command line is <strong><code>SVCHOST.EXE -K NETSVCS</code></strong> or
+<strong><code>SVCHOST.EXE -K NETSVCS -P</code></strong> - i.e. a <em>network services</em> <code>svchost</code> instance,
+chosen because it is expected to have internet access. Targeting a service group
+by command line is a precise, low-noise way to get a network-capable host process
+without opening a socket from the kernel.</p>
+<p>Injection uses the APC mechanism, staged through a work queue:</p>
+<ul>
+<li>a kernel-mode APC routine running at <code>APC_LEVEL</code> initialises a structure at
+  fixed offsets: <code>0x0</code> a table of API pointers, <code>0x28</code> the PE-mapping shellcode,
+  <code>0x800</code> the drop-zone URL, <code>0xA00</code> padding, <code>0x1000</code> the raw stager image;</li>
+<li>the argument table is <code>{0x0 stager buffer, 0x8 C2 URL, 0x10 VirtualAlloc,
+  0x18 LoadLibraryA, 0x20 GetProcAddress}</code>;</li>
+<li>it initialises a <code>WORK_QUEUE_ITEM</code> and calls <strong><code>ExQueueWorkItem</code></strong>; a system
+  thread picks it up and queues the PE-mapping shellcode to the APC queue of the
+  thread inside the target <code>svchost.exe</code>;</li>
+<li>when that thread next runs, the mapping shellcode loads the stager and calls
+  its entry point.</li>
+</ul>
+<p><strong>The user-mode stager</strong> [CONFIRMED]: MD5 <code>8db7440b39761ea8ed75b7870542e1f3</code>,
+SHA-1 <code>e21483618eeae7cc476bc67bf768069572be7fe0</code>, SHA-256
+<code>4cc7a14bc2e40be93bbdf6f871430f08c3335e893519d75ea37c66942e1eb7fa</code>, link time
+11 Dec 2018, 66.5 KB, PE32+ DLL, packed with <strong>MPRESS</strong> (<code>.MPRESS1</code>/<code>.MPRESS2</code>,
+in the same family as UPX).</p>
+<p>It receives its configuration from the driver through the <code>lpReserved</code> parameter
+of <code>DllEntryPoint</code>, in a struct at fixed offsets: <code>0x0</code> C2 URL (optionally with a
+scheduling argument), <code>0x11c</code> User-Agent, <code>0x180</code> proxy address, <code>0x1c0</code> proxy
+username, <code>0x1e0</code> proxy password. It then: waits until a deadline computed from
+system time; sets a User-Agent (default <code>"IE"</code>); registers
+<code>InternetSetStatusCallback</code> to detect a system proxy and use the supplied proxy
+credentials; issues a <strong>GET</strong> to the C2 URL expecting a raw PE; maps the response
+in memory and calls its entry point.</p>
+<p><strong>Timeline inference</strong> [INFERRED]: the vendor <code>CORE_DXE</code> was built in <strong>2014</strong>;
+the driver and stager were built in <strong>December 2018</strong>, ten days apart (11 and 18
+Dec). That is consistent with a toolkit completed in late 2018 and deployed
+afterwards, on hardware whose firmware had been shipping since 2014 - which is
+the realistic shape of this threat class: old, unpatched, unmeasured firmware.</p>
+<h3 id="39-detection-signatures-derived-from-the-reconstruction">3.9 Detection signatures derived from the reconstruction</h3>
+<p>Everything here is a <em>detection</em> artifact derived from published analysis. None
+of it is executable against a target, and none of it is a capability the malware
+did not already have. The <code>fwdiff</code> tool in this repository implements the
+image-level checks; the memory and host checks are for the analyst.</p>
+<table>
+<thead>
+<tr>
+<th>Signature</th>
+<th>Where</th>
+<th>Fidelity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unnamed PE section appended after <code>.reloc</code>, carrying shellcode + driver</td>
+<td><code>CORE_DXE</code> image</td>
+<td><strong>High</strong> - legitimate vendor <code>CORE_DXE</code> has no unnamed section</td>
+</tr>
+<tr>
+<td><code>E8</code> where <code>48 89 5C 24 08</code> belongs, at <code>AllocatePool</code> / <code>ExitBootServices</code> entry</td>
+<td><code>CORE_DXE</code> image, or firmware memory</td>
+<td><strong>High</strong> - prologue replaced by a <code>call</code></td>
+</tr>
+<tr>
+<td><code>E8</code> where <code>48 8B C4 48 89</code> belongs, at <code>CreateEventEx</code> entry</td>
+<td>Same</td>
+<td><strong>High</strong></td>
+</tr>
+<tr>
+<td><code>E9 &lt;rel32&gt;</code> at the end of <code>OslArchTransferToKernel</code> where <code>48 CB</code> belongs</td>
+<td><code>winload.efi</code> on the ESP, or its in-memory image</td>
+<td><strong>High</strong> - and checkable on a mounted ESP without booting the OS</td>
+</tr>
+<tr>
+<td>Immediate <code>0x6F4EB841</code> compared in code</td>
+<td>Shellcode / driver mapping stage</td>
+<td><strong>Very high</strong> - that value is the original <code>ExAllocatePool</code> prologue and appears in no legitimate component</td>
+</tr>
+<tr>
+<td>Immediates <code>0x42790710</code>, <code>0x2802057D</code>, <code>0x1C88047D</code>, <code>0x0311B83F</code>, <code>0x41EBE619</code>, <code>0x1C4F5B64</code>, <code>0x0ADC68C7</code></td>
+<td>Shellcode stages</td>
+<td><strong>High</strong> as a <em>cluster</em>; one alone can occur by accident in floating-point data</td>
+</tr>
+<tr>
+<td><code>gEfiEventLegacyBootGuid</code> <code>{2A571201-4966-47F6-8B86-F31E41F32F10}</code> referenced by a non-platform module</td>
+<td><code>CORE_DXE</code>, unexpected module</td>
+<td>Medium - legitimate firmware may register legacy-boot callbacks</td>
+</tr>
+<tr>
+<td>Shellcode copied to physical <code>0x98000</code>; sizes <code>0x229</code> and <code>0xCC</code></td>
+<td>Runtime only</td>
+<td>Medium - structural, supports corroboration</td>
+</tr>
+<tr>
+<td><code>ntoskrnl</code> sections with <code>MEM_WRITE</code> set (W+X), code in the relocation directory</td>
+<td>Kernel memory</td>
+<td><strong>High</strong> on any modern Windows; HVCI-compatible systems should never show this</td>
+</tr>
+<tr>
+<td>Driver registering <code>PsSetLoadImageNotifyRoutine</code> and matching <code>SVCHOST.EXE -K NETSVCS</code></td>
+<td>Kernel memory</td>
+<td><strong>High</strong> - no legitimate driver keys on a service-group command line</td>
+</tr>
+<tr>
+<td><code>MPRESS</code>-packed DLL injected into a network-services <code>svchost.exe</code> with no file on disk</td>
+<td>Memory</td>
+<td><strong>High</strong></td>
+</tr>
+<tr>
+<td>Type-2 <code>winload.efi</code> present on the ESP (where <code>bootmgfw.efi</code> should be)</td>
+<td>ESP</td>
+<td>Medium - this is <em>also</em> a BlackLotus artifact, for a different reason</td>
+</tr>
+</tbody>
+</table>
+<p>The last row is worth pausing on: an ESP-resident <code>winload.efi</code> is suspicious for
+<strong>two unrelated reasons</strong> in this report. BlackLotus renames the boot manager to
+<code>winload.efi</code>; MoonBounce's <code>winload.efi</code> is the legitimate loader whose
+<code>OslArchTransferToKernel</code> tail gets patched. One artifact, two families - which
+is exactly why a single indicator should never close an investigation.</p>
+<hr />
+<h2 id="4-blacklotus-the-bootkit-that-beat-secure-boot-honestly">4. BlackLotus: the bootkit that beat Secure Boot honestly</h2>
+<p><em>Primary sources: ESET (Martin Smolár), "BlackLotus UEFI bootkit: Myth confirmed",
+1 March 2023; Microsoft Defender Experts, "Guidance for investigating attacks
+using CVE-2022-21894", 11 April 2023; NSA, "BlackLotus Mitigation Guide", June
+2023; Wack0's CVE-2022-21894 PoC and write-up.</em></p>
+<h3 id="41-what-it-is">4.1 What it is</h3>
+<p>A ~80 kB commercial UEFI bootkit, sold on criminal forums for around $5,000 since
+at least 6 October 2022, and the <strong>first publicly documented bootkit to run on a
+fully patched Windows 11 system with Secure Boot enabled</strong> [CONFIRMED, ESET;
+CORROBORATED, Microsoft].</p>
+<p>It is not a firmware implant. It writes nothing to SPI flash. Its persistence is
+entirely on the <strong>EFI System Partition</strong> and in a <strong>UEFI NVRAM variable</strong>. This
+distinction is load-bearing for every remediation decision that follows.</p>
+<h3 id="42-the-insight-dont-break-secure-boot-borrow-its-trust">4.2 The insight: don't break Secure Boot, borrow its trust</h3>
+<p>Secure Boot will not load an unsigned bootloader. BlackLotus therefore does two
+things in sequence:</p>
+<ol>
+<li><strong>Temporarily break Secure Boot</strong> using CVE-2022-21894, so it can execute
+   unsigned code once, before <code>ExitBootServices</code>.</li>
+<li><strong>Use that one moment of authority to enroll its own Machine Owner Key</strong> in
+   <code>MokList</code>, and swap in a <em>legitimate Microsoft-signed <code>shim</code></em> as the boot
+   loader.</li>
+</ol>
+<p>After step 2, it no longer needs the vulnerability. <code>shim</code> will verify and launch
+<code>grubx64.efi</code> because the attacker's key is in the MOK database - which is
+precisely what MOK is for. <strong>The persistence mechanism is a documented, supported,
+signed feature working exactly as designed.</strong> Nothing is broken on subsequent
+boots. That is why revocation alone does not clean an infected machine, and why
+the recovery procedure is a reformat.</p>
+<h3 id="43-installation">4.3 Installation</h3>
+<p>The installer comes in offline and online variants; the online variant downloads
+its vulnerable victims directly from the <strong>Microsoft symbol store</strong>
+[CONFIRMED, ESET]:</p>
+<pre><code>https://msdl.microsoft.com/download/symbols/bootmgfw.efi/7144BCD31C0000/bootmgfw.efi
+https://msdl.microsoft.com/download/symbols/bootmgr.efi/98B063A61BC000/bootmgr.efi
+https://msdl.microsoft.com/download/symbols/hvloader.efi/559F396411D000/hvloader.efi
+</code></pre>
+<p>Note what this means: the attacker's payload is fetched from Microsoft, over TLS,
+with a valid signature. Any control that trusts "signed by Microsoft" is
+satisfied. Revocation (<code>dbx</code>) is the only answer, and revocation had not happened.</p>
+<p><strong>Preconditions</strong> [CONFIRMED]: local administrator, or SYSTEM. If not already
+elevated, the installer escalates through a <strong>UAC bypass</strong> (Program Compatibility
+Assistant). It reads the <code>SecureBoot</code> UEFI variable to learn whether it needs the
+exploit at all, and reads <code>KUSER_SHARED_DATA</code> (<code>NtMajorVersion</code>/<code>NtMinorVersion</code>)
+directly from memory to fingerprint the OS build.</p>
+<p><strong>Defanging the platform first</strong> [CONFIRMED]:</p>
+<ul>
+<li><strong>HVCI off</strong> - sets
+  <code>HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity\Enabled = 0</code>
+  (only if the key exists). Without this, its unsigned kernel driver cannot load.</li>
+<li><strong>BitLocker off</strong> - enumerates <code>Win32_EncryptableVolume</code> via WMI
+  (<code>Root\CIMV2\Security\MicrosoftVolumeEncryption</code>) and calls
+  <code>DisableKeyProtectors</code>. Rationale, explicit in ESET's analysis: with TPM-bound
+  BitLocker left on, the changed boot chain triggers a recovery prompt at next
+  boot and <strong>tips off the victim</strong>. The attacker disables the tripwire before
+  tripping it.</li>
+<li><strong>Original boot manager renamed</strong> - <code>bootmgfw.efi</code> becomes <code>winload.efi</code> in the
+  ESP, kept as both a launch path and an uninstall path.</li>
+</ul>
+<p><strong>Deployed files</strong> (Secure Boot enabled case) [CONFIRMED]:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ESP:\EFI\Microsoft\Boot</code></td>
+<td><code>grubx64.efi</code></td>
+<td>The BlackLotus bootkit: self-signed UEFI application</td>
+</tr>
+<tr>
+<td></td>
+<td><code>bootload.efi</code></td>
+<td>Legitimate Microsoft-signed <code>shim</code>, later becomes <code>bootmgfw.efi</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>bootmgfw.efi</code></td>
+<td>Legitimate but vulnerable Windows Boot Manager (CVE-2022-21894)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>BCD</code>, <code>BCDR</code></td>
+<td>Attacker's BCD store; backup of the victim's</td>
+</tr>
+<tr>
+<td><code>ESP:\system32</code></td>
+<td><code>hvloader.efi</code></td>
+<td>Legitimate but vulnerable Hypervisor Loader</td>
+</tr>
+<tr>
+<td></td>
+<td><code>bootmgr.efi</code></td>
+<td>Legitimate but vulnerable Boot Manager</td>
+</tr>
+<tr>
+<td></td>
+<td><code>mcupdate_AuthenticAMD.dll</code> / <code>mcupdate_GenuineIntel.dll</code></td>
+<td>Malicious self-signed native PE, chosen by CPU vendor</td>
+</tr>
+<tr>
+<td></td>
+<td><code>BCD</code></td>
+<td>Second attacker BCD driving the exploit</td>
+</tr>
+</tbody>
+</table>
+<p>On a machine without Secure Boot the whole exploit chain is unnecessary: replace
+<code>bootmgfw.efi</code> with the malicious binary and the firmware runs it [CONFIRMED].</p>
+<h3 id="44-cve-2022-21894-baton-drop-in-one-paragraph">4.4 CVE-2022-21894 ("baton drop") in one paragraph</h3>
+<p>Windows Boot Applications (<code>bootmgr.efi</code>, <code>hvloader.efi</code>, <code>winload.efi</code>) allow a
+serialized Secure Boot policy to be removed from memory before it is consumed, by
+using the <code>truncatememory</code> BCD option [CONFIRMED, PoC write-up + ESET]. The
+attacker first forces the policy to be allocated above a known physical address
+using <code>avoidlowmemory = 0x10000000</code>, chain-loads a second BCD via the
+<code>bcdfilepath</code> element (<code>custom:22000023</code>) to get around the Windows 10+ ban on
+<code>avoidlowmemory</code> when VBS is on, and then sets <code>truncatememory</code>,
+<code>nointegritychecks</code> and <code>testsigning</code>. The policy is cut out of memory, and the
+legitimate <code>hvloader.efi</code> proceeds to load <code>mcupdate_&lt;vendor&gt;.dll</code> with
+<code>nointegritychecks</code> in effect - from <code>ESP:\system32</code> rather than
+<code>\Windows\system32</code>, because the attacker's BCD sets <code>device</code> to the boot device
+and <code>systemroot</code> to <code>\</code> [CONFIRMED].</p>
+<p>That file is the attacker's, self-signed, and it runs with firmware's authority.</p>
+<p>Three independent exploitation paths were published in the PoC repository in
+August 2022 [CONFIRMED]. ESET's assessment is that the BlackLotus developer
+adapted the PoC rather than discovering the bug: the timeline fits, and the
+implementation reuses the PoC's specific BCD tricks [HYPOTHESIS, ESET's].</p>
+<h3 id="45-establishing-persistence">4.5 Establishing persistence</h3>
+<p>The self-signed <code>mcupdate*.dll</code> runs an embedded <strong><code>MokInstaller</code></strong> UEFI
+application which [CONFIRMED]:</p>
+<ol>
+<li>restores the victim's original BCD from <code>BCDR</code>;</li>
+<li>copies the dropped Microsoft-signed <code>shim</code> over <code>bootmgfw.efi</code>;</li>
+<li><strong>creates the <code>MokList</code> NVRAM variable containing the attacker's self-signed
+   public certificate</strong>, formatted as an <code>EFI_SIGNATURE_LIST</code> exactly like <code>db</code>
+   or <code>dbx</code>;</li>
+<li>deletes the exploit files from <code>ESP:\system32</code> (the directory itself survives -
+   a forensic artifact Microsoft explicitly calls out);</li>
+<li>reboots.</li>
+</ol>
+<p><code>MokList</code> is a Boot-Services-only variable. Writing it normally requires physical
+presence at the MOK Manager prompt. The exploit gave the attacker Boot Services
+with Secure Boot out of the way, so they wrote it programmatically. <strong>This is the
+single most important forensic artifact in the whole family</strong>: an unexpected
+certificate in <code>MokList</code> is durable, inspectable, and independent of the running
+OS.</p>
+<h3 id="46-every-subsequent-boot-the-execution-chain">4.6 Every subsequent boot: the execution chain</h3>
+<pre><code>Firmware
+ └─ bootmgfw.efi   (now = Microsoft-signed shim)
+     ├─ reads MokList, finds attacker certificate
+     └─ verifies + launches  ESP:\EFI\Microsoft\Boot\grubx64.efi   (BlackLotus, self-signed)
+         ├─ creates Boot-only NVRAM variable  VbsPolicyDisable
+         │     -&gt; Windows loader skips VBS / HVCI / Credential Guard
+         ├─ hooks  ImgArchStartBootApplication   (bootmgfw/bootmgr)
+         │     -&gt; catches winload.efi after load, before execution
+         ├─ hooks  BlImgAllocateImageBuffer      (winload.efi)
+         │     -&gt; allocates a buffer for the malicious kernel driver
+         ├─ hooks  OslArchTransferToKernel       (winload.efi)
+         │     -&gt; kernel + boot drivers are in memory, not yet running:
+         │        ├─ patches entry points of WdBoot.sys and WdFilter.sys to `ret`
+         │        └─ hooks entry point of disk.sys
+         ├─ at disk.sys entry: jump to malicious driver, then restore disk.sys
+         └─ driver waits for winlogon.exe
+             ├─ injects HTTP downloader into winlogon.exe as a new thread
+             ├─ re-injects if the thread dies
+             ├─ strips all privileges from MsMpEng.exe (Defender)
+             ├─ protects ESP files via ObSetHandleAttributes(ProtectFromClose)
+             └─ BSOD (KeBugCheck INVALID_KERNEL_HANDLE) if those handles vanish
+</code></pre>
+<p>[CONFIRMED throughout, ESET §"BlackLotus execution flow".]</p>
+<p>Two details worth dwelling on:</p>
+<p><strong>The Defender kill is sloppy, and that is exploitable.</strong> Patching
+<code>WdBoot.sys</code>/<code>WdFilter.sys</code> entry points and stripping <code>MsMpEng.exe</code> token
+privileges both fail against a simple restart of the Defender process
+[CONFIRMED, ESET explicitly: "as this functionality is poorly implemented, it can
+be made ineffective by restarting the MsMpEng.exe process"]. A defender who knows
+this can keep AV alive.</p>
+<p><strong>The anti-removal is a denial-of-service tripwire.</strong> Protected handles cannot be
+closed by other processes; if someone succeeds anyway, the driver crashes the
+machine rather than allow the files to be deleted. Microsoft's IR team turned
+this into a <em>detection</em>: attempting to hash the protected ESP file with
+<code>certutil</code> returns <code>ERROR_SHARING_VIOLATION</code> on an infected machine
+[CONFIRMED, Microsoft]. A security control that blocks removal is also a
+fingerprint.</p>
+<p><strong>The IPC is MAC-derived and therefore predictable.</strong> Named section/event names
+come from the primary adapter's MAC with a small transform (octets below 16 have
+16 added). For MAC <code>00-1c-0b-cd-ef-34</code>: section <code>\BaseNamedObjects\101c1b</code>, event
+<code>\BaseNamedObjects\Z01c1b</code> [CONFIRMED]. Anyone who can create those objects can
+talk to the kernel driver - including sending its <strong><code>Uninstall BlackLotus</code></strong>
+command. ESET calls this the bootkit's weak point [CONFIRMED]. It is the closest
+thing to a clean removal path that exists, and it still leaves you on a machine
+you cannot trust.</p>
+<h3 id="47-command-and-control">4.7 Command and control</h3>
+<p>The HTTP downloader in <code>winlogon.exe</code> talks to <code>/API/hpb_gate.php</code> on a rotating
+set of domains, supports both user-mode and kernel payloads, and can create
+processes as SYSTEM (<code>WTSQueryUserToken</code> + <code>CreateProcessAsUserW</code>) [CONFIRMED].
+Microsoft's IR team observed it also calling <code>api.ipify.org</code> over port 80 to learn
+the victim's public IP [CONFIRMED] - an excellent, low-false-positive hunt
+signal, because <code>winlogon.exe</code> has no business making outbound HTTP.</p>
+<h3 id="48-anti-analysis-and-targeting">4.8 Anti-analysis and targeting</h3>
+<p>Anti-VM, anti-debug and obfuscation are present but ESET characterises them as
+"not any breakthrough" [CONFIRMED]. Installers abort on locales <code>ro-MD</code>, <code>ru-MD</code>,
+<code>ru-RU</code>, <code>uk-UA</code>, <code>be-BY</code>, <code>hy-AM</code>, <code>kk-KZ</code> - a CIS-oriented exclusion list
+[CONFIRMED]. Component names and the signing certificate reference the anime
+<em>Higurashi When They Cry</em>: certificate <code>CN = When They Cry CA</code>, serial
+<code>570b5d22b723b4a442cc6eee...</code>, valid 2022-08-13 to 2032-08-13 [CONFIRMED].</p>
+<h3 id="49-persistence-properties">4.9 Persistence properties</h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Survives?</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS reinstall (OS partition only)</td>
+<td><strong>Yes</strong> - ESP untouched</td>
+<td>ESP is a separate partition [CONFIRMED]</td>
+</tr>
+<tr>
+<td>OS reinstall + ESP reformat</td>
+<td><strong>No</strong></td>
+<td>Microsoft's recommended recovery [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Disk replacement</td>
+<td><strong>No</strong></td>
+<td>Bootkit lives on the disk [CONFIRMED]</td>
+</tr>
+<tr>
+<td>Firmware update / SPI reflash</td>
+<td><strong>No effect</strong> - it was never in flash</td>
+<td>[CONFIRMED]</td>
+</tr>
+<tr>
+<td>CMOS clear</td>
+<td><strong>Breaks the trust anchor</strong> (MokList lost) but leaves files; machine likely will not boot</td>
+<td>[INFERRED]</td>
+</tr>
+<tr>
+<td>Secure Boot re-enable</td>
+<td><strong>No</strong> - it is already enabled and being satisfied</td>
+<td>[CONFIRMED]</td>
+</tr>
+<tr>
+<td><code>dbx</code> update revoking <code>bootmgfw.efi</code></td>
+<td><strong>Prevents new installs</strong>; does not clean an infected machine</td>
+<td>[CONFIRMED, ESET]</td>
+</tr>
+<tr>
+<td>Removing third-party UEFI CA</td>
+<td>Blocks the <code>shim</code> path</td>
+<td>[CONFIRMED, Microsoft]</td>
+</tr>
+</tbody>
+</table>
+<h3 id="410-indicators">4.10 Indicators</h3>
+<p><strong>Hashes (SHA-1, ESET) [CONFIRMED as published]:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>SHA-1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Installer</td>
+<td><code>05846d5b1d37ee2d716140de4f4f984cf1e631d1</code>, <code>a5a530a91100ed5f07a5d74698b15c646dd44e16</code>, <code>d82539bfc2cc7cb504be74ac74df696b13db486a</code>, <code>16b12cea54360aa42e1120e82c1e9bc0371cb635</code>, <code>dae7e7c4eec2ac0dc7963c44a5a4f47d930c5508</code>, <code>45701a83dec1dc71a48268c9d6d205f31d9e7ffb</code></td>
+</tr>
+<tr>
+<td>UEFI bootkit</td>
+<td><code>2ce056ae323b0380b0e87225ea0ae087a33cd316</code>, <code>5a0074203abd5deb464ba0a79e14b7541a033216</code>, <code>5dc9cbd75abd830e83641a0265bffddd2f602815</code>, <code>97aec21042df47d39ac212761729c6be484d064d</code>, <code>adceec18ff009bed635d168e0b116e72096f18d2</code>, <code>dbc064f757c69ec43517eff496146b43cba949d1</code></td>
+</tr>
+<tr>
+<td>HTTP downloader</td>
+<td><code>06af3016accdb3dfe1c23657bf1bf91c13baa757</code>, <code>0c0e78bf97116e781dde0e00a1cd0c29e68d623d</code>, <code>6d8cee28da8bcf25a4d232feb0810452acada11d</code>, <code>74ff58fce8f19083d16df0109dc91d78c94342fa</code>, <code>acc74217cbe3f2e727a826b34bde482dcae15be6</code>, <code>111c4998f3264617a7a9d9bf662d4b1577445b20</code></td>
+</tr>
+<tr>
+<td>Kernel driver</td>
+<td><code>17fa047c1f979b180644906fe9265f21af5b0509</code>, <code>1f3799fed3cf43254fe30dcdfdb8dc02d82e662b</code>, <code>4b882748faf2c6c360884c6812dd5bcbce75ebff</code>, <code>91f832f46e4c38ecc9335460d46f6f71352cffed</code>, <code>994dc79255aeb662a672a1814280de73d405617a</code>, <code>fff4f28287677caabc60c8ab36786c370226588d</code></td>
+</tr>
+<tr>
+<td>BCD store</td>
+<td><code>71559c3e2f3950d4ee016f24ca54da17d28b9d82</code>, <code>d6d3f3151b188a9da62deb95ea1d1abeff257914</code></td>
+</tr>
+<tr>
+<td>Exploit payload loader</td>
+<td><code>547faa2d64b85bf883955b723b07635c0a09326b</code>, <code>d1bbaa3d408e944c70b3815471eed7fa9aee6425</code></td>
+</tr>
+<tr>
+<td>MokInstaller</td>
+<td><code>0e6dd7110c38464ecaa55ee4e2fa303ada0edefb</code>, <code>d6bb89d8734b3e49725362dae9a868ae681e8bd6</code></td>
+</tr>
+<tr>
+<td>UAC bypass module</td>
+<td><code>164bb587109cfb20824303ad1609a65abb36c3e9</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Certificate:</strong> <code>CN = When They Cry CA</code>, serial <code>570B5D22B723B4A442CC6EEEBC2580E8</code>,
+thumbprint <code>C8E6BF8B6FDA161BBFA5470BCC262B1BDC92A359</code>.</p>
+<p><strong>Network:</strong> <code>xrepositoryx[.]name</code>, <code>myrepositoryx[.]com</code>, <code>myrepository[.]name</code>,
+<code>erdjknfweklsgwfmewfgref[.]com</code>, <code>harrysucksdick[.]com</code>, <code>heikickgn[.]com</code>,
+<code>frassirishiproc[.]com</code>, <code>egscorp[.]net</code>; path <code>/API/hpb_gate.php</code>
+(sometimes <code>/network/API/hpb_gate.php</code>); IPs <code>104.21.22[.]185</code>,
+<code>164.90.172[.]211</code>, <code>185.145.245[.]123</code>, <code>185.150.24[.]114</code>, <code>190.147.189[.]122</code>.</p>
+<p><strong>Host artifacts [CONFIRMED, Microsoft + ESET]:</strong></p>
+<ul>
+<li>ESP files <code>winload.efi</code>, <code>bootmgfw.efi</code>, <code>grubx64.efi</code> with recent or
+  inconsistent timestamps, and <strong>locked</strong> (hashing them fails with a sharing
+  violation);</li>
+<li>leftover directory <code>ESP:\system32\</code> (files deleted, directory not);</li>
+<li><code>MokList</code> containing a certificate that is not the organisation's;</li>
+<li><code>BootExecute</code>/BCD anomalies: a BCD referencing <code>custom:22000023</code>,
+  <code>avoidlowmemory</code>, <code>truncatememory</code>, <code>nointegritychecks</code>, <code>testsigning</code>;</li>
+<li>HVCI registry value set to 0; BitLocker protectors suspended;</li>
+<li>Defender operational log entries about antimalware intelligence stopping,
+  System log Event ID 7023 for the Defender service;</li>
+<li><code>winlogon.exe</code> making outbound connections, especially to port 80;</li>
+<li><strong>Measured Boot (TCG) log deltas</strong>: <code>EV_EFI_Boot_Services_Application</code> events
+  for <code>grubx64.efi</code> and for a <code>winload.efi</code> on the ESP, appearing between reboots
+  (<code>C:\Windows\Logs\MeasuredBoot\*.log</code>).</li>
+</ul>
+<hr />
+<h2 id="5-architecture-and-boot-chain-diagrams">5. Architecture and boot-chain diagrams</h2>
+<h3 id="51-lojax-firmware-implant-that-re-drops-a-userland-agent">5.1 LoJax — firmware implant that re-drops a userland agent</h3>
+<pre><code>                 ┌─────────────────────────────────────────────────────────┐
+                 │  SPI FLASH — BIOS region (survives everything)          │
+                 │                                                         │
+                 │  FFS volume                                             │
+                 │   ├─ DXE Core                                           │
+                 │   ├─ Ip4Dxe        (marker used by the patcher)         │
+                 │   ├─ NtfsDxe       (OEM AMI driver — DELETED)           │
+                 │   └─ SecDxe        (ADDED by ReWriter_binary.exe)       │
+                 │        ├─ PE image (compressed section)                 │
+                 │        ├─ UI section: &quot;SecDxe&quot;                          │
+                 │        └─ embedded NTFS DXE driver (Hacking Team, ntfs-3g)│
+                 └───────────────────────────┬─────────────────────────────┘
+                                             │ DXE Dispatcher loads it
+                                             ▼
+                              ┌──────────────────────────────┐
+                              │ SecDxe runs before any OS    │
+                              └──────────────┬───────────────┘
+                                             │
+              ┌──────────────────────────────┼──────────────────────────────┐
+              ▼                              ▼                              ▼
+   write rpcnetp.exe             write autoche.exe              patch SYSTEM hive FILE
+   %WINDIR%\SysWOW64             %WINDIR%\SysWOW64              BootExecute:
+                                                                 &quot;autocheck autochk *&quot;
+                                                              →  &quot;autocheck autoche *&quot;
+                                             │
+                                             ▼  (next Windows boot)
+                              ┌──────────────────────────────┐
+                              │ smss.exe runs BootExecute    │
+                              │  → autoche.exe               │
+                              │     ├─ creates service for   │
+                              │     │  rpcnetp.exe           │
+                              │     └─ restores BootExecute  │
+                              └──────────────┬───────────────┘
+                                             ▼
+                              ┌──────────────────────────────┐
+                              │ rpcnetp.exe (trojanized      │
+                              │  2008 Computrace agent)      │
+                              │  ├─ self→DLL, inject svchost │
+                              │  ├─ inject iexplore.exe      │
+                              │  └─ C2: secao[.]org, …       │
+                              └──────────────────────────────┘
+
+  Operator side (before all of the above):
+  RwDrv (signed RWEverything driver) + info_efi.exe
+      → ReWriter_read.exe   : HSFS/HSFC/FDATAX loop → dump.bin
+      → ReWriter_binary.exe : parse FFS, add SecDxe, delete NtfsDxe,
+                              write back if BIOSWE/BLE/SMM_BWP permit
+</code></pre>
+<h3 id="52-moonbounce-same-flash-no-new-files">5.2 MoonBounce — same flash, no new files</h3>
+<pre><code>  SPI FLASH — BIOS region
+  ┌──────────────────────────────────────────────────────────────┐
+  │ FFS volume                                                   │
+  │  └─ CORE_DXE  (legitimate module, MODIFIED IN PLACE)         │
+  │       ├─ EFI_BOOT_SERVICES.AllocatePool      ──► hook        │
+  │       ├─ EFI_BOOT_SERVICES.CreateEventEx     ──► hook        │
+  │       ├─ EFI_BOOT_SERVICES.ExitBootServices  ──► hook        │
+  │       └─ appended shellcode (in the image's slack space)     │
+  └───────────────────────────────┬──────────────────────────────┘
+                                  │ DXE phase
+                                  ▼
+                   hooks divert boot services calls
+                                  │
+                                  ▼  at ExitBootServices
+                   ┌──────────────────────────────────┐
+                   │ hooks inside the Windows loader  │
+                   └───────────────┬──────────────────┘
+                                   ▼
+                   ┌──────────────────────────────────┐
+                   │ malicious driver placed in the   │
+                   │ kernel address space (early init)│
+                   └───────────────┬──────────────────┘
+                                   ▼
+                   ┌──────────────────────────────────┐
+                   │ inject user-mode stage into      │
+                   │ svchost.exe                      │
+                   └───────────────┬──────────────────┘
+                                   ▼
+                   ┌──────────────────────────────────┐
+                   │ GET hxxp://mb.glbaitech[.]com/   │
+                   │     mboard.dll  → run in memory  │
+                   └──────────────────────────────────┘
+
+  Nothing is written to disk at any stage. No service, no file, no registry key.
+</code></pre>
+<h3 id="53-blacklotus-esp-bootkit-that-borrows-trust">5.3 BlackLotus — ESP bootkit that borrows trust</h3>
+<pre><code>  INSTALL (admin/SYSTEM, once)
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │ installer.exe                                                         │
+  │  ├─ UAC bypass if needed (Program Compatibility Assistant)            │
+  │  ├─ read SecureBoot UEFI var; read KUSER_SHARED_DATA for OS build     │
+  │  ├─ HVCI off (registry), BitLocker off (WMI DisableKeyProtectors)     │
+  │  ├─ rename ESP:\EFI\Microsoft\Boot\bootmgfw.efi → winload.efi         │
+  │  └─ drop: grubx64.efi, bootload.efi(shim), vulnerable bootmgfw.efi,   │
+  │           ESP:\system32\{hvloader.efi, bootmgr.efi, mcupdate_*.dll,   │
+  │                          BCD}, custom BCD/BCDR, then reboot           │
+  └───────────────────────────────┬───────────────────────────────────────┘
+                                  ▼
+  EXPLOIT (CVE-2022-21894 &quot;baton drop&quot;, once)
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │ bootmgfw.efi(vulnerable) → BCD{avoidlowmemory 0x10000000,             │
+  │                                custom:22000023 → ESP:\system32\bcd}   │
+  │   → bootmgr.efi(vulnerable) → BCD{truncatememory 0x10000000,          │
+  │                                    nointegritychecks, testsigning}    │
+  │     → Secure Boot policy cut out of memory → hvloader.efi loads        │
+  │       mcupdate_&lt;vendor&gt;.dll from ESP:\system32 (attacker's, self-signed)│
+  │         → MokInstaller: enroll attacker cert in MokList,               │
+  │                         restore BCD, install MS-signed shim as        │
+  │                         bootmgfw.efi, delete ESP:\system32 files       │
+  └───────────────────────────────┬───────────────────────────────────────┘
+                                  ▼
+  EVERY SUBSEQUENT BOOT (Secure Boot stays ON and is satisfied)
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │ firmware → bootmgfw.efi (= MS-signed shim)                            │
+  │   → reads MokList → verifies grubx64.efi (= BlackLotus) → runs it     │
+  │      ├─ NVRAM: VbsPolicyDisable                                       │
+  │      ├─ hook ImgArchStartBootApplication (bootmgfw/bootmgr)           │
+  │      ├─ hook BlImgAllocateImageBuffer (winload.efi)                   │
+  │      ├─ hook OslArchTransferToKernel (winload.efi)                    │
+  │      │    ├─ patch WdBoot.sys / WdFilter.sys entry → ret               │
+  │      │    └─ hook disk.sys entry                                      │
+  │      └─ at disk.sys: run malicious kernel driver, restore disk.sys    │
+  │           ├─ wait for winlogon.exe → inject HTTP downloader           │
+  │           ├─ strip MsMpEng.exe privileges                             │
+  │           ├─ ObSetHandleAttributes(ProtectFromClose) on ESP files     │
+  │           │    + KeBugCheck(INVALID_KERNEL_HANDLE) if they vanish     │
+  │           └─ IPC via MAC-derived named section/event                  │
+  │                 \BaseNamedObjects\101c1b  /  Z01c1b                   │
+  │                 commands: Install kernel driver | Uninstall BlackLotus│
+  │                                                                       │
+  │           HTTP downloader in winlogon.exe → /API/hpb_gate.php         │
+  └───────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="54-class-comparison-at-a-glance">5.4 Class comparison at a glance</h3>
+<pre><code>                       LoJax            MoonBounce          BlackLotus
+  layer                SPI flash        SPI flash           ESP + NVRAM
+  adds a module?       YES (SecDxe)     NO (in-place hook)  YES (grubx64.efi)
+  removes a module?    YES (NtfsDxe)    no                  no
+  writes to disk?      YES              NO                  YES (ESP only)
+  structural firmware  obvious          none                n/a
+    fingerprint?
+  needs firmware vuln? no (misconfig)   no (misconfig?)     n/a
+  needs SPI write?     YES              YES                 NO
+  needs a software     no                no                  YES (CVE-2022-21894)
+    vuln?
+  survives disk swap?  YES              YES                 NO
+  survives OS wipe?    YES              YES                 NO (if ESP wiped)
+  survives SPI reflash?NO               NO                  irrelevant
+  removal              reflash/board    reflash/board       reformat OS+ESP,
+                                                              revoke MOK, dbx
+</code></pre>
+<hr />
+<h2 id="6-comparative-analysis">6. Comparative analysis</h2>
+<h3 id="61-matrix">6.1 Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>LoJax</th>
+<th>MoonBounce</th>
+<th>BlackLotus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Class</strong></td>
+<td>UEFI firmware implant</td>
+<td>UEFI firmware implant</td>
+<td>UEFI bootkit</td>
+</tr>
+<tr>
+<td><strong>Disclosed</strong></td>
+<td>2018-09, ESET</td>
+<td>2022-01, Kaspersky</td>
+<td>2023-03, ESET</td>
+</tr>
+<tr>
+<td><strong>Actor</strong></td>
+<td>Sednit / APT28 [CONFIRMED as vendor assessment]</td>
+<td>APT41 [CONFIRMED as vendor assessment]</td>
+<td>Commodity, ~$5,000 on forums [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Infection vector</strong></td>
+<td>Operator tooling after kernel/admin compromise: signed <code>RwDrv</code> + <code>ReWriter_*</code>; needs permissive flash write config. No firmware CVE used (SmiFlash vuln noted, unused) [CONFIRMED]</td>
+<td>Undisclosed; <strong>UNKNOWN</strong>. Requires ability to obtain, patch and write back the image, so kernel access + SPI write path [INFERRED]</td>
+<td>Local admin/SYSTEM + installer; UAC bypass if needed; no privilege boundary at firmware level [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Exploitation required</strong></td>
+<td>No exploit; abuses legitimate firmware-write interface and misconfiguration</td>
+<td>No exploit seen; same class of abuse [INFERRED]</td>
+<td>Yes: CVE-2022-21894 to defeat Secure Boot once [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Persistence location</strong></td>
+<td>BIOS region of SPI flash: added <code>SecDxe</code> FFS file</td>
+<td>BIOS region of SPI flash: patched <code>CORE_DXE</code></td>
+<td><code>ESP:\EFI\Microsoft\Boot\{bootmgfw.efi→shim, grubx64.efi}</code> + <code>MokList</code> NVRAM variable</td>
+</tr>
+<tr>
+<td><strong>Firmware modification</strong></td>
+<td><strong>Yes</strong> (FFS add + delete + free-space shift)</td>
+<td><strong>Yes</strong> (inline hooks + appended shellcode)</td>
+<td><strong>No</strong> (never touches flash)</td>
+</tr>
+<tr>
+<td><strong>OS reinstall survival</strong></td>
+<td>Yes [CONFIRMED]</td>
+<td>Yes [CONFIRMED]</td>
+<td>Only if the ESP is preserved [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Disk replacement survival</strong></td>
+<td>Yes [CONFIRMED]</td>
+<td>Yes [CONFIRMED]</td>
+<td>No [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Firmware update survival</strong></td>
+<td>Only if update does not rewrite the whole BIOS region [CONFIRMED]</td>
+<td>Likely same [INFERRED]</td>
+<td>Unaffected (not in flash)</td>
+</tr>
+<tr>
+<td><strong>CMOS/NVRAM reset survival</strong></td>
+<td>Yes (code is in flash) [INFERRED]</td>
+<td>Yes [INFERRED]</td>
+<td>Breaks the trust anchor (MokList), leaves files; machine may not boot [INFERRED]</td>
+</tr>
+<tr>
+<td><strong>Secure Boot relationship</strong></td>
+<td>Not blocked: SB governs what firmware loads from disk, not the firmware's own volumes [INFERRED]. Real barriers: <code>BIOSWE</code>/<code>BLE</code>/<code>SMM_BWP</code>, descriptor perms, PRx, <code>FLOCKDN</code>, Boot Guard</td>
+<td>Same [INFERRED]</td>
+<td><strong>Bypassed</strong>, then permanently satisfied via shim + MOK [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Privilege obtained</strong></td>
+<td>Firmware (SMM-adjacent? no - DXE, pre-OS) + re-drops SYSTEM service</td>
+<td>Firmware DXE → kernel driver → SYSTEM in <code>svchost.exe</code></td>
+<td>Firmware-level code execution at boot → kernel driver → SYSTEM in <code>winlogon.exe</code></td>
+</tr>
+<tr>
+<td><strong>External comms</strong></td>
+<td>Yes, via userland agent C2</td>
+<td>Yes, via <code>svchost.exe</code> fetch + C2</td>
+<td>Yes, via <code>winlogon.exe</code> → <code>/API/hpb_gate.php</code></td>
+</tr>
+<tr>
+<td><strong>Can reinfect other components</strong></td>
+<td>Yes: re-drops agent every boot</td>
+<td>Yes: re-injects driver/payload every boot</td>
+<td>Yes: kernel payloads + user-mode payloads from C2</td>
+</tr>
+<tr>
+<td><strong>Detection difficulty</strong></td>
+<td>Medium: structural diff vs vendor image reveals added/removed files</td>
+<td><strong>High</strong>: no structural change; needs byte-level known-good comparison or runtime memory inspection</td>
+<td>Low-medium: many host artifacts (ESP files, MOK, measured-boot deltas, locked handles)</td>
+</tr>
+<tr>
+<td><strong>Remediation</strong></td>
+<td>Reflash SPI from trusted image with hardware programmer; full-region vendor update may work; else replace board [CONFIRMED]</td>
+<td>Same [INFERRED]</td>
+<td>Reformat OS partition <strong>and</strong> ESP; restore clean backup including ESP; revoke/remove attacker MOK (<code>mokutil</code>, physical presence); <code>dbx</code> update; remove 3rd-party UEFI CA [CONFIRMED]</td>
+</tr>
+<tr>
+<td><strong>Time to trust the machine again</strong></td>
+<td>After reflash + re-attestation</td>
+<td>After reflash + re-attestation</td>
+<td>After reformat + revocation verification</td>
+</tr>
+<tr>
+<td><strong>MITRE ATT&amp;CK</strong></td>
+<td>T1542.003 Pre-OS Boot: Bootkit; T1014 Rootkit</td>
+<td>Same</td>
+<td>T1542.003; T1548.002 UAC bypass; T1562.001/006 Impair Defenses; T1553.006 Code Signing Policy Modification</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-which-threat-is-hardest-to-detect-contain-and-eradicate">6.2 Which threat is hardest to detect, contain and eradicate?</h3>
+<p><strong>Hardest to detect: MoonBounce.</strong> Not because of obfuscation - the hooks are
+crude - but because it removes every signal defenders use. There is no new file
+to enumerate, no deleted module, no disk artifact, no service, no registry key.
+A structural firmware inventory looks clean. The only reliable detection is a
+byte-level comparison against the OEM image for that exact model and firmware
+version, which requires an asset database most organisations do not maintain. It
+also runs before the OS, so every OS-resident detection control is downstream of
+it.</p>
+<p><strong>Hardest to contain: MoonBounce and LoJax equally, and for the same reason.</strong>
+Containment of a compromised machine is normally "isolate, image, rebuild". For
+these two, rebuild does not work: the implant re-establishes itself on the freshly
+installed OS at the next boot. Containment requires treating the <em>hardware</em> as
+the compromised asset - quarantine the physical machine, do not reissue it, do not
+put it back on the network after a wipe.</p>
+<p><strong>Hardest to eradicate: LoJax and MoonBounce.</strong> Eradication means rewriting the
+SPI flash from a trusted image using a hardware programmer, or replacing the
+motherboard, then proving the result by re-reading the flash and comparing it to
+a known-good image. There is no software procedure that is sufficient. ESET says
+this outright and it has not changed since 2018.</p>
+<p><strong>BlackLotus is the easiest of the three to eradicate and the most dangerous in
+practice</strong>, because it is cheap, commoditised, requires only admin rights, and
+defeats the control everyone believed was protecting them. It is also the one
+whose removal does not require physical hardware work - which is exactly why the
+firmware-resident ones remain the more serious long-term threat.</p>
+<p><strong>The uncomfortable conclusion:</strong> the ranking that matters for defenders is not
+sophistication but <em>reachability</em>. BlackLotus will be used against many targets
+because it is for sale; MoonBounce and LoJax will be used against few, but on
+those few, the machine is gone.</p>
+<hr />
+<h2 id="7-detection-and-forensic-strategy">7. Detection and forensic strategy</h2>
+<h3 id="71-principle">7.1 Principle</h3>
+<p>Never let the compromised operating system be the sole witness. Each layer below
+is independent enough that an attacker has to defeat all of them, and the higher
+layers do not trust the lower ones.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What it establishes</th>
+<th>Trusted because</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Physical acquisition</td>
+<td>Ground truth about flash contents</td>
+<td>Out-of-band hardware, no OS involvement</td>
+</tr>
+<tr>
+<td>1. Platform configuration</td>
+<td>Whether the flash <em>could</em> have been written</td>
+<td>Read from chipset registers/descriptor, not from OS claims</td>
+</tr>
+<tr>
+<td>2. Firmware content integrity</td>
+<td>Whether flash contents match the vendor</td>
+<td>Cryptographic comparison to OEM release</td>
+</tr>
+<tr>
+<td>3. Boot chain and NVRAM</td>
+<td>What firmware will load, and what it trusts</td>
+<td>Signed variable structure, read from firmware, not OS</td>
+</tr>
+<tr>
+<td>4. Measured boot / TPM</td>
+<td>Whether the boot chain changed</td>
+<td>TPM PCRs, remote-verified</td>
+</tr>
+<tr>
+<td>5. OS-visible artifacts</td>
+<td>Cheap, fast, high-recall hunting</td>
+<td>Corroboration only</td>
+</tr>
+<tr>
+<td>6. Network</td>
+<td>Post-compromise activity</td>
+<td>Independent of the host</td>
+</tr>
+</tbody>
+</table>
+<h3 id="72-layer-0-1-acquisition-and-platform-posture">7.2 Layer 0-1: acquisition and platform posture</h3>
+<p><strong>Acquire the flash out of band.</strong> In-circuit SPI read with a hardware programmer
+(e.g. CH341A-class or a professional programmer), or chip-off in a lab, with the
+host powered down and the SPI header isolated. Record: programmer model, firmware
+version, operator, timestamp, and the SHA-256 of the dump at acquisition.
+Acquisition of flash via the running OS is <em>convenience</em>, not evidence, because
+the thing you are measuring is the thing you are trusting to measure it.</p>
+<p><strong>Interrogate platform configuration.</strong> With the machine off-network and booted
+from a read-only live image, CHIPSEC is the practical tool
+(<code>github.com/chipsec/chipsec</code>):</p>
+<ul>
+<li>BIOS write protections: <code>BIOSWE</code>, <code>BLE</code>, <code>SMM_BWP</code> in <code>BIOS_CNTL</code>;</li>
+<li>protected ranges <code>PR0</code>-<code>PR5</code> and <code>FLOCKDN</code> (flash descriptor lock);</li>
+<li>descriptor region permissions (BIOS/ME/GbE read-write vs read-only);</li>
+<li>SPI controller lock state and BIOS region access via the descriptor;</li>
+<li>Boot Guard / verified boot status where the platform exposes it;</li>
+<li>Secure Boot variable state (<code>common.secureboot.variables</code>).</li>
+</ul>
+<p>Interpretation is blunt: <strong>if the BIOS region is writable from the OS, LoJax-class
+implants are one kernel bug away.</strong> That is a finding on its own, before any
+malware is found.</p>
+<h3 id="73-layer-2-firmware-content-integrity-the-one-that-catches-moonbounce">7.3 Layer 2: firmware content integrity (the one that catches MoonBounce)</h3>
+<p>The procedure:</p>
+<ol>
+<li>Obtain the OEM's signed firmware release for that exact model/version; unpack
+   the vendor image, do not merely hash the capsule.</li>
+<li>Parse both images into volumes, files and sections (UEFITool, or
+   <code>uefi_firmware</code> Python package, in the enclave, on copies).</li>
+<li>Compare <strong>per file GUID and per section</strong>, not per image. Record: file present
+   in one but not the other; section content hash mismatch; section order change;
+   free-space layout change; <code>UI</code> section names.</li>
+<li>For every PE/COFF module present in both, diff the code bytes. A module whose
+   entry-point prologue differs from the vendor build is the MoonBounce signal.</li>
+<li>Keep a per-model <strong>reference manifest</strong>: GUID → SHA-256 of each section, plus
+   the module's expected entry-point bytes. Once you have that, detection is a
+   hash comparison, which runs at fleet scale.</li>
+</ol>
+<p>Known-bad content scanning on top of the diff:</p>
+<ul>
+<li>YARA over firmware volumes. Binarly's <strong>FwHunt</strong> rules
+  (<code>github.com/binarly-io/FwHunt</code>) are built for exactly this, at the module
+  level, and are the best starting corpus; Malpedia carries family rules for
+  MoonBounce.</li>
+<li>String hunts: <code>SecDxe</code>, <code>c:\edk2\NtfsPkg\</code>, <code>autoche</code>, <code>rpcnetp</code>,
+  <code>mcupdate_</code>, <code>When They Cry</code>, <code>hpb_gate</code>, <code>mboard.dll</code>, <code>VbsPolicyDisable</code>.
+  Treat hits as leads; several appear in clean firmware.</li>
+</ul>
+<p><strong>Do not skip the boring check:</strong> a firmware version that is <em>older</em> than the
+vendor's latest, on a machine that claims to be managed, is a finding. Downgrade
+is how implants survive updates.</p>
+<h3 id="74-layer-3-boot-chain-and-nvram">7.4 Layer 3: boot chain and NVRAM</h3>
+<p>Read the variables, not the OS's opinion of them (<code>efi-readvar</code> from efitools,
+<code>mokutil</code>, or a firmware-level dump):</p>
+<ul>
+<li><code>PK</code>, <code>KEK</code>, <code>db</code>, <code>dbx</code>: unexpected certificates, unexpected emptiness,
+  <code>dbx</code> older than the current Microsoft revocation list;</li>
+<li><strong><code>MokList</code> / <code>MokListRT</code></strong>: any certificate the organisation did not put there.
+  This is the single highest-value BlackLotus indicator and it survives everything
+  short of an NVRAM reset;</li>
+<li><code>BootOrder</code>, <code>Boot####</code>: unexpected entries, especially pointing at
+  <code>\EFI\Microsoft\Boot\grubx64.efi</code> on a Windows-only fleet;</li>
+<li><code>SecureBoot</code>, <code>SetupMode</code>, <code>VbsPolicyDisable</code>, <code>SaferMode</code> / custom variables;</li>
+<li>BCD: <code>avoidlowmemory</code>, <code>truncatememory</code>, <code>nointegritychecks</code>, <code>testsigning</code>,
+  <code>custom:22000023</code>, and any <code>device</code>/<code>systemroot</code> pointing at the ESP rather than
+  the OS partition [CONFIRMED, baton-drop mechanics].</li>
+</ul>
+<p>Tooling on a live Windows host, for triage only: <code>Confirm-SecureBootUEFI</code>,
+<code>Get-SecureBootUEFI</code>, <code>bcdedit /enum all</code>, <code>mountvol S: /S</code> then inventory
+<code>S:\EFI\Microsoft\Boot\</code>, and compare those files against
+<code>C:\Windows\Boot\EFI\</code> and against Microsoft's published hashes.</p>
+<h3 id="75-layer-4-measured-boot">7.5 Layer 4: measured boot</h3>
+<p>Measured boot is the only mechanism that gives you a <em>cryptographic</em> statement
+about the boot chain, and it works against all three families:</p>
+<ul>
+<li><strong>Windows</strong>: <code>C:\Windows\Logs\MeasuredBoot\*.log</code> (TCG log, one per boot).
+  Parse with <code>tbs</code>/TCGLogTools, diff between boots and between machines of the
+  same build. BlackLotus appears as <code>EV_EFI_Boot_Services_Application</code> entries for
+  <code>grubx64.efi</code> and an ESP-resident <code>winload.efi</code> [CONFIRMED, Microsoft].</li>
+<li><strong>Linux</strong>: <code>tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements</code>.</li>
+<li><strong>Remote verification</strong>: have the TPM quote PCRs to a verifier outside the
+  machine's trust boundary. A machine that cannot produce a quote matching the
+  golden value for its model/build is not trustworthy, regardless of what its OS
+  reports.</li>
+</ul>
+<p>Two honest caveats. (a) Measured boot tells you <em>that</em> something changed, not
+<em>whether it is malicious</em> - you need a golden baseline per model and firmware
+version. (b) If the firmware itself is the implant (LoJax, MoonBounce), the code
+doing the measuring may be the code being measured. That is why layer 0/2
+(hardware read-back, vendor comparison) outrank layer 4 for firmware implants,
+and why DRTM late-launch (Intel TXT, AMD SKINIT) exists at all: it re-establishes
+a measurement root after the platform is already running.</p>
+<h3 id="76-layer-5-os-visible-hunting-cheap-high-recall-low-trust">7.6 Layer 5: OS-visible hunting (cheap, high-recall, low-trust)</h3>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Catches</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ESP file timestamps inconsistent with each other or with <code>C:\Windows\Boot\EFI</code></td>
+<td>BlackLotus</td>
+<td>Microsoft's first recommended check</td>
+</tr>
+<tr>
+<td><code>ERROR_SHARING_VIOLATION</code> when hashing ESP files (<code>certutil -hashfile</code>)</td>
+<td>BlackLotus (active)</td>
+<td>Locked by <code>ProtectFromClose</code></td>
+</tr>
+<tr>
+<td><code>ESP:\system32\</code> directory present</td>
+<td>BlackLotus (post-install)</td>
+<td>Files deleted, directory not</td>
+</tr>
+<tr>
+<td>HVCI <code>Enabled=0</code>, BitLocker protectors suspended</td>
+<td>BlackLotus</td>
+<td>Both are prerequisite actions</td>
+</tr>
+<tr>
+<td>Defender operational log: intelligence stopped; System 7023</td>
+<td>BlackLotus</td>
+<td>Driver patches / privilege stripping</td>
+</tr>
+<tr>
+<td><code>winlogon.exe</code> outbound connections, esp. port 80; <code>api.ipify.org</code></td>
+<td>BlackLotus</td>
+<td><code>winlogon</code> should never do this</td>
+</tr>
+<tr>
+<td>Service matching the Computrace service name; <code>rpcnetp.exe</code>; <code>autoche.exe</code></td>
+<td>LoJax</td>
+<td>Check image path and signature, not just name</td>
+</tr>
+<tr>
+<td><code>BootExecute</code> = <code>autocheck autoche *</code> (or history of it)</td>
+<td>LoJax (transient)</td>
+<td>Self-repairs; absence proves nothing</td>
+</tr>
+<tr>
+<td>Kernel driver with no backing file; unexpected <code>svchost.exe</code> module</td>
+<td>MoonBounce</td>
+<td>Memory forensics required</td>
+</tr>
+</tbody>
+</table>
+<h3 id="77-layer-6-network">7.7 Layer 6: network</h3>
+<ul>
+<li><code>mb.glbaitech[.]com</code> (MoonBounce stage fetch);</li>
+<li><code>/API/hpb_gate.php</code> on any host (BlackLotus C2 pattern);</li>
+<li>LoJax C2 domains/IPs listed in §2.8;</li>
+<li>DNS/HTTP from <code>winlogon.exe</code>, <code>svchost.exe</code> to newly registered domains;</li>
+<li>egress from a machine that has no business making outbound 80/443.</li>
+</ul>
+<p><strong>Attribution is the weak point, not collection.</strong> On a host running any of these
+families, "which process owns this socket" is a claim by a compromised kernel:
+BlackLotus injects into <code>winlogon.exe</code> and MoonBounce into a
+<code>SVCHOST.EXE -K NETSVCS</code> instance precisely so that accounting names a signed
+Microsoft binary. <code>qvault/netobs.py</code> therefore records an attribution <em>tier</em> per
+flow (wire-only, claimed-only, corroborated, conflict) and reports the divergences
+between what the host says and what the wire saw. Corroboration means two sources
+agree, not that the attribution is true. Design and failure modes:
+<code>report/NETOBS_MODULE.md</code>.</p>
+<h3 id="78-acquisition-and-preservation-order">7.8 Acquisition and preservation order</h3>
+<p>Do this in order, because each step can destroy the next:</p>
+<ol>
+<li><strong>Network-isolate</strong> (switch port down, not just firewall rules) and photograph
+   the machine's state.</li>
+<li><strong>External evidence</strong>: TPM quote, Secure Boot variable dump, firmware version
+   as reported by firmware setup. These are small and fast.</li>
+<li><strong>Memory capture</strong> before shutdown, if memory-resident stages matter
+   (MoonBounce, BlackLotus). Trusted-agent or hardware-assisted, never a tool
+   installed onto the suspect OS at that moment.</li>
+<li><strong>Disk image</strong> (write-blocked) including the ESP and any recovery partitions.</li>
+<li><strong>SPI flash read-back</strong> out of band, powered down.</li>
+<li>Only then boot anything.</li>
+</ol>
+<p>Everything captured goes into the vault described in §9, in that order, with the
+chain-of-custody record filled in as it happens.</p>
+<h3 id="79-what-detection-cannot-do">7.9 What detection cannot do</h3>
+<p>It cannot tell you a machine is clean. It can tell you a machine matches a known
+baseline, or that a specific artifact is present. "No indicators found" on a
+firmware implant means "no indicators were found", which for MoonBounce may mean
+"we did not diff the right image".</p>
+<hr />
+<h2 id="8-containment-versus-eradication-stated-precisely">8. Containment versus eradication, stated precisely</h2>
+<p>These are different objectives with different success criteria and it is worth
+being pedantic, because most incident reports blur them.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Containment</th>
+<th>Eradication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Goal</strong></td>
+<td>Stop the threat acting and spreading</td>
+<td>Remove the malicious code and restore trust</td>
+</tr>
+<tr>
+<td><strong>For LoJax/MoonBounce</strong></td>
+<td>Quarantine the physical machine; never reissue it; block its network identity; preserve evidence</td>
+<td>Rewrite SPI flash from a trusted image with a hardware programmer (or replace the board), then verify by read-back and comparison</td>
+</tr>
+<tr>
+<td><strong>For BlackLotus</strong></td>
+<td>Isolate; block C2; preserve ESP, MOK and measured-boot evidence</td>
+<td>Reformat OS + ESP, revoke attacker MOK, apply <code>dbx</code>, remove unnecessary 3rd-party UEFI CA</td>
+</tr>
+<tr>
+<td><strong>Proves success by</strong></td>
+<td>No further C2, no further payload deployment</td>
+<td>Byte-level equality with a known-good image, plus a clean measured boot</td>
+</tr>
+<tr>
+<td><strong>Cannot be done by</strong></td>
+<td>Anything that leaves the machine running</td>
+<td>Encryption, AV, EDR, "removing the file"</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Encryption belongs entirely on the containment side.</strong> It preserves; it never
+repairs. A vault full of encrypted LoJax samples is a vault full of encrypted
+LoJax samples, and the machine that produced them is still infected.</p>
+<h3 id="85-the-six-capability-denials-and-the-plane-that-must-enforce-each">8.5 The six capability denials, and the plane that must enforce each</h3>
+<p>A containment plan is usually written as a list of things the subject may not do:
+reach the network, use authentication services, touch storage, consume compute,
+cross between networks, decrypt anything. Every one of those is enforceable at
+several layers, and the layers are not equivalent. The same six denials are either
+a real boundary or a sentence in a report, depending on which plane enforces them.</p>
+<table>
+<thead>
+<tr>
+<th>Plane</th>
+<th>Clean host</th>
+<th>OS compromised</th>
+<th>Firmware compromised</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Subject OS</strong> (firewall, ACLs, AppLocker, service shutdown)</td>
+<td>full</td>
+<td><strong>none</strong></td>
+<td><strong>none</strong></td>
+</tr>
+<tr>
+<td><strong>Hypervisor</strong> (no vNIC, no vDisk)</td>
+<td>full</td>
+<td>full</td>
+<td>partial</td>
+</tr>
+<tr>
+<td><strong>Firmware platform</strong> (passwords, boot order, lock bits)</td>
+<td>partial</td>
+<td>none</td>
+<td>none</td>
+</tr>
+<tr>
+<td><strong>Network fabric</strong> (port ACL, VLAN isolation)</td>
+<td>full</td>
+<td>full</td>
+<td>full, if every egress path is enumerated</td>
+</tr>
+<tr>
+<td><strong>Physical</strong> (cable out, power off, media removed, write-blocker)</td>
+<td>full</td>
+<td>full</td>
+<td>full</td>
+</tr>
+<tr>
+<td><strong>Cryptographic</strong> (the key is simply absent)</td>
+<td>full</td>
+<td>full</td>
+<td>full</td>
+</tr>
+</tbody>
+</table>
+<p>Two rows carry most of the argument:</p>
+<p><strong>Subject-OS enforcement disappears at exactly the moment you need it.</strong> Against a
+compromised kernel it is not a weakened control, it is a removed one: the
+attacker's code decides whether the rule applies. Against a DXE or SMM implant it
+never runs at all, because the implant executes before the OS exists. A plan built
+entirely from host firewalls, host ACLs and service disablement provides <em>zero</em>
+denial against any of the three families in this report once they are resident,
+while reading as complete on paper.</p>
+<p><strong>Decryption is a capability, not a location.</strong> No firewall, ACL, hypervisor or
+safe can deny it; they can only deny reach to the ciphertext, which is a different
+and weaker claim. Only the absence of key material denies decryption, which is why
+the vault's key management (§10) is the load-bearing control rather than any
+network rule.</p>
+<p><code>qvault/containment.py</code> encodes that table and can audit a claim: give it a plan, a
+posture and a list of capabilities you say you denied, and it reports which of them
+the plan does not actually support. It also refuses to claim eradication, always,
+because nothing in this table removes anything. LoJax survived OS reinstall and
+disk replacement, both far stronger than policy denial; a denial list that survives
+it is a change of what it can <em>do</em>, never of what is <em>there</em>.</p>
+<hr />
+<h2 id="9-cryptographic-quarantine-feasibility-analysis">9. Cryptographic quarantine: feasibility analysis</h2>
+<h3 id="91-the-proposal-under-evaluation">9.1 The proposal under evaluation</h3>
+<blockquote>
+<p>A suspicious firmware image or sample enters an isolated ingestion system.
+Before any analysis or execution-capable processing, the original object is
+cryptographically encapsulated. The encrypted object is stored in an isolated,
+immutable repository. Decryption is possible only through a separately
+controlled, explicitly authorised research environment.</p>
+</blockquote>
+<p>This is a sound design <em>for preservation</em>, and the analysis below is about
+sharpening where it holds and where it silently fails. The reference
+implementation in <code>qvault/</code> implements the parts that can be implemented in
+software honestly; §9.12 lists what must be hardware or process.</p>
+<h3 id="92-the-ten-questions-answered-directly">9.2 The ten questions, answered directly</h3>
+<p><strong>1. Can encryption at ingestion prevent execution of the stored malware?</strong></p>
+<p><em>Yes, for the stored object; no, for the machine that produced it.</em></p>
+<p>Once ciphertext is on disk, nothing can execute it: there is no loader that
+interprets AES-GCM output, no file association, no shell handler, no AV engine
+that will scan it (an AV engine cannot decrypt it, which is a feature), and no
+accidental double-click that does anything but produce an error. The stored
+object is inert <strong>only if</strong> three conditions hold:</p>
+<ul>
+<li>encryption completes before any plaintext hits durable storage (no temp files,
+  no volume-shadow copies, no page file on the ingestion host);</li>
+<li>decryption keys are not present on the storage host;</li>
+<li>nothing auto-decrypts on access (no FUSE mount, no auto-unlock keystore, no
+  "preview" integration).</li>
+</ul>
+<p>What encryption cannot do: it cannot stop the source machine's firmware implant
+from running at its next boot, and it cannot stop a human who is authorised to
+decrypt from then executing the sample. The last one is the dominant real-world
+risk and no cryptographic control touches it.</p>
+<p><strong>2. What happens if the ingestion host is already compromised?</strong></p>
+<p>Then everything downstream of the compromise is suspect, and the honest
+conclusion is that the object's <em>provenance</em> is unverified even though its
+<em>ciphertext</em> is intact. Concretely, a compromised ingestion host can:</p>
+<ul>
+<li>read the plaintext in the 64 KiB window before encryption (by definition: it is
+  the process doing the encryption);</li>
+<li>compute and record whatever hashes it likes - the manifest is only as honest as
+  the host that wrote it;</li>
+<li>steal a DEK while it exists in RAM (during ingest) and, if it also obtains the
+  wrapped DEK and KEK shares, decrypt later;</li>
+<li>suppress or forge audit entries, unless the log is anchored somewhere the host
+  cannot reach;</li>
+<li>write a <em>different</em> object into the vault than the one it claims to have
+  ingested (substitution), which no amount of post-hoc hashing can detect unless
+  the expected hash came from an independent source.</li>
+</ul>
+<p>Mitigations that actually work: make ingestion a <strong>disposable appliance</strong> that
+boots from read-only media, has no persistent writable storage except the vault
+target, and is re-imaged per case; derive the "expected" hash from an
+<strong>independent</strong> device (the flash programmer's own log, or a second reader);
+write the audit head to an <strong>external anchor</strong> the host cannot rewrite; treat
+objects ingested by an unverified host as <code>provenance: unverified</code> in the
+metadata, and never let that flag silently become "trusted".</p>
+<p><strong>3. Can firmware images be safely preserved without interpreting their contents?</strong></p>
+<p><em>Yes, and this is the correct default.</em> A firmware image is a byte string;
+preservation means "these exact bytes, unmodified, with this custody record".
+Interpretation is a separate, later, optional activity that happens in the
+enclave on a copy.</p>
+<p>This is also a security control. Firmware parsing entails LZMA/Tiano/EFI
+decompressors, PE loaders, FFS parsers and GUID databases - all of which have had
+memory-safety bugs. A vault that must parse a sample to store it has given an
+attacker a parser to attack at the exact moment its keys are in memory. The
+<code>qvault.triage</code> module therefore performs only bounded reads: magic numbers at
+fixed offsets, a flash-descriptor region table, string extraction over a capped
+window, and a Shannon-entropy histogram. It never decompresses, never maps, never
+loads.</p>
+<p><strong>4. How should encryption keys be managed?</strong></p>
+<p>Envelope encryption with split knowledge, in four layers:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Key</th>
+<th>Where it lives</th>
+<th>Rotation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Object</td>
+<td>256-bit DEK, unique per sample</td>
+<td>Only in RAM during ingest/retrieval; persisted only <em>wrapped</em></td>
+<td>Never reused; destroyed after wrapping</td>
+</tr>
+<tr>
+<td>Vault</td>
+<td>256-bit KEK, wraps DEKs</td>
+<td>Split K-of-N (Shamir) across custodians; production: HSM/TPM-sealed shares</td>
+<td>Rewrap DEKs under a new KEK, no re-encryption of objects</td>
+</tr>
+<tr>
+<td>Custodian</td>
+<td>Share-encryption key / HSM auth</td>
+<td>Smartcard, HSM slot, separate org unit</td>
+<td>Yearly, or on personnel change</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>Ed25519 signing key</td>
+<td>Offline or HSM; public half anchored externally</td>
+<td>Yearly, with cross-signed transition</td>
+</tr>
+</tbody>
+</table>
+<p>Rules that matter more than the algorithm choice: no key material on the storage
+host; no single person able to reconstruct the KEK; every key <em>use</em> logged
+separately from the vault audit log; tested restoration of keys from escrow; and
+a written, rehearsed procedure for what happens when a custodian leaves.</p>
+<p><em>On "crypto-shredding":</em> destroying a DEK renders one object permanently
+unreadable. That is a legitimate capability for data-protection compliance and a
+catastrophic one for evidence retention. In an evidence vault it should exist
+only as a dual-controlled, logged, last-resort action - never as an automatic
+retention policy.</p>
+<p><strong>5. Can individual samples have independent encryption keys?</strong></p>
+<p>Yes, and they must. <code>qvault</code> generates a fresh DEK per object. Consequences:
+compromise of one DEK exposes exactly one sample; a per-object key can be
+destroyed independently; a corrupted key affects one object rather than the
+archive; and there is no global key whose theft is a total loss. The cost is a
+wrapped-key blob per object (about 60 bytes), which is nothing.</p>
+<p><strong>6. How should researchers retrieve samples without exposing production?</strong></p>
+<p>Four rules, in order of importance:</p>
+<ol>
+<li><strong>Decrypt to the enclave, never "download".</strong> The retrieval verb writes into a
+   directory inside the analysis environment and nowhere else. <code>qvault</code> enforces
+   this with a <code>.enclave</code> sentinel: a normal workstation directory is refused.</li>
+<li><strong>Make retrieval a multi-party act.</strong> Threshold shares plus two independent
+   approvals, with the requester unable to approve their own request.</li>
+<li><strong>No bulk export.</strong> One object per authorised action, one audit entry per
+   action. If an operator wants fifty samples, that is fifty decisions and fifty
+   records.</li>
+<li><strong>One-way results.</strong> Findings, logs and derived indicators leave the enclave;
+   samples and memory images do not. Where a physical transfer is unavoidable, it
+   is a logged, sealed, single-purpose medium destroyed afterwards.</li>
+</ol>
+<p><strong>7. How can the vault prevent automatic extraction and execution?</strong></p>
+<p>By removing every automated path that could touch a plaintext:</p>
+<ul>
+<li>no key material on the storage host, so no daemon <em>can</em> decrypt;</li>
+<li>no plaintext ever written by the vault outside a marked enclave (mode <code>0400</code>,
+  no execute bit - enforced and tested);</li>
+<li>no auto-mount, no FUSE handler for <code>.qv</code> objects, no file association;</li>
+<li>exclude the vault's object store from AV/EDR scanning, indexing, thumbnailing,
+  cloud sync and backup agents that would otherwise need to read it (and would
+  either copy plaintext or choke);</li>
+<li>deny <code>execve</code> on the enclave output directory via mount options
+  (<code>noexec</code>) and, where available, an LSM policy;</li>
+<li>treat the enclave as hostile-after-use: revert to snapshot per case.</li>
+</ul>
+<p><strong>8. How should integrity and provenance be verified?</strong></p>
+<p>Layered, cheapest first:</p>
+<ol>
+<li><strong>Ciphertext hash</strong> per object, recomputed on every verify pass (detects
+   corruption and storage tampering).</li>
+<li><strong>Plaintext hash</strong> recorded at ingest and re-checked after decryption (proves
+   the bytes recovered are the bytes ingested).</li>
+<li><strong>Metadata binding</strong>: the stream header and object identity are AEAD
+   associated data, so ciphertext cannot be relabelled or swapped (tested).</li>
+<li><strong>Hash-chained audit log</strong>: each entry commits to the previous one; edits and
+   reordering break the chain (tested).</li>
+<li><strong>Signed checkpoints</strong>: the log head is signed with Ed25519 so <em>truncation</em>
+   is detectable (tested).</li>
+<li><strong>External anchoring</strong>: a checkpoint hash published outside the vault's
+   administrative domain - RFC 3161 timestamp, a transparency log, or a signed
+   paper custody record. This is the only control that survives a compromised
+   vault administrator, and it is a process control, not a code feature.</li>
+<li><strong>Merkle root</strong> over the object set, published on the same cadence, so the
+   <em>inventory</em> is committed to and not just individual objects (tested).</li>
+</ol>
+<p><strong>9. What happens if the vault's administrative environment is compromised?</strong></p>
+<p>Assume the attacker has root on the vault host. They can read all ciphertext (low
+value without the KEK), delete objects, rewrite envelopes and the audit log,
+fabricate approvals, alter policy, and - if the audit signing key is on that host
+- re-sign a rewritten history that verifies perfectly.</p>
+<p>What still holds, if the design is right: objects they cannot read (no KEK);
+history they cannot rewrite undetectably (external anchors); and objects they
+cannot silently substitute (hashes derived from an independent source at
+acquisition). What fails: availability, and any object whose "expected" hash came
+from the compromised host.</p>
+<p>Therefore the vault host must be treated as a <em>semi-trusted</em> component: it stores,
+it does not decide. Approvals should be signed by custodian-held keys, not by the
+server; the audit signing key belongs in an HSM or offline; the anchor belongs to
+a different administrative domain.</p>
+<p><strong>10. What attacks could bypass the quarantine boundary?</strong></p>
+<p>Enumerated with mitigations in §10. The short list: execution <em>before</em>
+encapsulation (previewers, indexers, sync clients, AV, autorun); key theft and
+out-of-band decryption; parser exploitation in triage; supply-chain compromise of
+the vault software itself; physical theft of shares; insider action; firmware or
+BMC implants in the ingestion appliance; DMA attacks against the enclave;
+plaintext re-introduced into general storage by a well-meaning analyst; and the
+simplest of all - an authorised person decrypting and running the sample.</p>
+<h3 id="93-containment-versus-eradication-restated-for-the-design">9.3 Containment versus eradication (restated for the design)</h3>
+<p>The vault is a <strong>containment and preservation</strong> system with a provable property:</p>
+<blockquote>
+<p>Between ingestion and authorised retrieval, the preserved object is not
+executable, not modified, and any modification of its stored form is detectable.</p>
+</blockquote>
+<p>It is <em>not</em> an eradication system and must never be described as one. Specifically:</p>
+<ul>
+<li>encrypting a LoJax sample does not clean the machine that produced it;</li>
+<li>a clean vault does not imply a clean fleet;</li>
+<li>a verified hash proves the sample is intact, not that the source was benign;</li>
+<li>a <code>verify: ok</code> result means "the vault's own bytes are internally consistent".</li>
+</ul>
+<hr />
+<h2 id="10-proposed-defensive-architecture">10. Proposed defensive architecture</h2>
+<h3 id="101-zones-and-trust-boundaries">10.1 Zones and trust boundaries</h3>
+<pre><code> ┌──────────────────────────────────────────────────────────────────────────────┐
+ │ ZONE 0 — SUBJECT (untrusted, powered off)                                    │
+ │   suspect host · SPI flash · disk · TPM                                      │
+ └───────────────────────────────┬──────────────────────────────────────────────┘
+                                 │ out-of-band acquisition only
+                                 │ (SPI programmer, write blocker, TPM quote)
+ ┌───────────────────────────────▼──────────────────────────────────────────────┐
+ │ ZONE 1 — ACQUISITION APPLIANCE (semi-trusted, disposable)                    │
+ │   boots read-only · no persistent plaintext path · no NIC after capture ·    │
+ │   TPM-measured boot · runs qvault ingest · writes ciphertext only            │
+ └───────────────────────────────┬──────────────────────────────────────────────┘
+                                 │ ciphertext + envelope + audit entry
+ ┌───────────────────────────────▼──────────────────────────────────────────────┐
+ │ ZONE 2 — IMMUTABLE VAULT (semi-trusted storage, no keys)                     │
+ │   objects/  (0400, content-addressed)   envelopes/ (0400, signed metadata)   │
+ │   audit.log (hash chain)   checkpoints/ (Ed25519)   WORM / object-lock       │
+ └───────────────────────────────┬──────────────────────────────────────────────┘
+                                 │ read-only mount
+ ┌───────────────────────────────▼──────────────────────────────────────────────┐
+ │ ZONE 3 — CONTROL PLANE (high trust, no sample access)                        │
+ │   policy engine · approval service (custodian signatures) · audit anchoring  │
+ │   external RFC 3161 timestamp / transparency log · inventory Merkle root     │
+ └───────────────────────────────┬──────────────────────────────────────────────┘
+                                 │ K-of-N shares + 2-person approval + policy
+ ┌───────────────────────────────▼──────────────────────────────────────────────┐
+ │ ZONE 4 — ANALYSIS ENCLAVE (hostile-by-assumption, network-isolated)          │
+ │   noexec plaintext store · disposable VMs per case · no BMC sharing ·        │
+ │   DRTM late-launch measurement · one-way results export (data diode)         │
+ └──────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Diagram source: <code>diagrams/quarantine_architecture.svg</code>.</p>
+<h3 id="102-component-responsibilities">10.2 Component responsibilities</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Does</th>
+<th>Must never</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acquisition appliance</td>
+<td>Hash, encrypt, seal, classify inertly, log</td>
+<td>Write plaintext anywhere persistent; hold the KEK</td>
+</tr>
+<tr>
+<td>Object store</td>
+<td>Hold ciphertext immutably, content-addressed</td>
+<td>Decrypt, parse, or be writable by the appliance after seal</td>
+</tr>
+<tr>
+<td>Envelope store</td>
+<td>Hold signed custody metadata</td>
+<td>Be the sole record of custody (audit chain is independent)</td>
+</tr>
+<tr>
+<td>Audit chain</td>
+<td>Record every state change, chained</td>
+<td>Be the only copy (anchors required)</td>
+</tr>
+<tr>
+<td>Custodian set</td>
+<td>Hold K-of-N KEK shares, sign approvals</td>
+<td>Co-locate shares; store them on the vault host</td>
+</tr>
+<tr>
+<td>Control plane</td>
+<td>Enforce policy, collect approvals, anchor checkpoints</td>
+<td>Hold sample keys or plaintext</td>
+</tr>
+<tr>
+<td>Enclave</td>
+<td>Decrypt under authorisation, analyse, produce findings</td>
+<td>Reach production networks; persist plaintext between cases</td>
+</tr>
+</tbody>
+</table>
+<h3 id="103-control-mapping">10.3 Control mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Control</th>
+<th>Where implemented</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Untrusted ingestion</td>
+<td>Read-only appliance, no plaintext path, provenance recorded</td>
+<td><code>ingest.py</code>, process control</td>
+</tr>
+<tr>
+<td>Cryptographic encapsulation</td>
+<td>AES-256-GCM chunked, AAD-bound, per-object key</td>
+<td><code>crypto.py</code></td>
+</tr>
+<tr>
+<td>Immutable storage</td>
+<td><code>O_EXCL</code>, fsync, <code>0400</code>, content-addressed by ciphertext</td>
+<td><code>store.py</code></td>
+</tr>
+<tr>
+<td>Independent key management</td>
+<td>Shamir K-of-N KEK, wrapped DEKs, KEK id check</td>
+<td><code>keys.py</code>, <code>crypto.py</code></td>
+</tr>
+<tr>
+<td>Access authorisation</td>
+<td>quorum + dual control + requester ≠ approver</td>
+<td><code>retrieve.py</code></td>
+</tr>
+<tr>
+<td>Isolated analysis</td>
+<td><code>.enclave</code> sentinel, <code>0400</code> output, no execute</td>
+<td><code>retrieve.py</code>, tests</td>
+</tr>
+<tr>
+<td>Firmware integrity verification</td>
+<td>reference manifests per model, module diffs</td>
+<td>§7.3, external tooling</td>
+</tr>
+<tr>
+<td>Hardware trust verification</td>
+<td>SPI read-back, CHIPSEC posture, TPM quote, DRTM</td>
+<td>§7.2, §7.5</td>
+</tr>
+<tr>
+<td>Audit logging</td>
+<td>hash chain + signed checkpoints + external anchor</td>
+<td><code>audit.py</code></td>
+</tr>
+<tr>
+<td>Recovery and remediation</td>
+<td>documented reflash/reformat procedures, re-attestation</td>
+<td>§8, §11</td>
+</tr>
+</tbody>
+</table>
+<h3 id="106-isolating-the-five-components-that-interpret-attacker-bytes">10.6 Isolating the five components that interpret attacker bytes</h3>
+<p>The vault holds ciphertext, which is inert. Five components <em>interpret</em> bytes chosen
+by aggressors, and each is a code-execution surface whose input the enemy selects:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Must not have</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evidence reader</td>
+<td>network, keys, model, vault write, report emit</td>
+<td>parses firmware volumes and PE/FFS modules</td>
+</tr>
+<tr>
+<td>Database parser</td>
+<td>the same</td>
+<td>hives and database files are a well-trodden parser exploitation surface</td>
+</tr>
+<tr>
+<td>Indicator processing</td>
+<td>artifact read, <strong>finding write</strong>, whitelist write</td>
+<td>an enrichment pipeline with write access to detection state is a <em>suppression</em> primitive</td>
+</tr>
+<tr>
+<td>Report generation</td>
+<td>artifact read, plaintext, keys, model</td>
+<td>a generator that reads artifacts can be injected by them; one that reads plaintext is an exfiltration route</td>
+</tr>
+<tr>
+<td>AI-assisted analysis</td>
+<td>artifact read, plaintext, keys, finding write</td>
+<td>prompt-injectable by construction, and it may not author conclusions</td>
+</tr>
+</tbody>
+</table>
+<p>Isolating these from the vault is the easy half. The hard half is isolating them from
+each other, because the dangerous paths are pairwise: a reader compromised by a
+crafted FFS volume that can reach the report generator can rewrite conclusions;
+indicator processing with write access can quietly withdraw a detection; and a model
+that can read decrypted artifacts is an exfiltration channel with a prompt-injection
+front door.</p>
+<p>Three enforcement points in <code>qvault/isolation.py</code>:</p>
+<ol>
+<li><strong>Placement is validated, not labelled.</strong> <code>place()</code> refuses a component in a zone
+   that lacks what it needs or confers what it must not have, and reports both
+   failures rather than the first.</li>
+<li><strong>Data flow is deny-by-default.</strong> Plaintext artifacts may not leave the enclave
+   toward the AI or presentation zones; key material flows only into the enclave; the
+   model returns <code>observation</code> objects and receives redacted extracts.</li>
+<li><strong>Model output is graded HYPOTHESIS</strong> with an unverified-output telemetry gap, so
+   rule F3 lowers it to <code>UNKNOWN</code> until a human grades it. It enters as an
+   <code>Observation</code>, never as a <code>Finding</code>, which means it cannot carry an attribution and
+   cannot reach <code>malicious_indicated</code> on its own.</li>
+</ol>
+<h3 id="107-firmware-integrity-is-a-separate-subsystem-not-a-scanner-check">10.7 Firmware integrity is a separate subsystem, not a scanner check</h3>
+<p>An operating-system scan runs on the machine it judges, in a kernel the implant may be
+inside, through drivers the firmware may be deceiving. It cannot establish that UEFI
+firmware, the boot chain or device firmware is trustworthy. This is not a confidence
+problem that more coverage fixes; it is a direction problem, and the evidence route
+decides the question before the scan starts.</p>
+<p>So <code>qvault/firmware_integrity.py</code> is a separate subsystem with its own vocabulary, and
+one rule: <strong>a verdict may not be stronger than the anchor that produced it.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Anchor</th>
+<th>Rank</th>
+<th>Establishes</th>
+<th>Grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS-mediated read</td>
+<td>0</td>
+<td><strong>nothing</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Firmware measures itself</td>
+<td>1</td>
+<td>boot chain, DXE modules</td>
+<td>HYPOTHESIS</td>
+</tr>
+<tr>
+<td>TPM quote</td>
+<td>2</td>
+<td>boot chain, DXE modules, option ROM</td>
+<td>CORROBORATED</td>
+</tr>
+<tr>
+<td>Hardware boot ROM</td>
+<td>3</td>
+<td>CRTM, boot chain</td>
+<td>CORROBORATED</td>
+</tr>
+<tr>
+<td>Out-of-band flash read</td>
+<td>4</td>
+<td>flash image, CRTM, DXE, ME/EC, option ROM</td>
+<td>CORROBORATED (CONFIRMED on two reads)</td>
+</tr>
+</tbody>
+</table>
+<p>Three consequences worth stating plainly.</p>
+<p><strong>Host trust requires <code>flash_image</code> and <code>crtm</code> at rank 3 or above.</strong> There is exactly
+one admissible route to <code>flash_image</code>: an out-of-band read. <code>certify_host()</code> refuses
+on any weaker basis, naming the missing subject.</p>
+<p><strong>A clean TPM quote is not host trust.</strong> Measurement begins at the CRTM, so a
+compromised CRTM measures itself and the quote still verifies. PCRs detect post-CRTM
+tampering, which is valuable and is a different claim from "the firmware is intact".</p>
+<p><strong><code>os_scan_verdict()</code> returns <code>UNATTESTED</code> whatever it found</strong>, including when every
+module matched. It exists so the refusal happens at the call site rather than in a
+design document nobody reads at 3am.</p>
+<h3 id="108-the-detection-engine-may-not-certify-its-own-integrity">10.8 The detection engine may not certify its own integrity</h3>
+<p>This generalizes §10.7 from firmware to the whole pipeline. An engine that reports "I am
+intact" has produced a claim about itself from inside itself, and an implant that patches
+the detector's classifier patches the detector's self-check in the same write. Evidence
+direction decides the question before the check runs.</p>
+<p>Four roles, one per component:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>May</th>
+<th>Must not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acquisition</td>
+<td>read artifacts, emit provenance, seal originals</td>
+<td>grade, attest its own coverage</td>
+</tr>
+<tr>
+<td>Analysis</td>
+<td>parse, emit observations and findings, correlate</td>
+<td>write originals, clear its own audit entry, attest itself</td>
+</tr>
+<tr>
+<td>Evidence storage</td>
+<td>hold originals and envelopes, append audit</td>
+<td>grade findings, rewrite history, attest itself</td>
+</tr>
+<tr>
+<td>Trust verification</td>
+<td>measure, check manifests, verify the audit chain</td>
+<td>parse artifacts, grade, modify originals, attest itself</td>
+</tr>
+</tbody>
+</table>
+<p><code>verify()</code> refuses an attestation when the attestor is the subject, when both hold the
+same role (two analysis components are still one role), or when the "evidence" is the
+subject's own report relayed by an intermediary. Only the verification role may attest
+at all. Grade is capped by evidence class, and <code>find_circular_trust()</code> catches the case
+that looks rigorous and is not: two components reporting on each other, each presented
+as the other's corroboration.</p>
+<p>The regress is stated rather than solved. A verifier must itself be anchored, so each
+attestation records its <code>root</code>; with no root the result is <strong>unverified</strong> with an
+<code>unverified_root</code> gap, because a verifier anchored in nothing outside the system is
+making exactly the claim this module refuses.</p>
+<h3 id="109-scanning-the-scanner-and-why-no-false-positives-is-not-a-goal">10.9 Scanning the scanner, and why "no false positives" is not a goal</h3>
+<p>An untrusted tool cannot be trusted to report that it is untrusted, and a detector cannot
+discover a trojan that edited the detector. Both statements are the same statement about
+evidence direction, and both are answered outside the code: a digest published with the
+release, a signed build, a hardware anchor, or read-only media.</p>
+<p><code>integrity.py</code> therefore refuses one specific thing. It will not accept a digest stored
+inside the tree it describes as proof of that tree, because an attacker who edits the
+module edits the recorded hash in the same change. A self-computed digest with no
+external reference is reported as <code>unverified</code>, never as verified, and the self-scan
+covers impersonation signals rather than only file hashes: interpreter startup hooks
+inside the package, import shadowing, world-writable code, <code>.pth</code> execution hooks, and
+bytecode with no source. Each carries its ordinary explanation, since every one of them
+is also something a legitimate packaging step does.</p>
+<p>The device result is then read through the scanner's own status. A finding from an
+unattested instrument stands but is capped at <code>INFERRED</code>; an <em>absence</em> of findings from
+an unattested instrument is <code>INCONCLUSIVE</code>, because silence from a tool nobody has
+verified is not evidence about the device.</p>
+<p>On error rates: "no false positives, no false negatives" is not a property a detector can
+have, and a tool printing it describes its author rather than its accuracy.
+<code>calibration.py</code> measures instead, reporting a confusion matrix over a labelled corpus
+with Wilson intervals, and it counts abstentions against accuracy rather than excluding
+them, since answering "inconclusive" to everything would otherwise score perfectly. Zero
+errors in n cases is reported as a bound (the rule of three: about 3/n at 95 percent), and
+<code>refuse_zero_claim()</code> rejects the sentence outright.</p>
+<p>Two false positives in this module were found and fixed by its own tests: a normal
+<code>__pycache__</code> was flagged as source-less bytecode because the source was sought in the
+wrong directory, and an installation absent from <code>sys.path</code> was treated as shadowed
+rather than as an answerable unknown.</p>
+<hr />
+<h2 id="11-failure-analysis-and-residual-risk">11. Failure analysis and residual risk</h2>
+<p>Each row is a way the architecture fails, how it happens, and what actually helps.
+"Residual" is what remains after the mitigation, stated so nobody mistakes the
+design for a guarantee.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Failure mode</th>
+<th>Mechanism</th>
+<th>Impact</th>
+<th>Mitigation</th>
+<th>Residual</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1</td>
+<td><strong>Execution before encapsulation</strong></td>
+<td>Previewer, indexer, cloud-sync client, backup agent or AV opens the source; or the acquisition host autoruns something from the subject's disk</td>
+<td>Sample executes on the appliance; appliance is now compromised and its outputs are untrusted</td>
+<td>Read-only boot media, no shell handlers, no network, dedicated appliance, never mount the subject's disk read-write, do not browse evidence in a GUI</td>
+<td>A firmware implant in the appliance itself; a zero-day in a tool that touches bytes</td>
+</tr>
+<tr>
+<td>F2</td>
+<td><strong>Compromised ingestion host</strong></td>
+<td>Root on appliance before or during ingest</td>
+<td>Forged hashes, substituted object, DEK theft, suppressed audit entries</td>
+<td>Disposable appliance, TPM-measured boot, independent expected-hash source, external audit anchor, <code>provenance: unverified</code> flag</td>
+<td>Attacker with firmware-level persistence in the appliance can lie consistently</td>
+</tr>
+<tr>
+<td>F3</td>
+<td><strong>Key compromise</strong></td>
+<td>Shares stolen, custodian coerced, HSM compromised, KEK reconstructed</td>
+<td>All objects decryptable</td>
+<td>Split knowledge, dual control on use, HSM-sealed shares, per-object DEK limits blast radius, key-use logging</td>
+<td>A quorum of colluding custodians is by definition authorised</td>
+</tr>
+<tr>
+<td>F4</td>
+<td><strong>Malicious firmware in the analysis environment</strong></td>
+<td>Sample exploits a parser; or enclave host has a firmware implant</td>
+<td>Analysis results fabricated; containment broken</td>
+<td>Network-isolated enclave, per-case VM snapshots, no BMC sharing, DRTM late launch, assume-exploitable parsing, re-flash enclave firmware on a schedule</td>
+<td>A firmware implant can survive everything the OS does; only hardware reflash clears it</td>
+</tr>
+<tr>
+<td>F5</td>
+<td><strong>Survives apparent remediation</strong></td>
+<td>Operator wipes OS on a LoJax/MoonBounce machine and returns it to service; implant re-drops on next boot</td>
+<td>Silent reinfection, false closure</td>
+<td>Eradication procedure requires SPI read-back comparison, not an OS reinstall; hardware quarantine for firmware cases; refuse to reissue hardware without an attestation record</td>
+<td>Improperly executed reflash; a board with a second, undiscovered flash device</td>
+</tr>
+<tr>
+<td>F6</td>
+<td><strong>Malicious firmware classified as legitimate</strong></td>
+<td>Legitimate-but-vulnerable signed Microsoft binaries (<code>bootmgfw.efi</code>, <code>hvloader.efi</code>) used by BlackLotus; vendor-signed components abused</td>
+<td>Allow-listing by signature passes the attacker</td>
+<td>Do not treat "signed" as "trusted": pin versions <em>and</em> apply <code>dbx</code>; alert on loader binaries whose version is older than policy; treat MOK enrollment as a high-severity event</td>
+<td>Revocation lag is the attacker's whole window, and it is measured in years for CVE-2022-21894</td>
+</tr>
+<tr>
+<td>F7</td>
+<td><strong>Evidence destroyed or corrupted</strong></td>
+<td>Rewritten audit log, deleted objects, failed re-wrap, bad migration, ransomware on the vault</td>
+<td>Loss of forensic value; custody challenge in legal proceedings</td>
+<td>Hash chain + signed checkpoints + external anchors, WORM/object-lock, offsite replica in a separate trust domain, tested restore, per-object wrap so a KEK rotation cannot orphan data</td>
+<td>Deliberate destruction by a privileged insider with anchor control</td>
+</tr>
+<tr>
+<td>F8</td>
+<td><strong>Silent truncation</strong></td>
+<td>Attacker deletes the last N audit entries so history looks clean</td>
+<td>Undetected loss of events</td>
+<td>Signed checkpoints published outside the host; verification fails when the log is shorter than the signed count (tested)</td>
+<td>If no checkpoint was ever published, truncation is invisible - anchoring cadence is the control</td>
+</tr>
+<tr>
+<td>F9</td>
+<td><strong>Wrong-sample substitution</strong></td>
+<td>Envelope swapped, or a benign file ingested in place of the suspect one</td>
+<td>Research conclusions apply to the wrong object</td>
+<td>Content-addressed by ciphertext, AAD binds metadata to bytes (tested), plaintext hash re-check after decrypt, independent expected hash</td>
+<td>Substitution at the point of capture, before any hash exists</td>
+</tr>
+<tr>
+<td>F10</td>
+<td><strong>Authorised insider exfiltration</strong></td>
+<td>A person with quorum + approvals decrypts and walks out with a sample</td>
+<td>Malware escapes the lab; or evidence leaks</td>
+<td>Dual control, enclave-only decrypt, no bulk export, physical controls, DLP on the enclave, per-action audit, periodic access review</td>
+<td>Two colluding authorised people are, by design, able to do this</td>
+</tr>
+<tr>
+<td>F11</td>
+<td><strong>Parser exploitation at the boundary</strong></td>
+<td>Deep FFS/PE/decompressor bug triggered by a crafted image</td>
+<td>Code execution in the vault or appliance</td>
+<td>Bounded, inert triage only (no decompression, no PE mapping); deep analysis deferred to the enclave</td>
+<td>Bugs in the bounded reader itself; string extraction can still be memory-unsafe if rewritten carelessly</td>
+</tr>
+<tr>
+<td>F12</td>
+<td><strong>Key rotation breaks history</strong></td>
+<td>KEK rotated but DEKs left wrapped under the old KEK, then old shares destroyed</td>
+<td>Permanent loss of all prior objects</td>
+<td>Rewrap pass with verification before destroying old shares; keep old KEK until a full verify passes; document the ceremony</td>
+<td>Human error in the ceremony; that is why it is rehearsed</td>
+</tr>
+<tr>
+<td>F13</td>
+<td><strong>Time and provenance ambiguity</strong></td>
+<td>Appliance clock wrong, timestamps unanchored</td>
+<td>Custody timeline challenged</td>
+<td>NTP from a trusted source at boot, RFC 3161 timestamps, independent time source in the custody record</td>
+<td>Clock skew before first sync</td>
+</tr>
+<tr>
+<td>F14</td>
+<td><strong>Supply chain in the vault itself</strong></td>
+<td>Malicious dependency, compromised build, tampered release</td>
+<td>Attacker controls the encryptor</td>
+<td>Pin and vendor dependencies, reproducible builds, signed releases, review the crypto code (it is ~400 lines by design), separate build host</td>
+<td>A compromised toolchain can ship a backdoor that looks correct</td>
+</tr>
+<tr>
+<td>F15</td>
+<td><strong>Plaintext re-introduced</strong></td>
+<td>Analyst copies a decrypted sample to a share "to look at it later"</td>
+<td>Quarantine bypassed entirely</td>
+<td><code>noexec</code> mounts, DLP, egress control, enclave resets, explicit policy with consequences, audit of enclave output</td>
+<td>Human convenience is the strongest attacker in the building</td>
+</tr>
+<tr>
+<td>F16</td>
+<td><strong>Physical access</strong></td>
+<td>Enclave or vault host stolen or opened; DMA via Thunderbolt/PCIe</td>
+<td>Keys, plaintext, or the whole archive</td>
+<td>Full-disk encryption with pre-boot auth, chassis intrusion detection, epoxy/secure mount, IOMMU on, disable unused DMA ports, locked racks</td>
+<td>A determined physical attacker with time</td>
+</tr>
+</tbody>
+</table>
+<h3 id="111-residual-risk-statement">11.1 Residual-risk statement</h3>
+<p>After all mitigations, the following remain true and should be written into any
+risk register that adopts this design:</p>
+<ol>
+<li><strong>The trustworthiness of a sample's provenance is bounded by the trust you
+   place in the acquisition appliance and its operator.</strong> Cryptography cannot
+   recover from "the capture device lied".</li>
+<li><strong>The enclave is the weakest link by design</strong>, because that is where plaintext
+   and execution live. Its isolation is physical and procedural, not cryptographic.</li>
+<li><strong>Firmware-resident threats are not remediated by any software control</strong>,
+   including this one.</li>
+<li><strong>Authorised collusion defeats dual control.</strong> It is a control against
+   mistakes and single insiders, not against a conspiracy.</li>
+<li><strong>Revocation lag is structural.</strong> CVE-2022-21894 was fixed in January 2022 and
+   the vulnerable binaries were still not revoked when BlackLotus was found in
+   the wild in 2023, which is why the bootkit worked on fully patched systems.</li>
+</ol>
+<h3 id="112-the-four-architectural-limitations-and-what-each-control-cannot-buy">11.2 The four architectural limitations, and what each control cannot buy</h3>
+<p>Reading <code>report/ARCHITECTURAL_LIMITATIONS.md</code> in full is worthwhile; the summary is
+that the four controls proposed for these systems increase <strong>coverage</strong> and none of
+them increases <strong>integrity</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Limitation</th>
+<th>Consequence</th>
+<th>Control</th>
+<th>What the control cannot buy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Limited live-state visibility</td>
+<td>historical records miss an active compromise</td>
+<td>optional live response</td>
+<td>integrity: live state is read by the kernel the implant may be inside</td>
+</tr>
+<tr>
+<td>Firmware blind spots</td>
+<td>OS-level scans cannot establish firmware integrity</td>
+<td>independent firmware acquisition</td>
+<td>coverage without physical access, or proof that in-circuit read-back equals the chip</td>
+</tr>
+<tr>
+<td>Baseline limitations</td>
+<td>legitimate unusual behaviour looks suspicious</td>
+<td>per-device baselines</td>
+<td>validity when the baseline was learned after compromise, or resistance to slow drift</td>
+</tr>
+<tr>
+<td>Indicator trust</td>
+<td>poisoned intelligence produces bad findings</td>
+<td>provenance and independent validation</td>
+<td>independence when feeds resell one upstream; and poisoning most cheaply causes false <em>negatives</em></td>
+</tr>
+</tbody>
+</table>
+<p>Two qualifiers are load-bearing and easy to lose. "Independent" firmware acquisition
+means the path does not pass through the subject: a flash read performed by a driver
+in a possibly compromised OS is a claim about the OS, not about the flash. And a
+baseline captured after compromise does not merely fail, it <em>certifies the implant as
+normal</em>, which is worse than having no baseline at all.</p>
+<p><code>qvault/limitations.py</code> encodes this as evidence planes with a
+<code>forgeable_by_subject</code> property, so a claim's strength is computed from the plane it
+rests on rather than asserted in prose.</p>
+<hr />
+<h2 id="12-implementation-roadmap">12. Implementation roadmap</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Work</th>
+<th>Exit criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0. Baseline (weeks 1-2)</strong></td>
+<td>Inventory firmware versions per model; obtain vendor images; build reference manifests (GUID → section hashes); enable Secure Boot, HVCI, TPM measured boot; verify SPI write protections with CHIPSEC on a sample of each model</td>
+<td>Every managed model has a reference manifest; % of fleet with <code>BIOSWE</code> protected, <code>SMM_BWP</code> set, <code>PRx</code> locked, <code>FLOCKDN</code> set is known and rising</td>
+</tr>
+<tr>
+<td><strong>0.5 Review gate (weeks 3-5)</strong></td>
+<td>Independent review against <code>report/THREAT_MODEL_REVIEW.md</code>: work the §6 checklist, attack claims C1-C10, confirm or dismiss weaknesses W1-W9. No hardening work starts before this.</td>
+<td>Every High finding either fixed with a failing-then-passing test, or accepted in writing with a named owner; the gate's exit criteria (§7 of that document) are met</td>
+</tr>
+<tr>
+<td><strong>1. Ingestion (weeks 2-4)</strong></td>
+<td>Deploy <code>qvault</code> on a disposable appliance; define custody record fields; split KEK shares to custodians; rehearse ingest of a synthetic image end to end</td>
+<td>Ingest→verify→retrieve rehearsed by two people who did not write the code; audit chain verified; checkpoint anchored externally</td>
+</tr>
+<tr>
+<td><strong>2. Detection (weeks 4-8)</strong></td>
+<td>Automate firmware diffing into CI for firmware images; ship FwHunt YARA to the enclave; add Measured Boot delta alerting; add the OS-visible hunts from §7.6 as low-fidelity signals requiring corroboration</td>
+<td>A deliberately modified test image (synthetic hook in a module) is detected by the pipeline; a clean image produces zero findings</td>
+</tr>
+<tr>
+<td><strong>3. Enclave (weeks 6-12)</strong></td>
+<td>Stand up the network-isolated enclave; <code>noexec</code> plaintext store; per-case VM snapshots; one-way results export; DRTM measurement if hardware supports it</td>
+<td>End-to-end case: sample → vault → approvals → enclave → findings out, with no plaintext leaving the enclave and every step in the audit log</td>
+</tr>
+<tr>
+<td><strong>4. Response (ongoing)</strong></td>
+<td>Write and rehearse the eradication procedures: SPI reflash with programmer, board swap, BlackLotus reformat + MOK revocation + <code>dbx</code>; publish re-attestation criteria</td>
+<td>A drill in which a machine is "remediated" and the result is verified by flash read-back and a clean measured boot, not by the OS reporting itself clean</td>
+</tr>
+</tbody>
+</table>
+<p>Ordering rationale: detection baselines (phase 0) come before tooling, because a
+vault that preserves samples you cannot compare against a known-good image
+preserves evidence without producing answers.</p>
+<hr />
+<h2 id="13-the-code-what-is-implemented-and-how-to-read-it">13. The code: what is implemented, and how to read it</h2>
+<p><code>qvault/</code> is a working prototype of zones 1-3, <strong>not a hardened implementation</strong>.
+It was written before the threat model had been independently reviewed, which is
+the wrong order (see <code>report/EVIDENCE_POLICY.md</code> §3.2). Nine weaknesses found on
+re-reading are listed in <code>report/THREAT_MODEL_REVIEW.md</code> §5; the four rated High
+each reduce "dual control" or "tamper-evident audit" from a property to a claim.</p>
+<p>It is deliberately small enough to audit: the cryptographic core is about 400 lines.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+<th>Key design decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>crypto.py</code></td>
+<td>Chunked AES-256-GCM (STREAM-style nonces), DEK wrapping</td>
+<td>Header + identity are AEAD associated data, so ciphertext cannot be relabelled</td>
+</tr>
+<tr>
+<td><code>keys.py</code></td>
+<td>Shamir secret sharing over GF(256), K-of-N</td>
+<td>No third-party dependency, so the split/combine logic is auditable in one screen</td>
+</tr>
+<tr>
+<td><code>audit.py</code></td>
+<td>Hash-chained log, Ed25519 signed checkpoints</td>
+<td>Chaining catches edits; signed counts catch truncation</td>
+</tr>
+<tr>
+<td><code>store.py</code></td>
+<td>Immutable content-addressed object store, Merkle root</td>
+<td>Object id is the <em>ciphertext</em> hash, so it is not a plaintext confirmation oracle</td>
+</tr>
+<tr>
+<td><code>ingest.py</code></td>
+<td>Streaming hash→encrypt→seal, inert triage, custody record</td>
+<td>Plaintext exists only as a 64 KiB RAM window</td>
+</tr>
+<tr>
+<td><code>triage.py</code></td>
+<td>Magic numbers, flash descriptor regions, strings, entropy</td>
+<td>Bounded reads only: no decompression, no PE mapping, no FFS parsing</td>
+</tr>
+<tr>
+<td><code>fwdiff.py</code></td>
+<td>Enclave-side FFS/PE module diff against an OEM image</td>
+<td>The only thing that catches an in-place <code>CORE_DXE</code> patch (§3.9)</td>
+</tr>
+<tr>
+<td><code>integrity.py</code></td>
+<td>Manifest, external-digest verification, impersonation checks, self-scan</td>
+<td>A digest stored beside the code is refused; a device result is read through the scanner's own status</td>
+</tr>
+<tr>
+<td><code>calibration.py</code></td>
+<td>Confusion matrix with Wilson intervals over a labelled corpus</td>
+<td>Abstentions count against accuracy; zero-error claims are rejected</td>
+</tr>
+<tr>
+<td><code>separation.py</code></td>
+<td>Four roles, one per component, and a ban on self-certification</td>
+<td>The engine that detects cannot attest itself; attestation grade is capped by evidence class; a verifier with no external root is unverified</td>
+</tr>
+<tr>
+<td><code>revoke.py</code></td>
+<td>Credential revocation with ordering and issuer verification</td>
+<td>Refresh grants die first; a request is not a revocation; unrevocable material needs replacement</td>
+</tr>
+<tr>
+<td><code>budgets.py</code></td>
+<td>Resource ceilings for every parsing component</td>
+<td>A bound artifact that expands 1000x is a denial-of-service primitive; a budget kill degrades the finding</td>
+</tr>
+<tr>
+<td><code>pillars.py</code></td>
+<td>Seven-pillar ledger traced to code and tests</td>
+<td>Fails if a capability is claimed but not built (<code>report/CAPABILITY_MAP.md</code>)</td>
+</tr>
+<tr>
+<td><code>zbt_bridge.py</code></td>
+<td>Adapter grading upstream Zero-Breach-Toolkit detections</td>
+<td>Binds a real detector's output to the F1-F5 rules and the plane model (<code>MERGE.md</code>)</td>
+</tr>
+<tr>
+<td><code>correlate.py</code></td>
+<td>Temporal evidence graph graded by independence</td>
+<td>Proximity alone never raises a grade; one plane caps at INFERRED (<code>MERGE.md</code>)</td>
+</tr>
+<tr>
+<td><code>firmware_integrity.py</code></td>
+<td>Anchor lattice and host certification with refusal</td>
+<td>An OS scan establishes nothing about firmware; certification needs rank ≥ 3 on flash and CRTM (§10.7)</td>
+</tr>
+<tr>
+<td><code>isolation.py</code></td>
+<td>Zone placement and deny-by-default data flow for the five untrusted components</td>
+<td>Refuses co-residence, plaintext egress and model-authored findings (§10.6)</td>
+</tr>
+<tr>
+<td><code>provenance.py</code></td>
+<td>The eight-element artifact envelope, enforced</td>
+<td>No artifact exists without source, timestamp, digest, method, versions, coverage, custody and at-rest protection (<code>report/EVIDENCE_POLICY.md</code> R9)</td>
+</tr>
+<tr>
+<td><code>findings.py</code></td>
+<td>Mandatory finding rules F1-F5 enforced by construction</td>
+<td>A finding cannot exist without a grade and a benign alternative; a device cannot be called clean (<code>report/EVIDENCE_POLICY.md</code> R4-R8)</td>
+</tr>
+<tr>
+<td><code>limitations.py</code></td>
+<td>Evidence planes, baseline validity, indicator provenance</td>
+<td>Computes what a claim may rest on instead of asserting it (§11.2)</td>
+</tr>
+<tr>
+<td><code>containment.py</code></td>
+<td>The six capability denials with per-plane coverage and claim auditing</td>
+<td>Refuses plans whose enforcement dies with the subject (§8.5)</td>
+</tr>
+<tr>
+<td><code>netpolicy.py</code></td>
+<td>Network context (BSSID/SSID/EAP) as a fail-safe policy selector</td>
+<td>Separates "selects a policy" from "is key material", which a BSSID must never be (see <code>report/NETOBS_MODULE.md</code> §11)</td>
+</tr>
+<tr>
+<td><code>netobs.py</code></td>
+<td>Network observation with an attribution honesty model</td>
+<td>Joins host-claimed sockets against wire-observed flows; the disagreement is the signal (see §7.7 and <code>report/NETOBS_MODULE.md</code>)</td>
+</tr>
+<tr>
+<td><code>retrieve.py</code></td>
+<td>Quorum + dual control + enclave sentinel + <code>0400</code> output</td>
+<td>Separation of duties enforced in code, not policy</td>
+</tr>
+<tr>
+<td><code>verify.py</code></td>
+<td>Recompute everything from bytes; report orphans</td>
+<td>Trusts no metadata it has not checked</td>
+</tr>
+<tr>
+<td><code>__main__.py</code></td>
+<td>CLI for the whole lifecycle</td>
+<td>Each verb maps to one audited operation</td>
+</tr>
+</tbody>
+</table>
+<p>The test suite (30 tests) is the argument that the claims are real: bit-flip
+detection, truncation rejection, metadata-swap rejection, quorum enforcement,
+self-approval refusal, enclave refusal, non-executable output, audit-edit and
+truncation detection, and byte-exact round trips across chunk boundaries.</p>
+<p>Two implementation notes worth calling out, because both were found by testing
+rather than by design:</p>
+<ul>
+<li>The first version of the GF(256) tables used 2 as the generator. It is <strong>not</strong>
+  primitive under the AES polynomial (order 51), so Shamir reconstruction
+  silently produced wrong keys. The tables now use 3, and a threshold test pins
+  the property that K-1 shares yield garbage rather than an error - below the
+  threshold there should be no signal and no oracle.</li>
+<li>The first flash-descriptor parser reported a phantom region on synthetic input.
+  Region entries are now validated against the image size, because a parser at
+  the boundary that invents structure is worse than one that admits ignorance.</li>
+</ul>
+<h3 id="131-what-is-deliberately-not-implemented">13.1 What is deliberately not implemented</h3>
+<table>
+<thead>
+<tr>
+<th>Missing</th>
+<th>Why</th>
+<th>What to use in production</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HSM/TPM key custody</td>
+<td>Requires hardware</td>
+<td>PKCS#11 / TPM 2.0 sealing; keep the Shamir layer for quorum</td>
+</tr>
+<tr>
+<td>WORM object storage</td>
+<td>Requires infrastructure</td>
+<td>S3 Object Lock (compliance mode) or append-only snapshots</td>
+</tr>
+<tr>
+<td>Transparency-log anchoring</td>
+<td>Requires a second trust domain</td>
+<td>Sigstore/Rekor, or RFC 3161 timestamps from an external TSA</td>
+</tr>
+<tr>
+<td>Enclave attestation</td>
+<td>Requires hardware</td>
+<td>TPM quote + DRTM (TXT/SKINIT) before releasing keys</td>
+</tr>
+<tr>
+<td>Approval signatures</td>
+<td>Would need key distribution</td>
+<td>Custodian-held signing keys, verified server-side</td>
+</tr>
+<tr>
+<td>Deep firmware parsing <em>at the vault boundary</em></td>
+<td>A parser at ingestion is an attack surface with keys in memory</td>
+<td><code>fwdiff</code> runs enclave-side only; UEFITool / <code>uefi_firmware</code> / FwHunt for deeper work, on copies</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-bibliography">14. Bibliography</h2>
+<p>Primary sources are marked ★. All links checked at time of writing; <code>nsa.gov</code> and
+<code>media.defense.gov</code> block automated clients, so those are cited by title and
+known location rather than quoted.</p>
+<p><strong>LoJax</strong>
+1. ★ ESET Research, <em>LoJax: First UEFI rootkit found in the wild, courtesy of the
+   Sednit group</em>, September 2018 (24 pp, PDF).
+   https://www.welivesecurity.com/wp-content/uploads/2018/09/ESET-LoJax.pdf
+2. ESET, <em>LoJax</em> blog announcement, 27 September 2018 (now redirects on ESET's
+   site; the whitepaper above is the authoritative text).
+3. C. Kallenberg, R. Wojtczuk, <em>Speed Racer: Exploiting an Intel Flash Protection
+   Race Condition</em>, January 2015.
+   https://bromiumlabs.files.wordpress.com/2015/01/speed_racer_whitepaper.pdf
+4. CERT/CC, <em>VU#766164: Intel BIOS locking mechanism contains race condition that
+   enables write protection bypass</em>. https://www.kb.cert.org/vuls/id/766164
+5. Intel, <em>7 Series / C216 Chipset PCH datasheet</em> (SPI controller, <code>BIOS_CNTL</code>,
+   <code>HSFS</code>/<code>HSFC</code>/<code>FDATAX</code> semantics).</p>
+<p><strong>MoonBounce</strong>
+6. ★ Kaspersky GReAT (M. Lechtik, V. Berdnikov, D. Legezo, I. Borisov),
+   <em>MoonBounce: the dark side of UEFI firmware</em>, 20 January 2022.
+   https://securelist.com/moonbounce-the-dark-side-of-uefi-firmware/105468/
+7. ★ Binarly, <em>A deeper UEFI dive into MoonBounce</em>, 21 January 2022.
+   https://www.binarly.io/blog/a-deeper-uefi-dive-into-moonbounce
+8. Kaspersky, <em>MosaicRegressor: Lurking in the Shadows of UEFI</em>, October 2020
+   (the other firmware-level implant in this lineage).
+   https://securelist.com/mosaicregressor/98849/
+9. Malpedia, <em>win.moonbounce</em> (family page, references, YARA).
+   https://malpedia.caad.fkie.fraunhofer.de/details/win.moonbounce
+10. Positive Technologies, <em>How bootkits are implemented in modern firmware</em>
+    (2022), comparative treatment of LoJax and MoonBounce.</p>
+<p><strong>BlackLotus and CVE-2022-21894</strong>
+11. ★ ESET Research (M. Smolár), <em>BlackLotus UEFI bootkit: Myth confirmed</em>,
+    1 March 2023. https://www.welivesecurity.com/2023/03/01/blacklotus-uefi-bootkit-myth-confirmed/
+12. ★ Microsoft Defender Experts, <em>Guidance for investigating attacks using
+    CVE-2022-21894: The BlackLotus campaign</em>, 11 April 2023.
+    https://www.microsoft.com/en-us/security/blog/2023/04/11/guidance-for-investigating-attacks-using-cve-2022-21894-the-blacklotus-campaign/
+13. ★ Microsoft MSRC, <em>CVE-2022-21894 Secure Boot Security Feature Bypass</em>.
+    https://msrc.microsoft.com/update-guide/vulnerability/CVE-2022-21894
+14. ★ Wack0, <em>CVE-2022-21894 "baton drop"</em> PoC and technical write-up, August 2022.
+    https://github.com/Wack0/CVE-2022-21894
+15. NSA, <em>BlackLotus Mitigation Guide</em> (CSI), 22 June 2023.
+    https://media.defense.gov/2023/Jun/22/2003247179/-1/-1/0/CSI_BLACKLOTUS_MITIGATION_GUIDE.PDF
+16. Microsoft, <em>KB5025885: Managing Windows Boot Manager revocations for Secure
+    Boot changes associated with CVE-2023-24932</em>.
+    https://support.microsoft.com/en-us/topic/kb5025885-how-to-manage-the-windows-boot-manager-revocations-for-secure-boot-changes-associated-with-cve-2023-24932-41a975df-beb2-40c1-99a3-b3ff139f832d</p>
+<p><strong>Platform, firmware and standards</strong>
+17. UEFI Forum, <em>UEFI Specification</em> (Boot Services, Secure Boot, signature
+    databases, <code>EFI_SIGNATURE_LIST</code>). https://uefi.org/specifications
+18. NIST SP 800-193, <em>Platform Firmware Resiliency Guidelines</em>.
+    https://csrc.nist.gov/pubs/sp/800/193/final
+19. NIST SP 800-155 (draft), <em>BIOS Integrity Measurement Guidelines</em>.
+    https://csrc.nist.gov/pubs/sp/800/155/ipd
+20. NIST SP 800-147B, <em>BIOS Protection Guidelines for Servers</em>.
+    https://csrc.nist.gov/pubs/sp/800/147/b/final
+21. CHIPSEC platform security assessment framework.
+    https://github.com/chipsec/chipsec
+22. Binarly FwHunt — YARA rules for firmware modules.
+    https://github.com/binarly-io/FwHunt
+23. TCG, <em>TPM 2.0 Library Specification</em>.
+    https://trustedcomputinggroup.org/resource/tpm-library-specification/
+24. ISO/IEC 27037, <em>Guidelines for identification, collection, acquisition and
+    preservation of digital evidence</em>. https://www.iso.org/standard/44381.html</p>
+<p><strong>Cryptography used by the vault</strong>
+25. NIST SP 800-38D, <em>Galois/Counter Mode (GCM) and GMAC</em>.
+    https://csrc.nist.gov/pubs/sp/800/38/d/final
+26. RFC 3394, <em>Advanced Encryption Standard (AES) Key Wrap Algorithm</em>.
+    https://www.rfc-editor.org/rfc/rfc3394.html
+27. RFC 3161, <em>Time-Stamp Protocol (TSP)</em>.
+    https://www.rfc-editor.org/rfc/rfc3161.html
+28. RFC 9580, <em>OpenPGP</em> (modern AEAD-based container design, useful comparison).
+    https://www.rfc-editor.org/rfc/rfc9580.html
+29. age, <em>age-encryption.org/v1</em> (the STREAM chunked-AEAD construction <code>qvault</code>
+    follows). https://age-encryption.org/v1
+30. Sigstore, <em>Transparency logging overview</em>. https://docs.sigstore.dev/logging/overview/</p>
+<p><strong>Added after the first release, with the function-level reconstruction</strong></p>
+<ol start="31">
+<li>★ Kaspersky, <em>Technical details of MoonBounce's implementation</em>, 12 pp,
+    January 2022. The primary source for §3.8: component hashes and build times,
+    the three boot-service prologues, <code>OslArchTransferToKernel</code> patching, the
+    name-hash algorithms and constants, the driver's <code>PsSetLoadImageNotifyRoutine</code>
+    targeting, and the APC/work-item injection chain.
+    https://media.kasperskycontenthub.com/wp-content/uploads/sites/43/2022/01/19115831/MoonBounce_technical-details_eng.pdf</li>
+<li>ESET, <em>LoJax</em> datasheet (short-form summary of the whitepaper above).
+    https://www.eset.com/fileadmin/ESET/US/resources/datasheets/ESETus-datasheet-lojax.pdf</li>
+<li>MITRE ATT&amp;CK, <em>S0397 — LoJax</em>.
+    https://attack.mitre.org/software/S0397/</li>
+<li>Kaspersky, press release: <em>third known firmware bootkit</em>.
+    https://usa.kaspersky.com/about/press-releases/kaspersky-uncovers-third-known-firmware-bootkit</li>
+<li>Microsoft Learn, <em>UEFI firmware analysis</em> (Azure firmware analysis).
+    https://learn.microsoft.com/en-us/azure/firmware-analysis/unified-extensible-firmware-interface-firmware-analysis</li>
+<li>Microsoft Learn, <em>UEFI scanning in Defender for Endpoint</em>.
+    https://learn.microsoft.com/en-us/defender-endpoint/uefi-scanning-in-defender-for-endpoint</li>
+<li><code>uefi-firmware-parser</code> — Python FFS/PE parsing.
+    https://github.com/theopolis/uefi-firmware-parser</li>
+<li>UEFITool — firmware image examination.
+    https://github.com/LongSoft/UEFITool</li>
+<li>NIST SP 800-83 Rev. 1, <em>Guide to Malware Incident Prevention and Handling for
+    Desktops and Laptops</em>. https://csrc.nist.gov/pubs/sp/800/83/r1/final</li>
+<li>NIST SP 800-86, <em>Guide to Integrating Forensic Techniques into Incident
+    Response</em>. https://csrc.nist.gov/pubs/sp/800/86/final</li>
+<li>FLARE-VM — reproducible reverse-engineering environment.
+    https://github.com/mandiant/flare-vm</li>
+<li>FLOSS — string extraction for packed/obfuscated binaries.</li>
+<li>Daulaguphu, S. <em>11 Critical Malware Persistence Mechanisms You Should Be
+    Familiar With</em>. tech-zealots.com, 7 April 2022. The source for the autostart
+    mechanism catalogue in <code>persistence.py</code>: Run/RunOnce keys, startup folders,
+    scheduled tasks, services, BootExecute, hive loading, BHOs, AppInit_DLLs, DLL
+    search order, and the rootkit/bootkit/fileless classes that leave no autostart
+    artefact.
+    https://tech-zealots.com/malware-analysis/malware-persistence-mechanisms/</li>
+<li>MITRE ATT&amp;CK, <em>T1547.001 — Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder</em>.
+    Run/RunOnce, Shell Folders, RunServicesOnce, Policies\Explorer\Run and the BootExecute value, with the procedure examples used to model autostart behaviour.
+    https://attack.mitre.org/techniques/T1547/001/</li>
+<li>MITRE ATT&amp;CK, <em>T1542.003 — Pre-OS Boot: Bootkit</em>.
+    Boot-chain execution before the OS, the behaviour QVault cannot observe from an autostart snapshot.
+    https://attack.mitre.org/techniques/T1542/003/</li>
+<li>MITRE ATT&amp;CK, <em>T1542.001 — Pre-OS Boot: System Firmware</em>.
+    Firmware-level persistence and why an OS-mediated read cannot support a firmware claim.
+    https://attack.mitre.org/techniques/T1542/001/</li>
+<li>MITRE ATT&amp;CK, <em>T1574.001 — Hijack Execution Flow: DLL</em>.
+    Current title of the DLL search-order technique; renamed from 'DLL Search Order Hijacking'.
+    https://attack.mitre.org/techniques/T1574/001/</li>
+<li>MITRE ATT&amp;CK, <em>T1014 — Rootkit</em>.
+    Hiding files, processes and registry keys from the host's own view, which is why absence in a snapshot is not evidence.
+    https://attack.mitre.org/techniques/T1014/</li>
+<li>MITRE ATT&amp;CK, <em>T1546.010 — Event Triggered Execution: AppInit DLLs</em>.
+    DLL injection into every user32 process via the AppInit_DLLs value.
+    https://attack.mitre.org/techniques/T1546/010/</li>
+<li>MITRE ATT&amp;CK, <em>T1543.003 — Create or Modify System Process: Windows Service</em>.
+    Service creation and modification, including ServiceDll replacement.
+    https://attack.mitre.org/techniques/T1543/003/</li>
+<li>MITRE ATT&amp;CK, <em>T1053.005 — Scheduled Task/Job: Scheduled Task</em>.
+    Task creation as SYSTEM, and the hidden-task flag used as our signal.
+    https://attack.mitre.org/techniques/T1053/005/</li>
+<li>MITRE ATT&amp;CK, <em>T1546.003 — Event Triggered Execution: WMI Event Subscription</em>.
+    Permanent WMI subscriptions; the gap recorded in the behaviour matrix.
+    https://attack.mitre.org/techniques/T1546/003/</li>
+<li>MITRE ATT&amp;CK, <em>T1546.012 — Event Triggered Execution: Image File Execution Options Injection</em>.
+    IFEO Debugger redirection, the mechanism added to the catalogue after this source review.
+    https://attack.mitre.org/techniques/T1546/012/</li>
+<li>MITRE ATT&amp;CK, <em>T1070 — Indicator Removal</em>.
+    Anti-forensic deletion and alteration, and why custody evidence is partial protection.
+    https://attack.mitre.org/techniques/T1070/</li>
+<li>MITRE ATT&amp;CK, <em>T1059.001 — Command and Scripting Interpreter: PowerShell</em>.
+    Script-host execution as the carrier for memory-resident activity.
+    https://attack.mitre.org/techniques/T1059/001/</li>
+<li>MITRE ATT&amp;CK, <em>T1134 — Access Token Manipulation</em>.
+    Token theft and impersonation, which policy can refuse the consequence of but cannot prevent.
+    https://attack.mitre.org/techniques/T1134/</li>
+<li>MITRE ATT&amp;CK, <em>T1068 — Exploitation for Privilege Escalation</em>.
+    Kernel, browser-sandbox and LPE exploitation: declared out of QVault's boundary rather than claimed.
+    https://attack.mitre.org/techniques/T1068/</li>
+<li>MITRE ATT&amp;CK, <em>T1553.006 — Subvert Trust Controls: Code Signing Policy Modification</em>.
+    Secure Boot weakening and boot-manager revocation, addressed as an anchor class rather than verified.
+    https://attack.mitre.org/techniques/T1553/006/</li>
+<li>Microsoft Sysinternals, <em>Sysmon</em> — event reference.
+    Event semantics verified from the product documentation: 1 process create, 7 image load, 11 file create, 12/13/14 registry create-delete/set-value/rename, 19/20/21 WMI filter, consumer and binding. The telemetry map cites these per mechanism.
+    https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon</li>
+<li>Microsoft Learn, <em>4698(S) A scheduled task was created</em>.
+    Task creation with the task XML, including the hidden flag, and the Security/System events used where Sysmon is absent.
+    https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-4698</li>
+<li>Microsoft Learn, <em>about_Logging_Windows</em> — script block logging.
+    Event 4104 and what it records, which is the deobfuscated text an encoded command line hides.
+    https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows</li>
+<li>Trusted Computing Group, <em>TPM 2.0 Library Specification</em>.
+    The specification behind the measured boot log: PCRs and event digests, the only pre-OS evidence in the map that is not the OS's own account of itself.
+    https://trustedcomputinggroup.org/resource/tpm-library-specification/</li>
+<li>SigmaHQ, <em>Sigma</em> rule repository.
+    Source of the cited hunting rules; each rule identifier in <code>telemetry.py</code> was read from this repository rather than reconstructed.
+    https://github.com/SigmaHQ/sigma</li>
+<li>Microsoft Learn, <em>Data tables in the Microsoft Defender XDR advanced hunting schema</em>.
+    The EDR field model behind the field choices here (DeviceRegistryEvents, DeviceImageLoadEvents, DeviceProcessEvents), used to keep the map vendor-neutral.
+    https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-schema-tables</li>
+<li>Microsoft Security Response Center, <em>Security Update Guide</em>.
+    Where the pre-OS and boot-manager fixes are tracked; used for the boot-chain rows rather than quoting advisories from memory.
+    https://msrc.microsoft.com/update-guide</li>
+<li>Google Cloud, <em>Threat Intelligence</em> blog.
+    Mandiant reporting used to check that the behaviour families in the matrix match activity reported in the wild rather than a taxonomy exercise.
+    https://cloud.google.com/blog/topics/threat-intelligence</li>
+<li>Google Project Zero, <em>0days-in-the-wild</em>.
+    Root-cause analyses for 0-days exploited in the wild, Apache-2.0, pinned at commit e21be4bb: 70 entries, 2019-2024. Indexed in vendor/p0_0days/index.json and reported in report/IN_THE_WILD.md.
+    https://github.com/googleprojectzero/0days-in-the-wild</li>
+<li>GitHub, <em>REST API: add a repository collaborator</em>.
+    Documents that an outside collaborator must be a user account; organisation accounts are refused, which is what the Project Zero invitation attempt returned.
+    https://docs.github.com/rest/reference/repos#add-a-repository-collaborator
+    https://github.com/mandiant/flare-floss</li>
+</ol>
+<p><strong>Correction to the supplied reading list.</strong> Link 16,
+<code>github.com/binarly-io/efibootguard</code>, returns 404 and is mislabelled: <code>efibootguard</code>
+is Siemens' Linux EFI bootloader (<code>github.com/siemens/efibootguard</code>), not
+Binarly firmware-security research. If the intent was Binarly's firmware tooling,
+that is <code>github.com/binarly-io/FwHunt</code> (item 22 above), which is the relevant one
+for this project.</p>
+<hr />
+<h2 id="15-unresolved-research-questions">15. Unresolved research questions</h2>
+<p>Stated as questions, with what evidence would settle each. These are the gaps I
+would chase next, in priority order.</p>
+<p><strong>Fourteen of them cannot be answered by reading anything at all</strong> — they need
+bench hardware. Those are collected separately in
+<code>report/HARDWARE_TEST_QUESTIONS.md</code>, with rig, experiment, and what result would
+confirm or refute the current assumption. Three of them (firmware-update coverage,
+measured-boot sensitivity, OS-writability of the BIOS region) would change this
+report's conclusions if they came out the other way.</p>
+<ol>
+<li><strong>How was MoonBounce's firmware written?</strong> Kaspersky states the infection
+   vector is unknown. Settling it needs either the operator tooling recovered
+   from a victim network, or telemetry of a flash write on an affected endpoint.
+   Until then, every claim about "remote firmware infection" is a hypothesis.</li>
+<li>~~<strong>Which specific loader/kernel functions does MoonBounce hook?</strong>~~
+   <strong>Resolved</strong> in §3.8: <code>OslArchTransferToKernel</code> in <code>winload.efi</code>, then
+   <code>ExAllocatePool</code> in <code>ntoskrnl</code>, reached via a <code>retfq</code>-tail patch and a
+   relocation-directory code cave. What remains open is <strong>how many loader builds
+   the 0x158878-byte scan window covers</strong>, since that offset is build-specific
+   and bounds which Windows versions the implant can infect.</li>
+<li><strong>How many LoJax-era platforms actually had writable BIOS regions in 2018,
+   and how many still do?</strong> ESET says the tool worked on misconfigured or
+   pre-PCH hardware. A CHIPSEC survey across a fleet would convert that into a
+   number, and that number is the real exposure metric.</li>
+<li><strong>Does any vendor firmware update preserve a malicious DXE file?</strong> ESET says a
+   full-region rewrite removes LoJax, but partial/region-preserving update
+   mechanisms exist. Testing this per vendor is unglamorous and directly
+   determines whether "update firmware" is remediation or theatre.</li>
+<li><strong>Is <code>MokList</code> audited anywhere at fleet scale?</strong> It is the highest-value
+   BlackLotus indicator and almost certainly not monitored in most estates. A
+   measurement study would be useful.</li>
+<li><strong>What is the actual revocation lag distribution for <code>dbx</code> entries?</strong> BlackLotus
+   exploited a gap of more than a year. Quantifying the distribution across
+   vendors would turn an anecdote into a risk parameter.</li>
+<li><strong>Can an SMM-based implant be detected from inside the OS at all?</strong> Out of
+   scope here (none of the three families use SMM), but it is the next layer down
+   and the answer is probably "only with hardware assistance".</li>
+<li><strong>What does Boot Guard actually attest in practice, per OEM?</strong> The
+   specification defines verified and measured modes; how each OEM configures
+   fuse policy is opaque, which makes trust decisions hard.</li>
+<li><strong>Does any of the three survive a vendor firmware capsule update in the field?</strong>
+   Requires controlled experiment on real hardware per model. This is the single
+   most decision-relevant unknown for remediation guidance.</li>
+<li><strong>How do you verify an enclave is clean, not merely isolated?</strong> DRTM gives a
+    measurement, but the verifier and the golden values are themselves trust
+    anchors. A worked design for a small lab would be a genuine contribution.</li>
+</ol>
+<hr />
+<h2 id="16-closing-assessment">16. Closing assessment</h2>
+<p>The three families tell a coherent story about where the attack surface actually
+is. LoJax abused a legitimate persistence channel (anti-theft firmware) plus a
+signed hardware-access driver. MoonBounce abused the fact that nobody compares
+firmware bytes. BlackLotus abused a <em>trust</em> mechanism - shim and MOK - designed
+to make Secure Boot usable, and got permanent persistence out of a one-time
+vulnerability.</p>
+<p>None of them required a novel firmware exploit. All three required defenders to
+have left something unmeasured: flash write protections, firmware content,
+or boot-chain trust state.</p>
+<p>That is the argument for the vault. Not that encryption defeats these threats -
+it does not, and any design that says so is wrong - but that preservation without
+execution is a precondition for studying them at all, and that a custody chain
+which can prove "these exact bytes, unmodified, never executed here" is the
+foundation every later conclusion rests on.</p>
+<p>The vault preserves. People eradicate. The architecture should never let anyone
+confuse the two.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

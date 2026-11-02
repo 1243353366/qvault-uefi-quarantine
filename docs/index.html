@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html" class="current">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="qvault">qvault</h1>
+<p><a href="https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg" /></a></p>
+<p><strong>Version 0.13.0</strong> · <a href="https://1243353366.github.io/qvault-uefi-quarantine/">documentation site</a> · <a href="changelog.html">CHANGELOG</a> · <a href="citations.html">citations</a> · <a href="capability-map.html">capability map</a> — a cryptographic quarantine vault for firmware evidence</p>
+<blockquote>
+<p><strong>Status: prototype, not hardened.</strong> The code was written before the threat model
+had been independently reviewed, which is the wrong order. Nine weaknesses found
+on re-reading are listed in
+<a href="threat-model-review.html"><code>report/THREAT_MODEL_REVIEW.md</code></a>; the four rated
+High each reduce dual control or tamper-evident audit from a property to a claim.
+Use it on synthetic fixtures, not on live samples.</p>
+</blockquote>
+<p>Reference implementation of the defensive architecture described in
+<a href="deep-dive.html"><code>report/UEFI_Malware_Deep_Dive_Report.md</code></a>.</p>
+<p>The goal is narrow and deliberately unglamorous: <strong>preserve hostile firmware as
+evidence, while denying it any opportunity to execute.</strong> This is a custody and
+containment tool. It is not an analyser, not a sandbox, and not a cleaner. It
+does not repair infected hardware.</p>
+<pre><code>ingest ──► hash ──► AES-256-GCM (chunked) ──► seal 0400 ──► audit chain
+                │                                          │
+                └──── DEK wrapped by Shamir-split KEK ──────┘
+
+retrieve ──► K-of-N shares ──► 2-person approval ──► enclave sentinel ──► 0400 plaintext
+</code></pre>
+<h2 id="documentation">Documentation</h2>
+<p>The full documentation is published at
+<strong><a href="https://1243353366.github.io/qvault-uefi-quarantine/">https://1243353366.github.io/qvault-uefi-quarantine/</a></strong>, generated from this repository by
+<code>tools/build_docs.py</code>, so the site cannot claim more than the code does.</p>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/deep-dive">Deep dive</a></td>
+<td>LoJax, MoonBounce and BlackLotus, with the architecture and the bibliography</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/in-the-wild">Zero-days in the wild</a></td>
+<td>The pinned Project Zero reference set, and why the overlap with this boundary is 2 of 70</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix">Behaviour to control</a></td>
+<td>17 attacker behaviours, the control that answers each, and the gaps named</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map">Telemetry map</a></td>
+<td>What feeds each detection: Sysmon, Windows events, script blocks, TPM log</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/persistence">Persistence</a></td>
+<td>Fourteen autostart mechanisms and four result classes</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/trust-model">Trust model</a> · <a href="https://1243353366.github.io/qvault-uefi-quarantine/limitations">Limitations</a></td>
+<td>What is programmatically enforced, and what is deployment-dependent</td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/citations">Citations</a></td>
+<td>All 68 sources, each with where it is used</td>
+</tr>
+</tbody>
+</table>
+<p>Every claim in the reports carries a source, a tag, a status and a falsifier in
+<code>report/CLAIMS_LEDGER.csv</code>; gate G3 fails if a claim has no source and gate G12 fails if the
+published site is stale.</p>
+<h2 id="read-this-before-trusting-any-claim-in-here">Read this before trusting any claim in here</h2>
+<p>This project performed <strong>no independent reverse engineering</strong>. No sample was
+obtained, unpacked or executed. Every statement about LoJax, MoonBounce and
+BlackLotus is a reconstruction from published vendor analysis, and every
+signature in <code>qvault/fwdiff.py</code> is derived from documented bytes without live
+validation.</p>
+<ul>
+<li><a href="evidence-policy.html"><code>report/EVIDENCE_POLICY.md</code></a> — the three rules this
+  project is held to, revised tag semantics, and a self-audit of where it broke them.</li>
+<li><a href="report/CLAIMS_LEDGER.csv"><code>report/CLAIMS_LEDGER.csv</code></a> — 48 claims with source,
+  locator, tag, verification status and a falsifier.</li>
+<li><a href="hardware-questions.html"><code>report/HARDWARE_TEST_QUESTIONS.md</code></a> — the 14
+  questions no document can answer, with rigs and experiments.</li>
+<li><a href="threat-model-review.html"><code>report/THREAT_MODEL_REVIEW.md</code></a> — what a critic
+  should attack, and why the review gate is still open.</li>
+</ul>
+<pre><code class="language-bash">python tools/check_claims.py     # fails on any claim missing evidence or falsifier
+</code></pre>
+<h2 id="why-each-piece-exists">Why each piece exists</h2>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Threat it addresses</th>
+<th>Why not something simpler</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Encrypt at ingestion, streaming</td>
+<td>Accidental execution, casual inspection, backup/AV crawlers touching the sample</td>
+<td>A password-protected zip still writes a plaintext temp file during <code>zip</code></td>
+</tr>
+<tr>
+<td>Fresh DEK per object</td>
+<td>One leaked key burns one sample, not the vault</td>
+<td>A single vault key means any single compromise is total</td>
+</tr>
+<tr>
+<td>KEK split K-of-N (Shamir, GF(256))</td>
+<td>Compromise of the vault host or any one custodian</td>
+<td>A KEK in one file is one credential away from full disclosure</td>
+</tr>
+<tr>
+<td>Dual-control approvals, requester ≠ approver</td>
+<td>Insider misuse, rushed "just decrypt it"</td>
+<td>Logging alone does not prevent, only records</td>
+</tr>
+<tr>
+<td>Enclave sentinel directory</td>
+<td>Decrypting straight into a workstation or production share</td>
+<td>Path checks alone are bypassable by symlink or mount games</td>
+</tr>
+<tr>
+<td>Chunked AEAD with metadata binding</td>
+<td>Silent corruption, sample swapping, truncation</td>
+<td>A plain SHA-256 manifest cannot tell you <em>which</em> bytes changed or stop a swap</td>
+</tr>
+<tr>
+<td>Content-address by ciphertext hash</td>
+<td>Plaintext hash as a confirmation oracle</td>
+<td>Content-addressing by plaintext hash leaks "do you have sample X?"</td>
+</tr>
+<tr>
+<td>Hash-chained audit + signed checkpoints</td>
+<td>Log editing, entry deletion, history rewrite</td>
+<td>A normal log file is editable by anyone with write access</td>
+</tr>
+<tr>
+<td>Inert triage (bounded reads only)</td>
+<td>Parser exploitation at the boundary</td>
+<td>Deep FFS/PE parsing at ingestion turns the vault into an attack surface</td>
+</tr>
+</tbody>
+</table>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install -r requirements.txt
+python -m pytest qvault/tests -q      # 418 tests, ~0.75s
+</code></pre>
+<p>Requires Python 3.10+ and <code>cryptography</code>.</p>
+<h2 id="use">Use</h2>
+<pre><code class="language-bash"># 1. Create the vault. It prints three share files: give them to three people.
+python -m qvault init --root vault --shares 3 --threshold 2 --custodian-dir custodian
+
+# 2. Ingest. Password-free, non-interactive, suitable for an acquisition appliance.
+python -m qvault ingest --root vault --file dump.bin \
+    --operator aadi --method &quot;SPI flash dump (CHIPSEC)&quot; \
+    --share custodian/share-1.json --share custodian/share-3.json
+
+# 3. Two different people approve a specific retrieval.
+python -m qvault approve --root vault --id &lt;object-id&gt; --approver reviewer1 --justification &quot;case 2026-11&quot;
+python -m qvault approve --root vault --id &lt;object-id&gt; --approver reviewer2 --justification &quot;case 2026-11&quot;
+
+# 4. Retrieve into an analysis enclave (a directory containing a .enclave marker).
+mkdir -p enclave &amp;&amp; touch enclave/.enclave
+python -m qvault retrieve --root vault --id &lt;object-id&gt; --requester analyst \
+    --out enclave --share custodian/share-1.json --share custodian/share-2.json
+
+# 5. Integrity and custody checks.
+python -m qvault verify --root vault
+python -m qvault audit --root vault
+python -m qvault checkpoint --root vault     # sign the current audit head
+</code></pre>
+<h2 id="network-observation">Network observation</h2>
+<p><code>qvault/netobs.py</code> records DNS, flow metadata, process ancestry and destination
+classification, then does the part that matters: joins what the host <strong>claims</strong>
+against what the wire <strong>shows</strong>.</p>
+<pre><code class="language-bash">python -m qvault netobs --input case.json     # {host:[], wire:[], dns:[]}
+</code></pre>
+<p>The output leads with disagreements (<code>unattributed_egress</code>, <code>phantom_claim</code>,
+<code>attribution_conflict</code>) because agreement is not evidence of innocence. On a host
+running BlackLotus or MoonBounce, endpoint attribution names <code>winlogon.exe</code> or
+<code>svchost.exe</code> exactly as designed, so the named-process rules see legitimate
+components doing legitimate-looking things. Only the divergence rule notices.</p>
+<p>Metadata only: no payloads, no query strings, no third-party traffic. Design,
+privacy constraints and ten failure modes: <code>report/NETOBS_MODULE.md</code>.</p>
+<blockquote>
+<p><strong>Built on <a href="https://github.com/interplains/Zero-Breach-Toolkit">Zero-Breach-Toolkit</a> by
+<a href="https://github.com/interplains">@interplains</a></strong> — release <strong>v2.0.2</strong>
+(<code>90148ea</code>, Apache-2.0), vendored unmodified at <code>vendor/zbtriage</code> and pinned by digest
+in <code>vendor/UPSTREAM.sha256</code>. The detector is theirs; the grading, correlation,
+containment and verification around it are what this repository adds. See
+<code>CREDITS.md</code>.</p>
+</blockquote>
+<h2 id="the-scan-covers-the-scanner">The scan covers the scanner</h2>
+<p><code>qvault/integrity.py</code> scans this installation as an artifact: file digests, interpreter
+startup hooks inside the package, import shadowing, world-writable code, <code>.pth</code> hooks,
+bytecode with no source. It refuses a digest stored beside the code it describes, and a
+self-computed digest with no external reference is <code>unverified</code>, never verified.</p>
+<p>A device result is then read through the scanner's own status: a finding from an
+unattested instrument stands but is capped at INFERRED, and an absence of findings from
+one is INCONCLUSIVE.</p>
+<p><code>qvault/calibration.py</code> measures false positives and false negatives against a labelled
+corpus with Wilson intervals. Abstentions count against accuracy, and zero-error claims
+are rejected by <code>refuse_zero_claim()</code>: zero errors in n cases is a bound of about 3/n,
+not an absence.</p>
+<h2 id="the-engine-cannot-certify-itself">The engine cannot certify itself</h2>
+<p>Four roles, one per component: acquisition, analysis, evidence storage, trust
+verification. <code>qvault/separation.py</code> refuses an attestation when the attestor is the
+subject, when both hold the same role, or when the evidence is the subject's own report
+relayed by an intermediary. Only the verification role may attest. Grade is capped by
+evidence class, and mutual peer attestation is detected as a trust cycle.</p>
+<p>The regress is named, not hidden: every attestation records its root, and with no root
+the result is <code>unverified</code> with an <code>unverified_root</code> gap.</p>
+<h2 id="seven-capabilities-traced-to-code">Seven capabilities, traced to code</h2>
+<p><code>report/CAPABILITY_MAP.md</code> is generated from <code>qvault/pillars.py</code>, which names the module
+and test for every requirement and refuses to label a pillar implemented while a
+required piece is missing:</p>
+<table>
+<thead>
+<tr>
+<th>Pillar</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1 Forensic acquisition</td>
+<td>partial (3/4)</td>
+</tr>
+<tr>
+<td>P2 IOC detection</td>
+<td>partial (2/3)</td>
+</tr>
+<tr>
+<td>P3 Behavioral correlation</td>
+<td>partial (2/4)</td>
+</tr>
+<tr>
+<td>P4 Cryptographic evidence vault</td>
+<td>partial (3/4)</td>
+</tr>
+<tr>
+<td>P5 Firmware integrity</td>
+<td>partial (2/3)</td>
+</tr>
+<tr>
+<td>P6 Containment</td>
+<td>partial (3/4)</td>
+</tr>
+<tr>
+<td>P7 Evidence assessment</td>
+<td>partial (3/4)</td>
+</tr>
+</tbody>
+</table>
+<p>Two requirements are load-bearing and partial: P3 process identity normalisation
+(subjects are strings, so two spellings of one binary do not merge) and P6 substrate
+enforcement (<code>isolation.py</code> and <code>budgets.py</code> state the boundary; nothing verifies the
+hypervisor honours it).</p>
+<h2 id="merged-with-zero-breach-toolkit">Merged with Zero-Breach-Toolkit</h2>
+<p>The upstream detector is vendored unmodified at <code>vendor/zbtriage</code> (Apache-2.0, pinned
+commit in <code>vendor/UPSTREAM.md</code>). The split is by responsibility: upstream decides which
+artifacts to read and which indicator matched; qvault decides what that match is worth.</p>
+<ul>
+<li><code>qvault/zbt_bridge.py</code> maps each upstream <code>EV_*</code> class to an evidence plane and grade,
+  fails loudly if upstream adds a grade nobody mapped, converts hits to <code>Observation</code>s
+  (never <code>Finding</code>s), and refuses family attribution on a single feed.</li>
+<li><code>qvault/correlate.py</code> is the temporal evidence graph: grade comes from independence,
+  not from event count. Four contacts from one plane stay <code>INFERRED</code>.</li>
+<li>Honest consequence: every upstream grade lands on the historical plane, which is
+  forgeable by the subject, so <code>adversarial_value()</code> returns <code>none</code> even for an
+  <code>on-disk</code> fingerprint.</li>
+</ul>
+<p>See <code>MERGE.md</code> for the strategy, the attribution notice, and the known gaps.</p>
+<h2 id="firmware-integrity-is-its-own-subsystem">Firmware integrity is its own subsystem</h2>
+<p>An OS scan runs on the machine it judges, so it cannot certify the hardware hosting
+it. <code>qvault/firmware_integrity.py</code> ranks anchors by independence and enforces that a
+verdict may not be stronger than its anchor:</p>
+<table>
+<thead>
+<tr>
+<th>Anchor</th>
+<th>Establishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS-mediated read</td>
+<td><strong>nothing</strong></td>
+</tr>
+<tr>
+<td>Firmware measures itself</td>
+<td>boot chain (hypothesis)</td>
+</tr>
+<tr>
+<td>TPM quote</td>
+<td>boot chain, DXE, option ROM (<strong>not</strong> flash or CRTM)</td>
+</tr>
+<tr>
+<td>Hardware boot ROM</td>
+<td>CRTM</td>
+</tr>
+<tr>
+<td>Out-of-band flash read</td>
+<td>flash image, CRTM, DXE, ME/EC</td>
+</tr>
+</tbody>
+</table>
+<p>Host trust needs <code>flash_image</code> and <code>crtm</code> at rank 3 or above, and the only route to
+<code>flash_image</code> is out-of-band. <code>certify_host()</code> refuses on weaker evidence naming the
+missing subject, and <code>os_scan_verdict()</code> returns <code>UNATTESTED</code> even when every module
+matched.</p>
+<h2 id="isolating-the-components-that-interpret-attacker-bytes">Isolating the components that interpret attacker bytes</h2>
+<p><code>qvault/isolation.py</code> places the five untrusted components (evidence readers,
+database parsers, indicator processing, report generation, AI-assisted analysis) and
+refuses placements that cannot meet them:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Zone</th>
+<th>Must not have</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evidence reader</td>
+<td>enclave</td>
+<td>network, keys, model, vault write, report emit</td>
+</tr>
+<tr>
+<td>Database parser</td>
+<td>enclave</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>Indicator processing</td>
+<td>intel</td>
+<td>artifact read, <strong>finding write</strong>, whitelist write</td>
+</tr>
+<tr>
+<td>Report generation</td>
+<td>presentation</td>
+<td>artifact read, plaintext, keys, model</td>
+</tr>
+<tr>
+<td>AI analysis</td>
+<td>ai</td>
+<td>artifact read, plaintext, keys, finding write</td>
+</tr>
+</tbody>
+</table>
+<p>Placement is validated rather than labelled, data flow is deny-by-default (plaintext
+never leaves the enclave toward AI or reporting; keys flow only into the enclave), and
+model output enters as an <code>Observation</code> graded <code>HYPOTHESIS</code>, never as a <code>Finding</code>.</p>
+<h2 id="every-artifact-carries-eight-mandatory-elements">Every artifact carries eight mandatory elements</h2>
+<p><code>qvault/provenance.py</code> refuses to build an envelope without all of them:</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Enforced how</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Original-source identification</td>
+<td>kind, locator and identity all non-empty</td>
+</tr>
+<tr>
+<td>Acquisition timestamp</td>
+<td>positive integer milliseconds, UTC</td>
+</tr>
+<tr>
+<td>SHA-256 digest</td>
+<td><strong>computed from the bytes</strong>, never accepted from the caller; <code>verify()</code> re-hashes in constant time</td>
+</tr>
+<tr>
+<td>Acquisition method</td>
+<td>fixed vocabulary, and each method maps to an evidence plane</td>
+</tr>
+<tr>
+<td>Tool and reader versions</td>
+<td>both mandatory and separate: a capture bug and a parser bug need different remedies</td>
+</tr>
+<tr>
+<td>Coverage and collection errors</td>
+<td>every error must state its effect; unobserved regions become telemetry gaps that lower finding confidence</td>
+</tr>
+<tr>
+<td>Chain of custody</td>
+<td>append-only, hash-chained, first event must be the acquisition; verification detects edits and reordering</td>
+</tr>
+<tr>
+<td>Cryptographic protection at rest</td>
+<td>authenticated ciphers only; <code>AES-256-CBC</code> and <code>none</code> are refused</td>
+</tr>
+</tbody>
+</table>
+<h2 id="five-rules-the-tool-cannot-break">Five rules the tool cannot break</h2>
+<p>Enforced in <code>qvault/findings.py</code> by construction, not by review:</p>
+<ol>
+<li><strong>Every finding has an evidence grade</strong> — <code>Finding</code> refuses to construct without one.</li>
+<li><strong>Every finding considers a plausible benign explanation</strong> — including all-clear results.</li>
+<li><strong>Missing telemetry lowers confidence</strong> — computed as grade minus one step per gap,
+   floor <code>UNKNOWN</code>. A gap can never raise a result.</li>
+<li><strong>Detection and attribution are separate</strong> — attribution cannot exceed detection,
+   because you cannot be more certain who did it than that it happened.</li>
+<li><strong>No device is ever called clean</strong> — <code>clean</code> is not a value the verdict type can
+   produce, and an unexamined critical surface forces <code>inconclusive</code>.</li>
+</ol>
+<p>An unexcluded benign explanation caps a finding at <code>suspicious</code>: failing to rule out
+the boring answer is not evidence of malice.</p>
+<h2 id="what-the-evidence-planes-can-and-cannot-establish">What the evidence planes can and cannot establish</h2>
+<p><code>qvault/limitations.py</code> models the four architectural limitations (live-state
+visibility, firmware blind spots, baselines, indicator trust) as evidence planes
+with a <code>forgeable_by_subject</code> property, so a claim's strength is computed from the
+plane it rests on:</p>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Plane</th>
+<th>Defensible against an adversary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Firmware integrity</td>
+<td>read via the subject's OS</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>Firmware integrity</td>
+<td>read out-of-band (physical)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Process existed</td>
+<td>live response</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>Network contact</td>
+<td>wire observation</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Behaviour is normal</td>
+<td>baseline</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>Object is malicious</td>
+<td>threat intel</td>
+<td><strong>no</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Also included: <code>baseline_validity()</code> returns <code>unverified</code> when the compromise window
+is unknown, never <code>valid</code>; <code>intel_trust()</code> reports three feeds sharing one upstream
+as <code>circular</code>, not corroboration. The controls raise coverage; none of them raises
+integrity. See <code>report/ARCHITECTURAL_LIMITATIONS.md</code>.</p>
+<h2 id="capability-denial-and-who-enforces-it">Capability denial, and who enforces it</h2>
+<p><code>qvault/containment.py</code> models the six denials (network, authentication services,
+storage, compute, inter-network, decryption) as a function of the <strong>plane</strong> that
+enforces them and the <strong>posture</strong> of the subject:</p>
+<table>
+<thead>
+<tr>
+<th>Plane</th>
+<th>Clean</th>
+<th>OS compromised</th>
+<th>Firmware compromised</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subject OS</td>
+<td>full</td>
+<td><strong>none</strong></td>
+<td><strong>none</strong></td>
+</tr>
+<tr>
+<td>Hypervisor</td>
+<td>full</td>
+<td>full</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>Fabric (switch/VLAN ACL)</td>
+<td>full</td>
+<td>full</td>
+<td>full, if every egress path is enumerated</td>
+</tr>
+<tr>
+<td>Physical</td>
+<td>full</td>
+<td>full</td>
+<td>full</td>
+</tr>
+<tr>
+<td>Cryptographic</td>
+<td>full</td>
+<td>full</td>
+<td>full</td>
+</tr>
+</tbody>
+</table>
+<p>A plan built from host firewalls, ACLs and service shutdown reads as complete and
+provides zero denial once the subject is compromised, because the subject decides
+whether its own rules apply. <code>audit_claim()</code> takes a plan, a posture and the
+capabilities you believe you denied, and reports which ones the plan does not
+support. <code>assess()</code> never claims eradication.</p>
+<h2 id="network-context-as-a-policy-selector">Network context as a policy selector</h2>
+<p><code>qvault/netpolicy.py</code> maps an observed association (BSSID, SSID, EAP state) to a
+collection, retention and custody policy. The BSSID is a <strong>selector only</strong> — it is
+48 bits broadcast in every beacon and clonable in seconds, so it can never be or
+seed a key. A test demonstrates why: two independent hosts hashing the same BSSID
+land on identical bytes.</p>
+<p>Because an evil-twin AP chooses its own BSSID, every disqualifier is checked
+before any credit is given. Randomised BSSIDs, open or PSK-only networks, and EAP
+without server-validation all fall to <code>untrusted</code>. Raising trust requires an
+authenticated network <em>plus</em> corroboration the AP does not get to assert alone.
+A hostile network yields the <code>forensic</code> policy: more evidence, tighter custody,
+no egress.</p>
+<h2 id="comparing-a-suspect-image-against-the-oem-reference">Comparing a suspect image against the OEM reference</h2>
+<p>LoJax is catchable by inventory (it adds <code>SecDxe</code> and removes <code>NtfsDxe</code>).
+MoonBounce is not: it patches a legitimate <code>CORE_DXE</code> in place, appends an
+<strong>unnamed section</strong> after <code>.reloc</code>, and turns five bytes at the head of three boot
+services into a <code>call</code>. The file GUID, name, type and volume layout are unchanged,
+so only a per-section byte comparison sees it.</p>
+<pre><code class="language-bash">python -m qvault fwdiff --reference oem_image.bin --suspect dump.bin
+</code></pre>
+<p>It reports modules added/removed, per-section hash changes, unnamed sections,
+write-and-execute sections, entry-point prologue changes, and any of the
+MoonBounce immediates (including <code>0x6F4EB841</code>, the original <code>ExAllocatePool</code>
+prologue the implant compares against). Exit code 0 means clean.</p>
+<p>Limits, stated in the module docstring: compressed sections are compared as
+opaque bytes, TE images are detected but not section-parsed, and a byte diff can
+tell you a module changed but not which function, without symbols.</p>
+<h2 id="what-the-tests-prove">What the tests prove</h2>
+<p><code>python -m pytest qvault/tests -q</code> exercises, among others:</p>
+<ul>
+<li>byte-exact round trip across empty / sub-chunk / exact-chunk / multi-chunk inputs;</li>
+<li>plaintext never appears inside the sealed object;</li>
+<li>a single flipped ciphertext bit is caught by both <code>verify</code> and decryption;</li>
+<li>truncated ciphertext and mismatched metadata (AAD) are rejected;</li>
+<li>one share is not enough (quorum enforced), two shares are;</li>
+<li>a requester cannot approve their own retrieval;</li>
+<li>retrieval outside a marked enclave is refused;</li>
+<li>retrieved plaintext is mode <code>0400</code>, never executable;</li>
+<li>audit edits break the hash chain, and truncation breaks the signed checkpoint;</li>
+<li>triage recognises a flash descriptor and FV header without parsing them, and
+  phantom regions can no longer be produced from synthetic input;</li>
+<li>orphan objects (bytes with no envelope) are reported as errors;</li>
+<li><code>fwdiff</code> detects an added module, a removed module, a modified section, an
+  unnamed appended section, a prologue replaced by a <code>call</code>, and a W+X section;
+  and malformed or truncated input never raises.</li>
+</ul>
+<h2 id="non-goals-and-honest-limits">Non-goals and honest limits</h2>
+<ul>
+<li><strong>Encryption does not disinfect.</strong> A machine whose firmware is already
+  compromised stays compromised. The vault preserves the evidence; reflashing,
+  hardware replacement and trust re-establishment are separate procedures.</li>
+<li><strong>The vault cannot defend a compromised ingestion host.</strong> Code that runs
+  before encapsulation has already won. See the failure analysis in the report;
+  the fix is architectural (disposable read-only acquisition appliance), not
+  cryptographic.</li>
+<li><strong>The local filesystem is not WORM.</strong> For real custody, place <code>objects/</code> and
+  <code>envelopes/</code> on compliance-mode object storage or an append-only snapshot, and
+  anchor checkpoints externally (RFC 3161, transparency log, paper record).</li>
+<li><strong>No deep parsing.</strong> Deliberately. Deep firmware parsing belongs in the
+  enclave, on a decrypted copy, under a parser that is assumed exploitable.</li>
+</ul>
+<h2 id="safety">Safety</h2>
+<p>This repository contains no malware, no exploit code and no persistence
+mechanism. Test fixtures are synthetic byte strings. Do not point the tooling at
+live samples outside an authorised, isolated analysis environment.</p>
+<p>Defensive research, dual-use by nature; published so defenders can adopt it.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

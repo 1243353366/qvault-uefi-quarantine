@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operating model · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html" class="current">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="operating-model-scrum-for-the-work-gates-for-the-safety">Operating model: Scrum for the work, gates for the safety</h1>
+<p>Scrum runs the backlog. It does not run the safety model, and it does not get a vote on
+whether a refusal may leak information.</p>
+<h2 id="what-scrum-is-used-for">What Scrum is used for</h2>
+<p>Backlog, sprinting, acceptance criteria, release gates, and progress visibility. Each sprint
+ends with evidence rather than a demo: <code>python3 tools/gates.py</code> is the acceptance record, and
+a red gate is a refusal, not a scheduling problem.</p>
+<h2 id="what-scrum-is-not-used-for">What Scrum is not used for</h2>
+<p>Velocity may not override:</p>
+<ul>
+<li><strong>refusal on ambiguity</strong> — an unanswerable question stays unanswerable, and a sprint
+  deadline does not convert it into a "no finding";</li>
+<li><strong>oracle safety</strong> — a denial that reveals whether a resource exists is a defect regardless
+  of how much it would cost to fix before the demo;</li>
+<li><strong>attack-surface validation</strong> — no merge that adds a mechanism, an adapter or an input
+  path without a threat-model note and the tests that fail-closed behaviour requires.</li>
+</ul>
+<p>If a gate blocks a release, the release moves. The gate does not.</p>
+<h2 id="epics">Epics</h2>
+<table>
+<thead>
+<tr>
+<th>Epic</th>
+<th>Scope</th>
+<th>Where it lives</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E1 Detection contract</td>
+<td>mechanism descriptors, four result classes, no clean state</td>
+<td><code>qvault/persistence.py</code></td>
+<td><code>test_persistence.py</code> (40)</td>
+</tr>
+<tr>
+<td>E2 Policy refusal and oracle safety</td>
+<td>one public code, deny-and-record, fail closed, uniform work</td>
+<td><code>qvault/netpolicy.py</code>, <code>qvault/probe.py</code></td>
+<td><code>test_policy_semantics.py</code>, <code>test_probe.py</code></td>
+</tr>
+<tr>
+<td>E3 Attestation and host trust</td>
+<td>evidence classes, ceilings, self-report refusal</td>
+<td><code>qvault/separation.py</code>, <code>qvault/grading.py</code>, <code>qvault/firmware_integrity.py</code></td>
+<td><code>test_module_trust.py</code>, <code>test_policy_semantics.py</code></td>
+</tr>
+<tr>
+<td>E4 Persistence mechanism coverage</td>
+<td>the eleven mechanisms, observability boundaries</td>
+<td><code>qvault/persistence.py</code></td>
+<td><code>test_persistence.py</code></td>
+</tr>
+<tr>
+<td>E5 Ledger and evidence validation</td>
+<td>claim tags, bibliography, CSV contract</td>
+<td><code>report/CLAIMS_LEDGER.csv</code>, <code>tools/check_claims.py</code></td>
+<td><code>test_persistence.py</code> ledger test</td>
+</tr>
+<tr>
+<td>E6 Attacker behaviour coverage</td>
+<td>behaviour to control, with gaps named</td>
+<td><code>qvault/behaviors.py</code>, <code>report/THREAT_BEHAVIOR_MATRIX.md</code></td>
+<td><code>test_behaviors.py</code>, gate G9</td>
+</tr>
+<tr>
+<td>E7 Telemetry and hunting content</td>
+<td>what feeds each detection, Sigma families, vendor field model</td>
+<td><code>qvault/telemetry.py</code>, <code>report/TELEMETRY_MAP.md</code></td>
+<td><code>test_telemetry.py</code>, gate G10</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-polyglot-boundary">The polyglot boundary</h2>
+<p>Language diversity is safe at the edges and unsafe at the decision. Concretely:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Language</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Verdict engine (<code>netpolicy</code>, <code>grading</code>)</td>
+<td>Python, single owner</td>
+<td>May not shell out, may not import an adapter, may not delegate a decision to another runtime</td>
+</tr>
+<tr>
+<td>Detection adapters (<code>persistence</code>, <code>probe</code>, <code>contract</code>)</td>
+<td>Python</td>
+<td>May build payloads; may not compute policy or grade arithmetic of their own</td>
+</tr>
+<tr>
+<td>Wire contract (<code>contract/verdict.schema.json</code>)</td>
+<td>JSON Schema</td>
+<td>The only interface other runtimes see</td>
+</tr>
+<tr>
+<td>Edge tooling (<code>adapters/verdict_lint.mjs</code>, <code>tools/*.py</code>, shell)</td>
+<td>any</td>
+<td>May read and report; holds no trust decision</td>
+</tr>
+</tbody>
+</table>
+<p>The boundary is enforced, not documented: <code>tools/gates.py</code> G5 fails if an engine module
+contains a process, socket or shell call, or if the engine imports an adapter. A Go collector
+or a shell report generator can be added later and cannot weaken this, because it only ever
+holds a payload.</p>
+<h2 id="the-shared-contract">The shared contract</h2>
+<p><code>contract/verdict.schema.json</code> describes one payload: mechanism, basis, attestation state,
+observed signals and counts, verdict token, cap grade, denial codes, remedy, statement.</p>
+<p>Two properties are structural:</p>
+<ul>
+<li>A policy payload has a <code>subject.resource</code> field that is always <code>null</code>. The type has no
+  place to echo what the caller asked about, so a refusal cannot become a probe.</li>
+<li><code>denial_codes</code> is a closed vocabulary with exactly one public value, so no adapter can
+  invent the richer taxonomy that would tell an attacker which gate nearly passed.</li>
+</ul>
+<p>Validation runs in two runtimes (<code>qvault/contract.py</code> and <code>adapters/verdict_lint.mjs</code>), and
+G4 fails if either accepts a payload the other rejects, or if the node adapter accepts a
+payload with no remedy.</p>
+<h2 id="sprint-end-checklist">Sprint-end checklist</h2>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>Does the suite pass?</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>Does the end-to-end lifecycle still work?</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>Does every claim have a source, a tag, a status and a falsifier?</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>Do both layers emit payloads the schema accepts, in both runtimes?</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>Is the decision still single-owner and in-process?</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>Can the persistence layer still report a clean result? (It must not.)</td>
+</tr>
+<tr>
+<td>G7</td>
+<td>Is a refusal identical across forbidden, absent and empty resources?</td>
+</tr>
+<tr>
+<td>G8</td>
+<td>Is a live capture still refused without isolation and attestation?</td>
+</tr>
+<tr>
+<td>G9</td>
+<td>Does every behaviour still resolve to real code, with the matrix current?</td>
+</tr>
+<tr>
+<td>G10</td>
+<td>Does every mechanism have an evidence source or a stated blind spot?</td>
+</tr>
+<tr>
+<td>G11</td>
+<td>Is the pinned in-the-wild reference set intact, and its report current?</td>
+</tr>
+</tbody>
+</table>
+<p>Merge requires G1 through G11. Nothing here is advisory.</p>
+<h2 id="status">Status</h2>
+<p>Scrum-wise: E1, E2, E4 and E5 are implemented and gated; E3 is implemented for the evidence
+model but blocked on hardware for the attestation half (<code>report/HARDWARE_TEST_QUESTIONS.md</code>).
+The architecture work that is not patchable at all — a host certifying itself, a local
+filesystem being append-only — remains in <code>report/TRUST_MODEL.md</code> and is not claimed as done.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

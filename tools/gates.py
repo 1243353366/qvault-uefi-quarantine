@@ -15,6 +15,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G9 behaviour matrix    every behaviour resolves to real code and the document is current
   G10 telemetry map      every mechanism has an evidence source or a stated reason
   G11 in-the-wild set    the pinned reference set is intact and its report is current
+  G12 documentation site the published site is a current render of the repository
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -194,6 +195,29 @@ def g11_in_the_wild() -> tuple[bool, str]:
                   f"report current")
 
 
+def g12_documentation_site() -> tuple[bool, str]:
+    """The published site is a current render of the repository."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import build_docs  # noqa: PLC0415
+
+    stale = []
+    for src, slug, title, _section in build_docs.PAGES:
+        if not (ROOT / src).exists():
+            stale.append(f"{src} missing")
+            continue
+        if not (ROOT / "docs" / slug).exists():
+            stale.append(f"docs/{slug} missing")
+            continue
+        if (ROOT / "docs" / slug).read_text() != build_docs.render_page(src, slug, title):
+            stale.append(f"docs/{slug} stale")
+    if (ROOT / "CITATIONS.md").read_text() != build_docs.render_citations():
+        stale.append("CITATIONS.md stale")
+    if stale:
+        return False, "; ".join(stale[:4]) + ("; run tools/build_docs.py")
+    entries = len(build_docs.bibliography())
+    return True, f"{len(build_docs.PAGES)} pages current, {entries} sources cited"
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -206,6 +230,7 @@ GATES = (
     ("G9", "behaviour matrix", g9_behaviour_matrix),
     ("G10", "telemetry map", g10_telemetry),
     ("G11", "in-the-wild set", g11_in_the_wild),
+    ("G12", "documentation site", g12_documentation_site),
 )
 
 
