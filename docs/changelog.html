@@ -57,8 +57,8 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <div class="layout">
 <nav>
   <a class="brand" href="index">QVault</a>
-  <p class="ver">v0.13.9 · prototype</p>
-  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html" class="current">Changelog</a></li></ul>
+  <p class="ver">v0.13.10 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-policy.html">Security policy</a></li><li><a href="provenance.html">Provenance and verification</a></li><li><a href="contributing.html">Contributing</a></li><li><a href="tooling-risk.html">Tooling risk</a></li><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html" class="current">Changelog</a></li></ul>
 </nav>
 <main>
 <h1 id="changelog">Changelog</h1>
@@ -68,6 +68,28 @@ versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versionin
 <strong>HYPOTHESIS</strong>, <strong>UNKNOWN</strong>. See <code>report/EVIDENCE_POLICY.md</code> for what they mean and what
 they deliberately do not mean.</p>
 <hr />
+<h2 id="01310-2026-11-02">[0.13.10] - 2026-11-02</h2>
+<h3 id="added-the-four-risks-of-publishing-this-answered-in-files">Added - the four risks of publishing this, answered in files</h3>
+<p>Publishing a tool that parses hostile firmware creates four exposures that code alone does not
+address. Each now has a document, and the documents are checkable where they can be.</p>
+<p><strong>A copy can be modified or repackaged.</strong> <code>PROVENANCE.md</code> states the Apache-2.0 obligations that
+travel with a redistribution (LICENSE, NOTICE, CREDITS), what a fork may and may not imply, and how
+to verify a release: wheel plus <code>SHA256SUMS</code> on the release page, commit hash, public CI run. It
+also states the limit plainly: tags are <strong>not signed</strong>, no signing key is configured, so integrity
+rests on HTTPS to GitHub and the commit hash rather than on a signature.</p>
+<p><strong>The tooling is itself an attack surface.</strong> <code>report/TOOLING_RISK.md</code> registers every component that
+consumes input it does not control, with the guard found by reading it and the gap that remains.
+Three rows say <code>none observed</code> because no bound was found, and the page says so rather than
+describing intent. A test fails if a module takes <code>bytes</code> or parses JSON and is not registered.</p>
+<p><strong>Claims can outrun their evidence.</strong> <code>CONTRIBUTING.md</code> makes a claim a row, not a sentence: source,
+locator, tag and falsifier, with <code>CONFIRMED</code> requiring independent verification and hardware-plane
+claims requiring an out-of-band anchor. It lists what gets rejected, including <code>CLEAN</code> from missing
+telemetry and any offensive capability.</p>
+<p><strong>Behaviour can be poorly documented.</strong> <code>SECURITY.md</code> routes reports to private advisories, states
+that there is no bounty and no response SLA, and splits in-scope (parsers, store, audit chain, key
+handling, denial responses) from out of scope (the implant families, remediation claims, anything
+requiring kernel control, which is the documented host trust gap).</p>
+<p>Twenty-six new tests across the register and the policies.</p>
 <h2 id="0139-2026-11-02">[0.13.9] - 2026-11-02</h2>
 <h3 id="added-discovery-files-with-the-caveat-in-the-file">Added - discovery files, with the caveat in the file</h3>
 <p><code>docs/sitemap.xml</code> and <code>docs/robots.txt</code>, both generated by <code>tools/build_docs.py</code> from the page

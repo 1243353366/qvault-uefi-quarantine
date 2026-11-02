@@ -4,7 +4,9 @@
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.9** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.10** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+
+[`SECURITY.md`](SECURITY.md) (report a vulnerability privately) · [`PROVENANCE.md`](PROVENANCE.md) (licence, verifying a release, what signing does not cover) · [`CONTRIBUTING.md`](CONTRIBUTING.md) (how a claim earns a grade)
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -73,6 +75,9 @@ validation.
   for this release: what is enforced, the claims census including the unverified ones,
 - [`report/DEFECT_LOG.md`](report/DEFECT_LOG.md) — six of this project's own
   defects, how each was found, what fixed it, what it bought and what it cost,
+- [`report/TOOLING_RISK.md`](report/TOOLING_RISK.md) — every component that parses
+  input it does not control, the guard found by reading it, and the gap that remains
+  (the register includes rows where no guard was found)
   graded like any other claim
   and six open findings with the observation that would close each
   (access, capability, execution), each with its non-claims and the condition under

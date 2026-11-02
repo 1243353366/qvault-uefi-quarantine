@@ -9,6 +9,36 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.10] - 2026-11-02
+
+### Added - the four risks of publishing this, answered in files
+
+Publishing a tool that parses hostile firmware creates four exposures that code alone does not
+address. Each now has a document, and the documents are checkable where they can be.
+
+**A copy can be modified or repackaged.** `PROVENANCE.md` states the Apache-2.0 obligations that
+travel with a redistribution (LICENSE, NOTICE, CREDITS), what a fork may and may not imply, and how
+to verify a release: wheel plus `SHA256SUMS` on the release page, commit hash, public CI run. It
+also states the limit plainly: tags are **not signed**, no signing key is configured, so integrity
+rests on HTTPS to GitHub and the commit hash rather than on a signature.
+
+**The tooling is itself an attack surface.** `report/TOOLING_RISK.md` registers every component that
+consumes input it does not control, with the guard found by reading it and the gap that remains.
+Three rows say `none observed` because no bound was found, and the page says so rather than
+describing intent. A test fails if a module takes `bytes` or parses JSON and is not registered.
+
+**Claims can outrun their evidence.** `CONTRIBUTING.md` makes a claim a row, not a sentence: source,
+locator, tag and falsifier, with `CONFIRMED` requiring independent verification and hardware-plane
+claims requiring an out-of-band anchor. It lists what gets rejected, including `CLEAN` from missing
+telemetry and any offensive capability.
+
+**Behaviour can be poorly documented.** `SECURITY.md` routes reports to private advisories, states
+that there is no bounty and no response SLA, and splits in-scope (parsers, store, audit chain, key
+handling, denial responses) from out of scope (the implant families, remediation claims, anything
+requiring kernel control, which is the documented host trust gap).
+
+Twenty-six new tests across the register and the policies.
+
 ## [0.13.9] - 2026-11-02
 
 ### Added - discovery files, with the caveat in the file

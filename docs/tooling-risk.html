@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tooling risk · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.10 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-policy.html">Security policy</a></li><li><a href="provenance.html">Provenance and verification</a></li><li><a href="contributing.html">Contributing</a></li><li><a href="tooling-risk.html" class="current">Tooling risk</a></li><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="tooling-risk-the-tool-as-an-attack-surface">Tooling risk: the tool as an attack surface</h1>
+<p>Release <strong>0.13.10</strong>. This project parses hostile firmware for a living, which
+makes it part of the reader's problem rather than only part of the answer. This
+register lists every component that consumes input it does not control, the guard
+found by reading that component, and the gap that remains.</p>
+<blockquote>
+<p><strong>Read the <code>none observed</code> rows as written.</strong> They mean no bound was found in the
+module, not that the module is safe. This page is a risk register, not a
+certification, and nothing on it grades above <code>CORROBORATED</code>.</p>
+</blockquote>
+<h2 id="where-the-register-stands">Where the register stands</h2>
+<ul>
+<li>No component has been fuzzed. There is no harness in <code>tools/</code> and no corpus in the tree. <em>(CONFIRMED)</em></li>
+<li>Python removes the memory-safety class (buffer overflows, use-after-free) that a C parser of the same inputs would carry. It does not remove unbounded allocation, quadratic scanning, or logic errors in length handling. <em>(CORROBORATED)</em></li>
+<li>Handling hostile input without executing it is the design and is visible in the code; that it is robust against a determined adversary is not established, and no claim here says so. <em>(CONFIRMED)</em></li>
+</ul>
+<h2 id="components-that-parse-input-they-do-not-control">Components that parse input they do not control</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Consumes</th>
+<th>Guard found</th>
+<th>Remaining gap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qvault/fingerprints.py</code></td>
+<td>firmware bytes and indicator text</td>
+<td>text-derived grade capped at INFERRED (<code>MAX_TEXT_GRADE</code>)</td>
+<td>Matching is linear per indicator; an indicator set large enough to be quadratic on a hostile image is not bounded or measured.</td>
+</tr>
+<tr>
+<td><code>qvault/fwdiff.py</code></td>
+<td>two firmware images, arbitrary bytes</td>
+<td>explicit caps: MAX_FILES 4096, MAX_SECTIONS 96, MAX_PE_CANDIDATES 4</td>
+<td>Caps bound the count of structures, not the cost of comparing two near-identical large images inside those caps.</td>
+</tr>
+<tr>
+<td><code>qvault/ingest.py</code></td>
+<td>evidence blobs from an operator or an acquisition</td>
+<td>none observed: hashing and metadata capture; bounds come from the caller</td>
+<td>No independent size ceiling here, so a caller that streams an unbounded blob is trusted not to. That is an assumption, not a check.</td>
+</tr>
+<tr>
+<td><code>qvault/store.py</code></td>
+<td>on-disk store files, writable by anyone who reaches the volume</td>
+<td>refuses a second open for writing; unrecognised enum values refused, not defaulted</td>
+<td>The store trusts file permissions (seal 0400) plus the audit chain. A writer with the volume mounted can replace a file; detection is the chain's job, not the store's.</td>
+</tr>
+<tr>
+<td><code>qvault/audit.py</code></td>
+<td>audit log entries, attacker-writable between runs</td>
+<td>hash chain plus checkpoint verification, so deletion mid-chain fails verification</td>
+<td>Truncation at the head is detected only against a checkpoint held elsewhere; if both are replaced, the shorter chain verifies as valid.</td>
+</tr>
+<tr>
+<td><code>qvault/provenance.py</code></td>
+<td>manifests and vendored-source trees</td>
+<td><code>hmac.compare_digest</code> for secret-derived comparisons</td>
+<td>A modified vendored tree is caught only if its pinned hash is checked, and the pin is data in the same repository it is meant to protect.</td>
+</tr>
+<tr>
+<td><code>qvault/retrieve.py</code></td>
+<td>object identifiers from a caller</td>
+<td><code>hmac.compare_digest</code> on identifier comparison</td>
+<td>Comparison is constant-time; the surrounding lookup is not, so the guarantee is about one comparison, not about the operation.</td>
+</tr>
+<tr>
+<td><code>qvault/keys.py</code></td>
+<td>key material and identifiers</td>
+<td>none observed at this layer beyond storage; comparisons are delegated</td>
+<td>Key lifetime and zeroisation are not enforced by the language. Python strings are immutable, so a key in memory is presumed present until the process exits.</td>
+</tr>
+<tr>
+<td><code>qvault/crypto.py</code></td>
+<td>sealed ciphertext, which an attacker may control</td>
+<td>AES-256-GCM: authentication is checked before plaintext is used</td>
+<td>No adversarial test of chunk framing or truncation; the framing assumptions are covered by unit tests written from the same model as the implementation.</td>
+</tr>
+<tr>
+<td><code>qvault/triage.py</code></td>
+<td>bytes from the vendored zbtriage engine</td>
+<td>vendored at a pinned revision; high-frequency indicator counting fixed after an undercount defect</td>
+<td>Third-party code is trusted at its pin. Its upstream changes are audited by hand, and that audit is not automated.</td>
+</tr>
+<tr>
+<td><code>qvault/wild.py</code></td>
+<td>the in-the-wild dataset (pinned snapshot)</td>
+<td>pinned snapshot; entries are metadata, not samples</td>
+<td>Parsed as trusted because it is vendored. If the snapshot is regenerated, nothing re-validates its schema.</td>
+</tr>
+<tr>
+<td><code>qvault/netobs.py</code></td>
+<td>LAN telemetry: device records, flow metadata, discovery output</td>
+<td>BSSID treated as context, never as a key or identity</td>
+<td>Records are supplied by an agent on a network the adversary may control, so identity claims are corroborated at best.</td>
+</tr>
+</tbody>
+</table>
+<p>12 registered components. A test fails if a module takes <code>bytes</code> or parses JSON and is missing from this table, so the register stays complete as the code grows.</p>
+<h2 id="what-a-reader-should-do-with-it">What a reader should do with it</h2>
+<p>Run this on a machine you can rebuild. Treat the evidence store as data written by an adversary, because a bootkit that knows it is being collected will try to write it. Neither of those is a paranoid reading of the code; both follow from the rows above.</p>
+<h2 id="what-this-page-does-not-claim">What this page does not claim</h2>
+<p>It does not claim the parsers are safe, bounded, or audited by anyone other than this project. It claims that each component consuming untrusted input is named, that its guard is described at the level it was verified, and that its gap is written down rather than left for a reader to discover during an incident.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>
