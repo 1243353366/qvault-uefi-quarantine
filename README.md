@@ -2,9 +2,9 @@
 
 [![ci](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg)](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml)
 
-CI runs the suite this README describes: tests on 3.11 and 3.12, all sixteen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
+CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.7** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.8** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -12,6 +12,15 @@ CI runs the suite this README describes: tests on 3.11 and 3.12, all sixteen gat
 > [`report/THREAT_MODEL_REVIEW.md`](report/THREAT_MODEL_REVIEW.md); the four rated
 > High each reduce dual control or tamper-evident audit from a property to a claim.
 > Use it on synthetic fixtures, not on live samples.
+
+> **What went wrong on the way here.** This README declared CI before the workflow had ever
+> run: the token lacked the `workflow` scope, the file never pushed, and the badge was removed
+> until the claim was true. The first real run was red, on a dependency every local
+> environment already had. v0.13.3 shipped with its tag one commit behind `main`. v0.13.6
+> shipped three cross-page links that resolve on the built site and 404 in the repository.
+> Each is fixed, each fix is now a check rather than a resolution, and each is graded in
+> [`report/DEFECT_LOG.md`](report/DEFECT_LOG.md). Five of the six defects were on a phase
+> boundary, which is why the local gates were all passing while the releases were not.
 
 Reference implementation of the defensive architecture described in
 [`report/UEFI_Malware_Deep_Dive_Report.md`](report/UEFI_Malware_Deep_Dive_Report.md).
@@ -62,6 +71,9 @@ validation.
 - [`report/DENIAL_MODEL.md`](report/DENIAL_MODEL.md) — the three ways to deny an attacker
 - [`report/SECURITY_REPORT.md`](report/SECURITY_REPORT.md) — the point-in-time report
   for this release: what is enforced, the claims census including the unverified ones,
+- [`report/DEFECT_LOG.md`](report/DEFECT_LOG.md) — six of this project's own
+  defects, how each was found, what fixed it, what it bought and what it cost,
+  graded like any other claim
   and six open findings with the observation that would close each
   (access, capability, execution), each with its non-claims and the condition under
   which the denial ends; no denial claim reaches CONFIRMED

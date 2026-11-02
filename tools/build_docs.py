@@ -39,6 +39,7 @@ PAGES = [
      "Acquisition and analysis", "Assurance"),
     ("report/LAN_LAYER.md", "lan-layer.html", "LAN containment", "Controls"),
     ("report/NETOBS_MODULE.md", "netobs.html", "Network observation", "Controls"),
+    ("report/DEFECT_LOG.md", "defect-log.html", "Defect log", "Research"),
     ("report/DENIAL_MODEL.md", "denial-model.html", "Denial model", "Controls"),
     ("report/TRUST_MODEL.md", "trust-model.html", "Trust model", "Assurance"),
     ("report/THREAT_MODEL_REVIEW.md", "threat-model-review.html",
