@@ -98,3 +98,16 @@ def test_every_published_page_is_navigable_from_every_page():
         html = path.read_text()
         for _src, slug, _title, _section in build_docs.PAGES:
             assert f'href="{slug}"' in html, f"{path.name} does not link to {slug}"
+
+
+def test_the_everything_page_lists_every_published_page():
+    """A page that exists but is not listed on the index is a page nobody finds."""
+    import importlib
+    gen = importlib.import_module("gen_everything")
+    text = (Path(__file__).resolve().parents[2] / "report" / "EVERYTHING.md").read_text()
+    for source, slug, title, section in build_docs.PAGES:
+        if source == gen.SELF:
+            continue
+        url = f"{build_docs.SITE}/" if slug == "index.html" else f"{build_docs.SITE}/{slug[:-5]}"
+        assert f"[{title}]({url})" in text, f"{title} ({slug}) is published but not listed on the index"
+        assert f"`{source}`" in text, f"{source} is published but its source path is not listed"

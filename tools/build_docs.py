@@ -66,6 +66,7 @@ EXTENSIONS = ["tables", "fenced_code", "toc", "sane_lists", "attr_list"]
 
 PAGES = [
     ("README.md", "index.html", "Overview", "Overview"),
+    ("report/EVERYTHING.md", "everything.html", "Everything, linked", "Overview"),
     ("report/UEFI_Malware_Deep_Dive_Report.md", "deep-dive.html",
      "UEFI malware deep dive", "Research"),
     ("report/IN_THE_WILD.md", "in-the-wild.html",

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Everything, linked · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.18.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li><li><a href="everything.html" class="current">Everything, linked</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Response</p><ul><li><a href="endpoint-response.html">Endpoint response: crushing a keylogger</a></li></ul><p class="nav-section">Design</p><ul><li><a href="at-rest.html">Records sealed at rest</a></li><li><a href="cdup.html">CDUP: data usability protection</a></li></ul><p class="nav-section">Analysis</p><ul><li><a href="input-capture.html">Input capture: four tiers</a></li><li><a href="threatintel.html">Threat intelligence and disruption</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-policy.html">Security policy</a></li><li><a href="provenance.html">Provenance and verification</a></li><li><a href="contributing.html">Contributing</a></li><li><a href="tooling-risk.html">Tooling risk</a></li><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="everything-linked">Everything, linked</h1>
+<p>Every page this project publishes, in one place. The list is generated from the same table
+<code>tools/build_docs.py</code> publishes from, so a page that exists is a page that appears here, and a
+test fails if that stops being true.</p>
+<p>33 pages in 8 sections, built from the sources in this repository.
+Nothing on the site is written twice: each page is rendered from the Markdown file named beside it.</p>
+<h2 id="overview">Overview</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/">Overview</a></td>
+<td><code>README.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="research">Research</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/deep-dive">UEFI malware deep dive</a></td>
+<td><code>report/UEFI_Malware_Deep_Dive_Report.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/in-the-wild">Zero-days in the wild</a></td>
+<td><code>report/IN_THE_WILD.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix">Behaviour to control</a></td>
+<td><code>report/THREAT_BEHAVIOR_MATRIX.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map">Telemetry map</a></td>
+<td><code>report/TELEMETRY_MAP.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/fingerprints">Family fingerprints</a></td>
+<td><code>report/FINGERPRINTS.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/defect-log">Defect log</a></td>
+<td><code>report/DEFECT_LOG.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="response">Response</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response">Endpoint response: crushing a keylogger</a></td>
+<td><code>report/ENDPOINT_RESPONSE.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="design">Design</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/at-rest">Records sealed at rest</a></td>
+<td><code>report/AT_REST.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/cdup">CDUP: data usability protection</a></td>
+<td><code>report/CDUP.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="analysis">Analysis</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/input-capture">Input capture: four tiers</a></td>
+<td><code>report/INPUT_CAPTURE.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/threatintel">Threat intelligence and disruption</a></td>
+<td><code>report/THREAT_INTEL.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="controls">Controls</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/persistence">Persistence detection</a></td>
+<td><code>report/PERSISTENCE.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/lan-layer">LAN containment</a></td>
+<td><code>report/LAN_LAYER.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/netobs">Network observation</a></td>
+<td><code>report/NETOBS_MODULE.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/denial-model">Denial model</a></td>
+<td><code>report/DENIAL_MODEL.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="assurance">Assurance</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/security-policy">Security policy</a></td>
+<td><code>SECURITY.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/provenance">Provenance and verification</a></td>
+<td><code>PROVENANCE.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/contributing">Contributing</a></td>
+<td><code>CONTRIBUTING.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/tooling-risk">Tooling risk</a></td>
+<td><code>report/TOOLING_RISK.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/security-report">Security report</a></td>
+<td><code>report/SECURITY_REPORT.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/acquisition">Acquisition and analysis</a></td>
+<td><code>report/ACQUISITION_AND_ANALYSIS.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/trust-model">Trust model</a></td>
+<td><code>report/TRUST_MODEL.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/threat-model-review">Threat model review</a></td>
+<td><code>report/THREAT_MODEL_REVIEW.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/limitations">Architectural limitations</a></td>
+<td><code>report/ARCHITECTURAL_LIMITATIONS.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/capability-map">Capability map</a></td>
+<td><code>report/CAPABILITY_MAP.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/evidence-policy">Evidence policy</a></td>
+<td><code>report/EVIDENCE_POLICY.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/operating-model">Operating model</a></td>
+<td><code>report/OPERATING_MODEL.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/reproduce">Reproduce the results</a></td>
+<td><code>report/REPRODUCE.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/hardware-questions">Hardware test backlog</a></td>
+<td><code>report/HARDWARE_TEST_QUESTIONS.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="sources">Sources</h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/citations">Citations</a></td>
+<td><code>CITATIONS.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/contributors">Contributors</a></td>
+<td><code>CONTRIBUTORS.md</code></td>
+</tr>
+<tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/changelog">Changelog</a></td>
+<td><code>CHANGELOG.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="artefacts-that-are-not-pages">Artefacts that are not pages</h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source repository</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine">https://github.com/1243353366/qvault-uefi-quarantine</a></td>
+</tr>
+<tr>
+<td>Release 0.18.0</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine/releases/tag/v0.18.0">https://github.com/1243353366/qvault-uefi-quarantine/releases/tag/v0.18.0</a></td>
+</tr>
+<tr>
+<td>What changed, and when</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine/commits/main">https://github.com/1243353366/qvault-uefi-quarantine/commits/main</a></td>
+</tr>
+<tr>
+<td>Every claim with its grade and source</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/report/CLAIMS_LEDGER.csv">https://github.com/1243353366/qvault-uefi-quarantine/blob/main/report/CLAIMS_LEDGER.csv</a></td>
+</tr>
+<tr>
+<td>Endpoint response tools</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine/tree/main/response">https://github.com/1243353366/qvault-uefi-quarantine/tree/main/response</a></td>
+</tr>
+<tr>
+<td>Sitemap</td>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/sitemap.xml">https://1243353366.github.io/qvault-uefi-quarantine/sitemap.xml</a></td>
+</tr>
+<tr>
+<td>Workflow runs, as GitHub reports them</td>
+<td><a href="https://github.com/1243353366/qvault-uefi-quarantine/actions">https://github.com/1243353366/qvault-uefi-quarantine/actions</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="reading-this-site-without-trusting-it">Reading this site without trusting it</h2>
+<p>The site is a build product. <code>tools/build_docs.py</code> renders it from the Markdown in the repository,
+a gate fails the push if the published HTML is stale against those sources, and a second gate
+fails if any claim lacks a source or a grade. Where a page and the code disagree, the code is
+what runs, and the disagreement is a defect worth reporting.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>
