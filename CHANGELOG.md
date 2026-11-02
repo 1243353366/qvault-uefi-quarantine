@@ -55,6 +55,22 @@ correctly refused, hence the demo case stays local.
 
 Nineteen tests, plus a CLI that exits 2 and says "refused" rather than writing a defective document.
 
+### Added - input capture graded by observation point
+
+`qvault/inputcapture.py` classifies collection mechanisms into four tiers - application, OS,
+privileged, external - and keeps **severity on a separate axis**, because a level 1 session thief
+routinely costs more than a level 3 keylogger. Level 4 is listed and marked unobservable from the
+host rather than omitted; confirming it needs external instrumentation.
+
+Corroboration requires two distinct telemetry planes; three signals from one plane are one
+observation. Every innocent explanation recorded for these signals (accessibility tools, keyboard
+utilities, remote support, vendor input drivers) must be excluded on the record before corroboration.
+`CONFIRMED` is unreachable, and an empty case is `UNKNOWN` with a caveat, never clean.
+
+Bug found by a test: the case grade was computed with `min` over grade ranks, which returned the
+**strongest** technique - a case with one corroborated and one inferred finding reported
+CORROBORATED overall. Now the weakest, as it must be.
+
 ## [0.13.12] - 2026-11-02
 
 ### Fixed - the two riskiest rows, hardened and re-graded
