@@ -20,6 +20,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G14 internal links     every link in the published site resolves
   G15 residency taxonomy substrate per family, and no document merges them
   G16 table alignment     columns line up in the source, not only when rendered
+  G17 denial model        every posture keeps its non-claims; no denial reaches CONFIRMED
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -302,6 +303,36 @@ def g16_table_alignment() -> tuple[bool, str]:
     return True, f"{total} table rows aligned across {len(list((ROOT / 'report').glob('*.md'))) + 1} documents"
 
 
+def g17_denial_model() -> tuple[bool, str]:
+    """Every posture keeps its non-claims, and no denial claim reaches CONFIRMED."""
+    from qvault import denial as D, findings as F
+
+    D.assert_complete()
+    sys.path.insert(0, str(ROOT / "tools"))
+    import tables  # noqa: PLC0415
+    import gen_denial_model  # noqa: PLC0415
+
+    for posture in D.POSTURES:
+        for plane in D.PLANES:
+            if plane not in posture.admissible_planes:
+                continue
+            for evidence in range(0, 6):
+                for enforced in (True, False):
+                    grade = D.assess(posture.name, plane=plane,
+                                     corroborating_evidence=evidence,
+                                     enforced_by_target=enforced)["grade"]
+                    if grade == F.CONFIRMED:
+                        return False, f"{posture.name} on {plane} reaches CONFIRMED"
+
+    on_disk = (ROOT / "report" / "DENIAL_MODEL.md").read_text()
+    if on_disk != tables.align(gen_denial_model.render()):
+        return False, "report/DENIAL_MODEL.md is stale; run tools/gen_denial_model.py"
+    for posture in D.POSTURES:
+        if f"`{posture.name}`" not in on_disk:
+            return False, f"{posture.name} is missing from the rendered model"
+    return True, f"{len(D.POSTURES)} postures, {len(D.PLANES)} planes, no CONFIRMED denial claim"
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -319,6 +350,7 @@ GATES = (
     ("G14", "internal links", g14_internal_links),
     ("G15", "residency taxonomy", g15_residency),
     ("G16", "table alignment", g16_table_alignment),
+    ("G17", "denial model", g17_denial_model),
 )
 
 

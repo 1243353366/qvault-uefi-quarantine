@@ -9,6 +9,34 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.5] - 2026-11-02
+
+### Added - the denial model, with the failures included
+
+Three postures, kept apart because they fail differently: `deny_access` (the payload is
+unusable), `deny_capability` (the code cannot reach what it needs), `deny_execution` (the code
+exists but cannot start). `qvault/denial.py` and the generated
+`report/DENIAL_MODEL.md`.
+
+Each posture carries what it does **not** do, which is the useful half:
+
+- encryption denies access only while the key is withheld, and ends the moment the key returns
+  inside the attacker's reach; a key copied before encryption was never denied at all, and a
+  bootkit in SPI flash needs no payload to decrypt
+- isolation removes only what is on our enumeration, and a quiet implant on an isolated host is
+  quieter rather than absent
+- an allow list denies execution only where the verification root is outside the code being
+  verified; a signed-but-hostile component passes by construction, and a revocation nobody shipped
+  denies nothing
+
+Grade arithmetic: the enforcement plane sets the ceiling (hardware, external key, out of band and
+applied revocation reach CORROBORATED; in-band policy caps at INFERRED; no plane at all is
+UNKNOWN), and **no denial claim reaches CONFIRMED**, because inability is inferred from the absence
+of a success and absence of evidence is not evidence. Gate G17 refuses a plane that claims
+CONFIRMED and refuses a posture that has lost its non-claims.
+
+23 tests in `qvault/tests/test_denial.py`. 814 tests, seventeen gates.
+
 ## [0.13.4] - 2026-11-02
 
 ### Added - a way to ask whether the release, the remote and the site agree

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Denial model · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.5 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html" class="current">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="denial-model-three-postures-and-the-conditions-that-end-them">Denial model: three postures and the conditions that end them</h1>
+<p>Three ways to deny an attacker, kept apart because they fail differently. Each one is a
+statement about an adversary's <em>inability</em>, and inability is the hardest claim to establish
+from inside the system being attacked. So each posture carries its non-claims and the
+condition under which the denial ends.</p>
+<blockquote>
+<p>These are not detections and not verdicts. A posture is a control. This page grades the
+claim that the control is holding, and records what it cannot do. The verdict engine
+remains single-owner; nothing here decides whether a host is compromised.</p>
+</blockquote>
+<h2 id="the-three-postures">The three postures</h2>
+<table>
+<thead>
+<tr>
+<th>Posture</th>
+<th>Denies</th>
+<th>Load-bearing control</th>
+<th>Ceiling</th>
+<th>Availability cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deny_access</code></td>
+<td>the payload is usable: the bytes are there, the key is not</td>
+<td>key custody, plus the proof that the key never lived beside the ciphertext</td>
+<td>CORROBORATED</td>
+<td>lose the key and the evidence or the data is gone; this is the one posture whose failure mode is unrecoverable by design</td>
+</tr>
+<tr>
+<td><code>deny_capability</code></td>
+<td>the code reaches what it needs: execution, communication, persistence</td>
+<td>the completeness of the resource enumeration, which is ours and not the attacker's</td>
+<td>CORROBORATED</td>
+<td>reduced observability: the same boundary that starves the malware also starves the telemetry that would have caught it</td>
+</tr>
+<tr>
+<td><code>deny_execution</code></td>
+<td>the code starts: on disk, unverified, and unable to run</td>
+<td>the verification root being outside the control of the code being verified</td>
+<td>CORROBORATED</td>
+<td>a wrong allow list or a bad revocation update bricks the machine; the denial is only as good as the update pipeline behind it</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deny_access"><code>deny_access</code></h2>
+<p><strong>Denies.</strong> the payload is usable: the bytes are there, the key is not.</p>
+<p><strong>Load-bearing.</strong> key custody, plus the proof that the key never lived beside the ciphertext.</p>
+<p><strong>Stops:</strong></p>
+<ul>
+<li>a payload encrypted before an attacker arrived being read afterwards</li>
+<li>exfiltration of the ciphertext turning into execution, while the key is withheld</li>
+<li>an analyst or an automated tool decrypting evidence without quorum</li>
+</ul>
+<p><strong>Does not stop:</strong></p>
+<ul>
+<li>a key that was already copied while it was available</li>
+<li>plaintext an attacker kept before encryption happened</li>
+<li>an implant that never needed the payload: a bootkit in SPI flash is not encrypted</li>
+<li>the attacker waiting: access is denied for a window, not for good</li>
+</ul>
+<p><strong>Denial ends when:</strong> the key becomes available inside the attacker's reach, at which point the payload is as readable as it was before.</p>
+<p><strong>Cost of being wrong:</strong> lose the key and the evidence or the data is gone; this is the one posture whose failure mode is unrecoverable by design.</p>
+<h2 id="deny_capability"><code>deny_capability</code></h2>
+<p><strong>Denies.</strong> the code reaches what it needs: execution, communication, persistence.</p>
+<p><strong>Load-bearing.</strong> the completeness of the resource enumeration, which is ours and not the attacker's.</p>
+<p><strong>Stops:</strong></p>
+<ul>
+<li>a driver talking to a device it is no longer on the same bus as</li>
+<li>an implant beaconing out of a host with no route, or a port that is down</li>
+<li>persistence across reboot when the write target is protected below the OS</li>
+</ul>
+<p><strong>Does not stop:</strong></p>
+<ul>
+<li>a capability we did not think of; isolation only removes what is on our list</li>
+<li>code that still runs and adapts inside the reduced space</li>
+<li>an attacker who moves to a host that is not isolated</li>
+<li>detection: a quiet implant on an isolated host is quieter, not absent</li>
+</ul>
+<p><strong>Denial ends when:</strong> the isolation is lifted, or the attacker finds a path that was never in the enumeration, and the capability returns without any alarm having fired.</p>
+<p><strong>Cost of being wrong:</strong> reduced observability: the same boundary that starves the malware also starves the telemetry that would have caught it.</p>
+<h2 id="deny_execution"><code>deny_execution</code></h2>
+<p><strong>Denies.</strong> the code starts: on disk, unverified, and unable to run.</p>
+<p><strong>Load-bearing.</strong> the verification root being outside the control of the code being verified.</p>
+<p><strong>Stops:</strong></p>
+<ul>
+<li>an unsigned or revoked boot component on a chain anchored in hardware</li>
+<li>a userland binary outside the allow list, where the kernel enforcing it is itself trusted</li>
+<li>a bootkit whose revocation has actually been applied</li>
+</ul>
+<p><strong>Does not stop:</strong></p>
+<ul>
+<li>code verified on a chain the attacker controls below the verifier</li>
+<li>a signed component that is legitimately signed and malicious, which verification cannot see by construction</li>
+<li>a revocation nobody shipped: an unapplied dbx denies nothing</li>
+<li>anything already running before verification was enabled</li>
+</ul>
+<p><strong>Denial ends when:</strong> the verifier's root is compromised, or the allow list is stale against a signed-but-hostile component, and execution is permitted by policy.</p>
+<p><strong>Cost of being wrong:</strong> a wrong allow list or a bad revocation update bricks the machine; the denial is only as good as the update pipeline behind it.</p>
+<h2 id="what-each-enforcement-plane-can-support">What each enforcement plane can support</h2>
+<p>A control is only as strong as the plane it sits on. A plane inside the thing being
+attacked is a preference, not an enforcement.</p>
+<table>
+<thead>
+<tr>
+<th>Plane</th>
+<th>Ceiling</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hardware</code></td>
+<td>CORROBORATED</td>
+<td>the host cannot rewrite it without physical access</td>
+</tr>
+<tr>
+<td><code>external_key</code></td>
+<td>CORROBORATED</td>
+<td>the key is outside the host's trust domain, so a host compromise is not a key compromise</td>
+</tr>
+<tr>
+<td><code>out_of_band</code></td>
+<td>CORROBORATED</td>
+<td>a different machine or a port the host cannot reprogram</td>
+</tr>
+<tr>
+<td><code>supply_chain</code></td>
+<td>CORROBORATED</td>
+<td>a signed revocation that has actually been applied</td>
+</tr>
+<tr>
+<td><code>in_band</code></td>
+<td>INFERRED</td>
+<td>policy running on the host it constrains, so compromising the host compromises the control</td>
+</tr>
+<tr>
+<td><code>absent</code></td>
+<td>UNKNOWN</td>
+<td>asserted with nothing behind it</td>
+</tr>
+</tbody>
+</table>
+<p>No plane reaches CONFIRMED, and the gate refuses one that tries. CONFIRMED is for
+things present in the evidence; "the attacker could not" is inferred from the
+absence of a success, and absence of evidence is what this project refuses to
+promote. The strongest a denial claim gets is CORROBORATED.</p>
+<h2 id="three-postures-one-mistake">Three postures, one mistake</h2>
+<table>
+<thead>
+<tr>
+<th>Combination</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>deny_access + deny_execution on the same plane</td>
+<td>collapses into one control: a key held by the same authority that signs the allow list is one compromise away from both</td>
+</tr>
+<tr>
+<td>deny_capability + deny_execution across planes</td>
+<td>independent: starvation is enforced on the network, execution on the boot chain, so one compromise does not lift the other</td>
+</tr>
+<tr>
+<td>all three on the target OS</td>
+<td>none of them hold against a kernel-level compromise; they describe a machine that is still trusted, which is the assumption a bootkit removes</td>
+</tr>
+</tbody>
+</table>
+<p>The independence test is the plane, not the label. Three denials enforced by one
+authority are one denial: a key held by the same service that signs the allow list
+is a single compromise away from both.</p>
+<h2 id="worked-against-the-three-families">Worked against the three families</h2>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Posture that applies</th>
+<th>Plane</th>
+<th>Grade</th>
+<th>What it does not give you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LoJax</td>
+<td><code>deny_capability</code> (SPI write protection), then <code>deny_execution</code></td>
+<td>hardware</td>
+<td>CORROBORATED</td>
+<td>an implant already in flash keeps booting: protection stops the write, not the resident</td>
+</tr>
+<tr>
+<td>MoonBounce</td>
+<td><code>deny_capability</code> on the flash descriptor, <code>deny_access</code> for the collected image</td>
+<td>hardware, external_key</td>
+<td>CORROBORATED</td>
+<td>the dump is only as good as the programmer that read it, and an encrypted archive is not a trusted one</td>
+</tr>
+<tr>
+<td>BlackLotus</td>
+<td><code>deny_execution</code> by revocation</td>
+<td>supply_chain</td>
+<td>INFERRED until the revocation is actually applied, CORROBORATED after</td>
+<td>a signed-but-later-revoked bootloader still runs on every machine that never applied the update</td>
+</tr>
+</tbody>
+</table>
+<p>BlackLotus is where the supply-chain plane is easiest to mistake for a hardware one. The
+control is real, but it lives in an update pipeline: the denial holds on the machines
+that shipped the revocation and nowhere else. That is why the grade depends on
+application, not on the advisory existing.</p>
+<h2 id="what-all-three-share">What all three share</h2>
+<p>Every posture above assumes something below it is intact. Deny execution assumes the
+verifier's root is trusted; deny capability assumes the enumeration of what the code
+needs is complete; deny access assumes the key was never where the payload was. A
+bootkit voids the in-band versions of all three at once, which is the same limit the
+architectural limitations page records as A1 and A5.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>
