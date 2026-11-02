@@ -275,11 +275,19 @@ def cmd_authz(args) -> None:
         bundle = json.load(fh)
     with open(args.keys, "r", encoding="utf-8") as fh:
         keys = json.load(fh)
+    anchors = []
+    for path in args.anchor:
+        with open(path, "r", encoding="utf-8") as fh:
+            anchors.append(fh.read())
+    policy = ({"selection": args.pcr_selection, "expected_digest": args.pcr_expected}
+              if args.pcr_selection and args.pcr_expected else None)
     out = authz.verify_bundle(
         bundle,
         root_public_hex=args.root,
         public_keys=keys,
-        attested_executors=[x for x in args.attested.split(",") if x],
+        anchor_pems=anchors,
+        attestation_nonce=args.attestation_nonce,
+        pcr_policy=policy,
         observed_plaintext_sha256=args.plaintext_sha256,
         used_nonces=authz.NonceStore(args.nonces) if args.nonces else None,
     )
@@ -375,8 +383,10 @@ def build_parser() -> argparse.ArgumentParser:
     az.add_argument("--root", required=True, help="hex Ed25519 public key of the policy root")
     az.add_argument("--keys", required=True, help="JSON mapping fingerprint -> hex public key")
     az.add_argument("--plaintext-sha256", help="sha256 of the bytes you actually received")
-    az.add_argument("--attested", default="", help="comma-separated executor fingerprints confirmed "
-                                                   "out of band")
+    az.add_argument("--anchor", action="append", default=[], help="PEM trust anchor; repeatable")
+    az.add_argument("--attestation-nonce", default="", help="nonce this verifier issued")
+    az.add_argument("--pcr-selection", help="e.g. sha256:0,1,2,7")
+    az.add_argument("--pcr-expected", help="expected digest over the selected PCRs")
     az.add_argument("--nonces", help="nonce store file, to refuse replays across runs")
     az.set_defaults(func=cmd_authz)
     cp = sub.add_parser("checkpoint", help="sign the current audit head")

@@ -29,6 +29,30 @@ host that answers whatever asks is an envelope, not a boundary.
 
 Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
 =======
+## [0.18.0] - 2026-11-02
+
+### Changed - execution demands attestation evidence, not a fingerprint list
+
+`attested_executors` was the verifier asserting its own conclusion: a set of fingerprints written down
+and taken as proof. It is gone. Execution now requires a quote over the receipt's digest, verified
+against a certificate chain that terminates at a verifier-supplied anchor, carrying a nonce the
+verifier issued, inside a freshness window, and matching a PCR policy the verifier measured itself.
+
+`qvault/attestation.py` performs those checks and refuses any subset of them: a self-signed key under
+no anchor, a leaf marked CA, a chain whose links do not verify, an expired certificate, a replayed
+nonce, a quote generated too long ago, evidence bound to a different receipt, and measurements that do
+not match the policy each produce their own refusal. Absent evidence is `HYPOTHESIS`; a bare quote with
+no measurement policy is `REFUSED`, because it pins a key rather than a platform.
+
+Stated limit: no TPM2 structure is parsed, so the endorsement binding lives in the anchor set, and
+revocation is not checked.
+
+Two defects found while building. `AttestationEvidence.sign` assumed Ed25519 and crashed on an EC
+attestation key, which is what an endorsement CA actually issues. And the early-return verdicts of
+`verify_attestation` omitted `failed_checks`, so a refusal raised `KeyError` in the reporting path
+instead of reporting: found by running the CLI, not by the unit tests, which is the second time in two
+releases that the command-line path caught what the suite did not.
+
 ## [0.17.0] - 2026-11-02
 
 ### Added - authorization split into four separately verifiable elements

@@ -20,10 +20,11 @@ Each element is computed independently and none short-circuits the others, becau
 hides which element failed and lets a broken authority check masquerade as a broken identity.
 
 Grades follow the project's vocabulary. Identity, authority and intent reach CONFIRMED when their
-signatures verify. Execution reaches CONFIRMED only when the executing key is in a set the verifier
-learned out of band; otherwise it is HYPOTHESIS, because a host that lies about what it did can also
-lie about its own receipt. Without that out-of-band witness this module cannot distinguish an operator
-from compromised infrastructure, and says so instead of implying otherwise.
+signatures verify. Execution reaches CONFIRMED only against `qvault/attestation.py`: a quote over this
+receipt's digest, under a PCR policy the verifier supplied, carrying a nonce the verifier issued, signed
+by a key that chains to an anchor. A fingerprint allowlist used to pass for that, which was the
+verifier asserting its own conclusion; evidence that is offered and does not hold is now a REFUSED
+rather than a downgrade.
 """
 from __future__ import annotations
 
@@ -257,6 +258,11 @@ class Receipt:
             "produced_at": self.produced_at,
         }
 
+    @property
+    def digest(self) -> str:
+        """What attestation evidence binds to, so a quote cannot be moved between executions."""
+        return hashlib.sha256(_msg("receipt", _canon(self.payload()))).hexdigest()
+
     def sign(self, private: Ed25519PrivateKey) -> "Receipt":
         draft = replace(self, executor=fingerprint(private.public_key()))
         return replace(draft, signature=private.sign(_msg("receipt", _canon(draft.payload()))).hex())
@@ -316,7 +322,10 @@ def verify_authorization(
     keys: Mapping[str, Ed25519PublicKey],
     receipt: Receipt | None = None,
     used_nonces: NonceStore | None = None,
-    attested_executors: Sequence[str] = (),
+    attestation: "AttestationEvidence | None" = None,
+    attestation_anchors: Sequence = (),
+    attestation_nonce: str = "",
+    pcr_policy: "PcrPolicy | None" = None,
     observed_plaintext_sha256: str | None = None,
     now: datetime | None = None,
 ) -> dict:
@@ -446,16 +455,33 @@ def verify_authorization(
                 contradicted = True
         else:
             reasons.append("no observed plaintext hash supplied: the receipt is the only account")
-        attested = receipt.executor in attested_executors
-        reasons.append("executing key was confirmed out of band" if attested
-                       else "executing key is not attested out of band: the host's own claim")
         ok = sig_ok and bound_intent and bound_object and well_formed and not contradicted
         if not ok:
             verdicts["execution"] = _verdict("REFUSED", reasons)
-        elif attested and receipt.attestation != "none" and observed_plaintext_sha256 is not None:
-            verdicts["execution"] = _verdict("CONFIRMED", reasons)
+        elif observed_plaintext_sha256 is None:
+            verdicts["execution"] = _verdict(
+                "HYPOTHESIS", reasons + ["no bytes to check: the receipt is unverified, not falsified"])
         else:
-            verdicts["execution"] = _verdict("HYPOTHESIS", reasons)
+            # A fingerprint list is not evidence. What is demanded is a quote over this receipt, under a
+            # measurement policy, with a nonce this verifier issued, from a key that chains to an anchor.
+            from .attestation import verify_attestation
+            quote = verify_attestation(
+                attestation,
+                receipt_digest=receipt.digest,
+                expected_nonce=attestation_nonce,
+                anchors=list(attestation_anchors),
+                pcr_policy=pcr_policy,
+                now=moment,
+            )
+            reasons.extend(f"attestation: {r}" for r in quote["reasons"])
+            if quote["grade"] == "CONFIRMED":
+                verdicts["execution"] = _verdict("CONFIRMED", reasons, ak_name=quote["ak_name"])
+            elif attestation is None and not attestation_anchors and not attestation_nonce:
+                verdicts["execution"] = _verdict("HYPOTHESIS", reasons)
+            else:
+                # Evidence was presented and did not hold. That is a refutation, not a gap.
+                verdicts["execution"] = _verdict("REFUSED", reasons,
+                                                 failed_checks=quote.get("failed_checks", []))
 
     # A contradicted execution is a refusal like any other: the receipt named bytes that were not the
     # bytes. Only "not yet checked" is allowed to leave the run merely incomplete.
@@ -474,20 +500,23 @@ def verify_authorization(
 # ---------------------------------------------------------------- offline bundle
 
 def to_bundle(*, intent: Intent, approvals: Iterable[Approval], policy: AuthorityPolicy,
-              receipt: Receipt | None = None) -> dict:
+              receipt: Receipt | None = None, attestation=None) -> dict:
     return {
         "version": 1,
         "intent": intent.to_dict(),
         "approvals": [a.to_dict() for a in approvals],
         "policy": policy.to_dict(),
         "receipt": receipt.to_dict() if receipt else None,
+        "attestation": attestation.to_dict() if attestation else None,
     }
 
 
 def verify_bundle(bundle: Mapping, *,
                   root_public_hex: str,
                   public_keys: Mapping[str, str],
-                  attested_executors: Sequence[str] = (),
+                  anchor_pems: Sequence[str] = (),
+                  attestation_nonce: str = "",
+                  pcr_policy: Mapping | None = None,
                   observed_plaintext_sha256: str | None = None,
                   used_nonces: NonceStore | None = None,
                   now: datetime | None = None) -> dict:
@@ -501,9 +530,17 @@ def verify_bundle(bundle: Mapping, *,
         receipt = Receipt.from_dict(bundle["receipt"]) if bundle.get("receipt") else None
         keys = {fp: load_public(raw) for fp, raw in public_keys.items()}
         root = load_public(root_public_hex)
+        from .attestation import AttestationEvidence, PcrPolicy
+        from cryptography import x509
+        evidence = (AttestationEvidence.from_dict(bundle["attestation"])
+                    if bundle.get("attestation") else None)
+        anchors = [x509.load_pem_x509_certificate(pem.encode()) for pem in anchor_pems]
+        policy_pcr = PcrPolicy.from_dict(pcr_policy) if pcr_policy else None
     except (KeyError, TypeError, AuthorizationError, ValueError) as exc:
         return {"overall": "MALFORMED", "blocked_by": list(ELEMENTS), "error": str(exc), "elements": {}}
     return verify_authorization(intent=intent, approvals=approvals, policy=policy,
                                 policy_root_key=root, keys=keys, receipt=receipt,
-                                used_nonces=used_nonces, attested_executors=attested_executors,
+                                used_nonces=used_nonces, attestation=evidence,
+                                attestation_anchors=anchors, attestation_nonce=attestation_nonce,
+                                pcr_policy=policy_pcr,
                                 observed_plaintext_sha256=observed_plaintext_sha256, now=now)

@@ -1,6 +1,6 @@
 # Threat intelligence and adversary disruption
 
-Release **0.17.0**. Built on `feature/threatintel`, merged in this release.
+Release **0.18.0**. Built on `feature/threatintel`, merged in this release.
 
 Three questions, kept apart on purpose: **what software is operating** (the malware evidence graph), **what infrastructure it depends on**, and **how the operation finances itself**. They are separated because a wallet in a sample and a wallet in an advertisement support "related artefacts", not "this person runs that device", and a module that blurs the two produces confident nonsense.
 

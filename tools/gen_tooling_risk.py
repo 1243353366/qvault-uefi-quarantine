@@ -60,6 +60,18 @@ REGISTER = {
         gap="Both controls sit on the same volume. Rewriting the mark and the log together, or "
             "holding the signing key, defeats them; closing that needs an off-box anchor (RFC 3161, "
             "a transparency log, paper custody), which is deployment and not code."),
+    "attestation.py": dict(
+        consumes="X.509 certificate chains, attestation statements and quotes, from the party whose "
+                "execution is being audited",
+        guard="the chain must terminate at an anchor the verifier supplied; validity windows, CA and "
+              "leaf roles and each link signature are checked; the statement must carry a nonce the "
+              "verifier chose and the digest of this exact receipt, be inside a freshness window, and "
+              "match a PCR policy; the quote signature is verified with the key the chain yielded, "
+              "never the key the bundle names",
+        gap="No TPM2 structure is parsed, so a software key under an anchor you were misled into "
+            "trusting produces accepted evidence; there is no revocation checking (CRL or OCSP), so a "
+            "withdrawn attestation key stays valid for runs made before the withdrawal; and the cert "
+            "and statement parsing has not been fuzzed."),
     "authorization.py": dict(
         consumes="authorization bundles: intent, approvals, policy and receipt as JSON, from whoever "
                 "presents them",
@@ -71,7 +83,8 @@ REGISTER = {
         gap="Parsing itself is unbounded: a large members map or a huge approvals list is processed "
             "before any signature is examined, so a hostile bundle can spend CPU and memory. No "
             "fuzzing has been done on the JSON surface. A malformed bundle is reported as MALFORMED "
-            "rather than raised, which is a behaviour claim, not a hardening claim."),
+            "rather than raised, which is a behaviour claim, not a hardening claim. Execution depends "
+            "on attestation.py, which does not parse TPM2 structures and does not check revocation."),
     "provenance.py": dict(
         consumes="manifests and vendored-source trees",
         guard="`hmac.compare_digest` for secret-derived comparisons",

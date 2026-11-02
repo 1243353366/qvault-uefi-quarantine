@@ -4,7 +4,7 @@
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.17.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.18.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 [`SECURITY.md`](SECURITY.md) (report a vulnerability privately) · [`PROVENANCE.md`](PROVENANCE.md) (licence, verifying a release, what signing does not cover) · [`CONTRIBUTING.md`](CONTRIBUTING.md) (how a claim earns a grade)
 
@@ -436,18 +436,19 @@ boundary, because a name is not evidence. "Requester is not the approver" was a 
 anyone who could run the CLI could approve as `reviewer2`. Authority is now split into four elements,
 each carrying its own evidence and its own verdict, in `qvault/authorization.py`.
 
-| Element       | What it is bound to                                                                                 | What produces the verdict                                                                      | What makes it fail                                                            |
-| ------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Identity**  | An Ed25519 key fingerprint. A human name is an annotation on a fingerprint, never the proof itself. | Signature verification of the requester and of every approver.                                 | A signature relabelled as a different key; an unsigned request.               |
-| **Authority** | A policy document signed by a root key that never signs an approval itself.                         | Policy signature, capability grant, quorum, and requester not among approvers.                 | Tampered policy, expired policy, unentitled approver, self-approval.          |
-| **Intent**    | Object id, ciphertext hash, purpose, expiry and a single-use nonce, all inside the signed bytes.    | Digest equality per approval, plus a nonce store asked whether it is spent.                    | An approval for another object, a replay, an expired or future-dated request. |
-| **Execution** | The artefact, not the host's account of itself.                                                     | Receipt signature bound to the intent digest and object, against a hash the verifier computed. | A receipt naming bytes the verifier does not hold.                            |
+| Element       | What it is bound to                                                                                                                                                                                  | What produces the verdict                                                                                                   | What makes it fail                                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Identity**  | An Ed25519 key fingerprint. A human name is an annotation on a fingerprint, never the proof itself.                                                                                                  | Signature verification of the requester and of every approver.                                                              | A signature relabelled as a different key; an unsigned request.                                                       |
+| **Authority** | A policy document signed by a root key that never signs an approval itself.                                                                                                                          | Policy signature, capability grant, quorum, and requester not among approvers.                                              | Tampered policy, expired policy, unentitled approver, self-approval.                                                  |
+| **Intent**    | Object id, ciphertext hash, purpose, expiry and a single-use nonce, all inside the signed bytes.                                                                                                     | Digest equality per approval, plus a nonce store asked whether it is spent.                                                 | An approval for another object, a replay, an expired or future-dated request.                                         |
+| **Execution** | An artefact plus attestation evidence: a quote over this receipt's digest, under a PCR policy the verifier supplied, carrying a nonce the verifier issued, signed by a key that chains to an anchor. | Receipt signature against a hash the verifier computed, plus chain, freshness, binding, measurement and quote verification. | A receipt naming other bytes; an unsigned or unanchored quote; a mismatched or missing measurement; a replayed nonce. |
 
 Verification runs anywhere, from files:
 
 ```bash
-qvault authz bundle.json --root <hex> --keys keys.json \
-    --plaintext-sha256 <hash of the bytes you received> --attested <executor fingerprint>
+qvault authz bundle.json --root <hex> --keys keys.json --anchor vendor-root.pem \
+    --attestation-nonce <nonce you just issued> --pcr-selection sha256:0,1,2,7 \
+    --pcr-expected <digest you measured yourself> --plaintext-sha256 <hash of the bytes you received>
 ```
 
 Each element is computed independently and none short-circuits another, so a missing requester key
@@ -460,11 +461,14 @@ unchecked one, and the two are never collapsed.
 
 What this does not do. It makes authorization checkable; it does not prevent the action, and a host
 that never asks permission is still unconstrained. If the custodian's signing device is compromised,
-identity is compromised, which is the residual and is smaller than "anyone with a shell". `attested`
-means the verifier learned the executor's key through some other channel: no TPM quote is verified
-here. There is no revocation list, so a withdrawn custodian's old signature remains valid for a run
-that predates the withdrawal. And if you read the bundle from the compromised host, you are trusting it
-to tell you what it did.
+identity is compromised, which is the residual and is smaller than "anyone with a shell". Execution is
+confirmed only against evidence: a fingerprint the verifier was told to trust is no longer accepted, and
+evidence that is offered and fails is `REFUSED` rather than downgraded. What remains outside this code:
+the anchor is the trust decision, so an anchor you were misled into trusting defeats the check; no TPM2
+structure is parsed, so the endorsement-to-hardware binding lives entirely in that anchor; there is no
+revocation list (CRL or OCSP), so a withdrawn attestation key keeps verifying runs it made before the
+withdrawal; and if you read the bundle from the compromised host, you are trusting it to tell you what
+it did.
 
 ## What the tests prove
 

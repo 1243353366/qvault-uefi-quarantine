@@ -8,10 +8,48 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
+
+from qvault import attestation as att
 from qvault import authorization as az
 
 PLAINTEXT = "b" * 64
 CIPHERTEXT = "a" * 64
+NONCE = "verifier-chosen-nonce"
+PCRS = "sha256:0,1,2,7"
+PCR_DIGEST = "9f" * 32
+
+
+def _pki():
+    now = datetime.now(timezone.utc)
+    root_key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "qvault test root")])
+    root = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(root_key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5)).not_valid_after(now + timedelta(days=365))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(root_key, hashes.SHA256()))
+    ak_key = ec.generate_private_key(ec.SECP256R1())
+    ak = (x509.CertificateBuilder()
+          .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "attestation key")]))
+          .issuer_name(root.subject).public_key(ak_key.public_key())
+          .serial_number(x509.random_serial_number())
+          .not_valid_before(now - timedelta(minutes=5)).not_valid_after(now + timedelta(days=30))
+          .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+          .sign(root_key, hashes.SHA256()))
+    from cryptography.hazmat.primitives import serialization
+    return root, ak, ak_key, [ak.public_bytes(serialization.Encoding.PEM).decode()]
+
+
+def _evidence(pki, receipt_digest, **over):
+    _, ak, ak_key, pem = pki
+    stmt = att.AttestationStatement(nonce=over.pop("nonce", NONCE), receipt_digest=receipt_digest,
+                                    pcr_selection=PCRS, pcr_digest=PCR_DIGEST,
+                                    ak_name=att.key_fingerprint(ak.public_key()), **over)
+    return att.AttestationEvidence(stmt, pem).sign(ak_key)
 
 
 @pytest.fixture()
@@ -32,7 +70,13 @@ def world(tmp_path):
     receipt = az.Receipt(intent_digest=intent.digest, object_id="obj-1",
                          plaintext_sha256=PLAINTEXT, executor="", attestation="tpm_quote").sign(ex)
     keys = {az.fingerprint(k.public_key()): k.public_key() for k in (req, a1, a2, a3, ex)}
+    pki = _pki()
     return {
+        "pki": pki,
+        "anchor": pki[0],
+        "evidence": _evidence(pki, receipt.digest),
+        "nonce": NONCE,
+        "pcr": att.PcrPolicy(selection=PCRS, expected_digest=PCR_DIGEST),
         "root": root, "req": req, "a1": a1, "a2": a2, "a3": a3, "ex": ex,
         "policy": policy, "intent": intent, "approvals": approvals, "receipt": receipt,
         "keys": keys, "nonces": az.NonceStore(str(tmp_path / "nonces.txt")),
@@ -42,7 +86,8 @@ def world(tmp_path):
 def verify(w, **over):
     args = dict(intent=w["intent"], approvals=w["approvals"], policy=w["policy"],
                 policy_root_key=w["root"].public_key(), keys=w["keys"], receipt=w["receipt"],
-                used_nonces=w["nonces"], observed_plaintext_sha256=PLAINTEXT)
+                used_nonces=w["nonces"], observed_plaintext_sha256=PLAINTEXT,
+                attestation=None, attestation_anchors=[], attestation_nonce="", pcr_policy=None)
     args.update(over)
     return az.verify_authorization(**args)
 
@@ -53,13 +98,36 @@ def test_all_four_elements_pass_and_the_grade_says_what_is_missing(world):
     assert out["elements"]["authority"]["grade"] == "CONFIRMED"
     assert out["elements"]["intent"]["grade"] == "CONFIRMED"
     assert out["elements"]["execution"]["grade"] == "HYPOTHESIS"
-    assert out["overall"] == "CORROBORATED", "an unattested execution must not round up to CONFIRMED"
+    assert out["overall"] == "CORROBORATED", "an unverified execution must not round up to CONFIRMED"
 
 
-def test_out_of_band_attestation_is_what_raises_execution(world):
-    out = verify(world, attested_executors=[az.fingerprint(world["ex"].public_key())])
-    assert out["elements"]["execution"]["grade"] == "CONFIRMED"
+def test_execution_is_only_confirmed_by_evidence(world):
+    """A fingerprint list used to be enough. Now the quote has to verify, or the claim is refused."""
+    out = verify(world, attestation=world["evidence"], attestation_anchors=[world["anchor"]],
+                 attestation_nonce=world["nonce"], pcr_policy=world["pcr"])
+    assert out["elements"]["execution"]["grade"] == "CONFIRMED", out["elements"]["execution"]["reasons"]
     assert out["overall"] == "CONFIRMED"
+
+
+def test_a_refused_quote_is_reported_rather_than_raised(world):
+    """Found through the CLI: the early-return verdicts had no failed_checks key and the reporting
+    path crashed, which is worse than either verdict."""
+    for over in ({"attestation_anchors": []},
+                 {"attestation_anchors": [world["anchor"]], "pcr_policy": None}):
+        args = {"attestation": world["evidence"], "attestation_nonce": world["nonce"]}
+        args.update(over)
+        out = verify(world, **args)
+        assert out["elements"]["execution"]["grade"] == "REFUSED"
+        assert out["overall"] == "REFUSED"
+
+
+def test_evidence_for_another_receipt_is_refused_not_downgraded(world):
+    """Presenting evidence that does not hold is a refutation, which is stronger than a gap."""
+    elsewhere = _evidence(world["pki"], "ab" * 32)
+    out = verify(world, attestation=elsewhere, attestation_anchors=[world["anchor"]],
+                 attestation_nonce=world["nonce"], pcr_policy=world["pcr"])
+    assert out["elements"]["execution"]["grade"] == "REFUSED"
+    assert out["overall"] == "REFUSED"
 
 
 def test_a_label_is_not_an_identity(world):
@@ -163,7 +231,8 @@ def test_the_receipt_must_match_the_bytes_the_verifier_holds(world):
 
 def test_an_unverified_receipt_is_capped_not_refused(world):
     out = verify(world, observed_plaintext_sha256=None,
-                 attested_executors=[az.fingerprint(world["ex"].public_key())])
+                 attestation=world["evidence"], attestation_anchors=[world["anchor"]],
+                 attestation_nonce=world["nonce"], pcr_policy=world["pcr"])
     assert out["elements"]["execution"]["grade"] == "HYPOTHESIS", \
         "no bytes to check is unverified, not falsified"
 
@@ -193,16 +262,20 @@ def test_signatures_are_domain_separated(world):
 
 
 def test_a_bundle_verifies_from_files_alone(world):
+    from cryptography.hazmat.primitives import serialization
     bundle = az.to_bundle(intent=world["intent"], approvals=world["approvals"],
-                          policy=world["policy"], receipt=world["receipt"])
+                          policy=world["policy"], receipt=world["receipt"],
+                          attestation=world["evidence"])
     out = az.verify_bundle(
         bundle,
         root_public_hex=world["root"].public_key().public_bytes_raw().hex(),
         public_keys={fp: k.public_bytes_raw().hex() for fp, k in world["keys"].items()},
-        attested_executors=[az.fingerprint(world["ex"].public_key())],
+        anchor_pems=[world["anchor"].public_bytes(serialization.Encoding.PEM).decode()],
+        attestation_nonce=world["nonce"],
+        pcr_policy=world["pcr"].to_dict(),
         observed_plaintext_sha256=PLAINTEXT,
     )
-    assert out["overall"] == "CONFIRMED"
+    assert out["overall"] == "CONFIRMED", out["elements"]["execution"]["reasons"]
 
 
 def test_a_malformed_bundle_is_reported_not_raised(world):
