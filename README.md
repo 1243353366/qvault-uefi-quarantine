@@ -4,7 +4,7 @@
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.10** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.11** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 [`SECURITY.md`](SECURITY.md) (report a vulnerability privately) · [`PROVENANCE.md`](PROVENANCE.md) (licence, verifying a release, what signing does not cover) · [`CONTRIBUTING.md`](CONTRIBUTING.md) (how a claim earns a grade)
 
@@ -23,6 +23,35 @@ CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen g
 > Each is fixed, each fix is now a check rather than a resolution, and each is graded in
 > [`report/DEFECT_LOG.md`](report/DEFECT_LOG.md). Five of the six defects were on a phase
 > boundary, which is why the local gates were all passing while the releases were not.
+
+## The risks of running this
+
+Four things this project cannot design away. Each has a document rather than a reassurance, because
+the reassuring version of this section would be a lie.
+
+- **A copy can be modified or repackaged.** The licence requires `LICENSE`, `NOTICE` and
+  `CREDITS.md` to travel with any redistribution, and [`PROVENANCE.md`](PROVENANCE.md) says what a
+  fork may and may not imply. Verification is a commit hash, a public CI run, and the wheel's
+  `SHA256SUMS` on the release page. Tags here are **not signed**, so that is HTTPS plus a hash, not
+  a signature. A copy with the graders stripped still imports and still prints verdicts.
+- **The tool is itself an attack surface.** It parses firmware and evidence it did not write.
+  [`report/TOOLING_RISK.md`](report/TOOLING_RISK.md) registers every component that consumes
+  untrusted input with the guard found in it and the gap left behind: three rows say
+  `none observed`, and **nothing has been fuzzed**. The two that concern me most are `store.py` and
+  `audit.py`, because both trust data written by an adversary who knows it is being collected.
+- **Claims can outrun their evidence.** A claim is a row in the ledger with a source, a locator, a
+  grade and a falsifier. `CONFIRMED` requires independent verification, a hardware-plane claim
+  requires an out-of-band anchor, and `CLEAN` is not a grade. [`CONTRIBUTING.md`](CONTRIBUTING.md)
+  makes that the price of a merge, which is why the ledger still carries rows with no independent
+  verification instead of a shorter, friendlier list.
+- **Undocumented behaviour is legal and reputational exposure.** [`SECURITY.md`](SECURITY.md) routes
+  reports to private advisories, states plainly that there is no bounty and no response timeframe,
+  and separates what is in scope (parsers, store, audit chain, key handling, denial responses) from
+  what is not (the implant families, remediation claims, anything requiring kernel control, which
+  is the documented host trust gap).
+
+Run it on hardware you own or have written permission to examine, and treat the evidence store as
+data written by an adversary. Both follow from the rows above, not from caution.
 
 Reference implementation of the defensive architecture described in
 [`report/UEFI_Malware_Deep_Dive_Report.md`](report/UEFI_Malware_Deep_Dive_Report.md).

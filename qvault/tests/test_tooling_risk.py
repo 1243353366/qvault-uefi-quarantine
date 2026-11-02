@@ -84,3 +84,13 @@ def test_security_policy_routes_reports_to_private_advisories():
     body = (ROOT / "SECURITY.md").read_text()
     assert "private vulnerability reporting" in body
     assert "no bug bounty" in body.lower() or "no bug bounty and no response sla" in body.lower()
+
+
+def test_the_readme_carries_the_four_risks():
+    """The README is the front door; the four exposures belong on it, not only in linked files."""
+    body = (ROOT / "README.md").read_text()
+    assert "## The risks of running this" in body
+    for link in ("PROVENANCE.md", "TOOLING_RISK.md", "CONTRIBUTING.md", "SECURITY.md"):
+        assert link in body, f"{link} is not referenced by the README section"
+    assert "not signed" in body
+    assert "nothing has been fuzzed" in body

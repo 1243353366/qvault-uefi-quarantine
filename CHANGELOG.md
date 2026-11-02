@@ -9,6 +9,22 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.11] - 2026-11-02
+
+### Added - the four risks get a section on the front door
+
+The risk documents existed and were linked from a policy line; the README still opened with a status
+warning that said only "prototype". It now carries `## The risks of running this` between the status
+warning and the architecture: a modified copy, the tool as an attack surface, claims outrunning
+evidence, and undocumented behaviour as exposure, each pointing at the file that treats it.
+
+A test holds the section in place and fails if any of the four references or the two honest
+sentences disappear: tags are not signed, and nothing has been fuzzed.
+
+One self-correction inside the edit: the first draft put the unverified ledger count in the README as
+a typed number. That is defect D6 in the middle of documenting defects, so the count came out and the
+sentence states the fact without a figure that would drift.
+
 ## [0.13.10] - 2026-11-02
 
 ### Added - the four risks of publishing this, answered in files
