@@ -1,0 +1,6 @@
+# Crawlers read /robots.txt at the origin root, not at this project path, so this copy is
+# advisory. It is published so the policy travels with the site and the sitemap is
+# discoverable. Everything here may be indexed.
+User-agent: *
+Allow: /
+Sitemap: https://1243353366.github.io/qvault-uefi-quarantine/sitemap.xml

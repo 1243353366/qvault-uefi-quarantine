@@ -14,6 +14,48 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "docs"
+
+#: Where the site is published. Absolute URLs here: a sitemap entry must be absolute to be useful.
+SITE = "https://1243353366.github.io/qvault-uefi-quarantine"
+
+#: Pages crawlers should know about, in site order. Derived from PAGES so a new page cannot be
+#: published and forgotten; index.html becomes the bare site root.
+def sitemap_urls(pages: dict[str, str]) -> list[str]:
+    urls = []
+    for slug in pages:
+        path = "" if slug == "index.html" else slug[:-5]
+        urls.append(f"{SITE}/{path}" if path else f"{SITE}/")
+    urls.append(f"{SITE}/citations")
+    return urls
+
+
+def render_sitemap(pages: dict[str, str]) -> str:
+    """No lastmod and no priority: both would need a clock, and a generated file that changes on
+    every build makes the docs-drift gate meaningless."""
+    out = ['<?xml version="1.0" encoding="UTF-8"?>\n',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
+    for url in sitemap_urls(pages):
+        out.append(f"  <url><loc>{url}</loc></url>\n")
+    out.append("</urlset>\n")
+    return "".join(out)
+
+
+def render_robots() -> str:
+    """Advisory at this path, and the file says so.
+
+    The robots exclusion standard (RFC 9309) has a crawler fetch `/robots.txt` at the host root,
+    once per origin. On github.io the origin is shared, so this copy at a project path is not the
+    file a crawler reads; the repo owner cannot write the host-root one. It is published anyway so
+    the policy travels with the site and the sitemap sits at a stable advertised path.
+    """
+    return (
+        "# Crawlers read /robots.txt at the origin root, not at this project path, so this copy is\n"
+        "# advisory. It is published so the policy travels with the site and the sitemap is\n"
+        "# discoverable. Everything here may be indexed.\n"
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {SITE}/sitemap.xml\n"
+    )
 REPORT = ROOT / "report" / "UEFI_Malware_Deep_Dive_Report.md"
 
 sys.path.insert(0, str(ROOT))
@@ -302,6 +344,8 @@ def main() -> int:
     for slug, html in pages.items():
         (DEST / slug).write_text(html)
     (DEST / ".nojekyll").write_text("")
+    (DEST / "sitemap.xml").write_text(render_sitemap(pages))
+    (DEST / "robots.txt").write_text(render_robots())
     print(f"built {len(pages)} pages into docs/ plus CITATIONS.md")
     return 0
 
