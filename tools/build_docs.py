@@ -175,9 +175,9 @@ def rewrite_links(html: str) -> str:
         slug = SLUG_BY_SOURCE.get(base) or SLUG_BY_NAME.get(name)
         if slug:
             return f'href="{slug}{"#" + anchor if anchor else ""}"'
-        if base.endswith(".md"):
-            # a file that is not published as a page: link to it in the repository rather
-            # than leaving a dead .md href on the site
+        if "." in Path(base).name:
+            # a file that is not published as a page (a CSV, a licence, an unpublished
+            # document): link to it in the repository rather than leave a dead relative href
             return f'href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/{base}"'
         return match.group(0)
 
