@@ -9,6 +9,33 @@ they deliberately do not mean.
 
 ---
 
+## [0.6.0] - 2026-11-02
+
+Published-source fingerprints and their defensive inversion, for LoJax, MoonBounce and
+BlackLotus.
+
+**No sample of any family was handled.** Nothing in this repository contains malware, and no
+entry is primary-sourced. Each fingerprint carries the published analysis it came from, a
+benign explanation for the same artifact, the corroboration needed before it means anything,
+and the control that defeats the mechanism.
+
+### Added
+
+- `qvault/fingerprints.py`: 11 fingerprints across three families, with `scan_text`,
+  `check_image` (unnamed PE section, entry point outside sections), `check_config`
+  (security-state combinations) and `defender_inversion`. A textual match is capped at
+  INFERRED, and `assert_catalogue_integrity()` refuses a CONFIRMED grade, because claiming
+  primary analysis of a sample that was never handled would be false.
+- `tools/gen_fingerprints.py` + `report/FINGERPRINTS.md`: the document is generated from the
+  code, so a fingerprint cannot exist in one and not the other.
+- 20 tests, including that the rpcnetp lead carries its Absolute/Computrace false positive.
+
+### Note
+
+`LOJAX-1` is the honest centre of this release: the same artifact is the legitimate
+anti-theft agent on a great many OEM machines. Detection without corroboration there is a
+false positive by construction, which is why every entry carries `benign` and `hostile_when`.
+
 ## [0.5.0] - 2026-11-02
 
 Adversarial testing found four defects. All four were the same failure inverted: something

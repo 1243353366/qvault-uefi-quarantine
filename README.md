@@ -65,7 +65,7 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest qvault/tests -q      # 398 tests, ~0.75s
+python -m pytest qvault/tests -q      # 418 tests, ~0.75s
 ```
 
 Requires Python 3.10+ and `cryptography`.
