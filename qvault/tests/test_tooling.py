@@ -82,6 +82,22 @@ def test_history_is_exempt_and_says_why():
     assert any(k.startswith("vendor") for k in sync_version.EXEMPT)
 
 
+def test_the_changelog_documents_the_shipped_version():
+    """Eight releases once hid under a single [Unreleased] heading with nothing checking."""
+    from qvault import __version__
+
+    assert sync_version.changelog_version() == __version__
+
+
+def test_a_release_without_a_note_is_caught(monkeypatch, tmp_path):
+    (tmp_path / "CHANGELOG.md").write_text("# Changelog\n\n## [0.0.9] - old\n")
+    monkeypatch.setattr(sync_version, "ROOT", tmp_path)
+    assert sync_version.changelog_version() == "0.0.9"
+    from qvault import __version__
+
+    assert sync_version.changelog_version() != __version__
+
+
 def test_packaging_does_not_pin_a_second_version():
     pyproject = (ROOT / "pyproject.toml").read_text()
     assert not re.search(r'^version\s*=\s*["\']', pyproject, re.MULTILINE)

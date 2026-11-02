@@ -67,6 +67,16 @@ def cli_version() -> str:
     return match.group(1) if match else ""
 
 
+def changelog_version() -> str:
+    """The newest release heading in the changelog, which should be the shipped version."""
+    text = (ROOT / "CHANGELOG.md").read_text()
+    for line in text.splitlines():
+        match = re.match(r"^## \[(\d+\.\d+\.\d+)\]", line)
+        if match:
+            return match.group(1)
+    return ""
+
+
 def check() -> int:
     want = source_version()
     problems = [f"{name} says {got}, source says {want}"
@@ -78,6 +88,11 @@ def check() -> int:
                         "(version = {attr = \"qvault.__version__\"})")
     if not re.search(r'attr\s*=\s*"qvault\.__version__"', pyproject):
         problems.append("pyproject.toml no longer reads its version from qvault.__version__")
+
+    newest_note = changelog_version()
+    if newest_note != want:
+        problems.append(f"CHANGELOG.md's newest heading is {newest_note or 'none'}, source says "
+                        f"{want}: a release needs a note under its own heading")
 
     from_cli = cli_version()
     if from_cli != want:

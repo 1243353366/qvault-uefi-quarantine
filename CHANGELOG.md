@@ -9,6 +9,63 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.1] - 2026-11-02
+
+### Fixed - a gate that fails now stops the push
+
+`.githooks/pre-push` runs all fourteen gates and exits nonzero on any failure; `bash
+tools/install_hooks.sh` points a clone at it. The gates already returned 1 on failure. What was
+missing was anything listening: a `| tail` in my own command swallowed the exit code and a broken
+commit reached main. `tools/reproduce.sh` and the CI workflow run with `set -o pipefail` for the
+same reason.
+
+### Added - the version has one source
+
+`qvault/__init__.py` is authoritative. `tools/sync_version.py --check` fails when the README,
+packaging metadata, `qvault --version` or the newest changelog heading disagree with it. Gate G13
+runs that check. This is the README-at-0.5.0 bug turned into a test: the copy went stale because
+nothing compared it to the code. CHANGELOG history and `vendor/` are exempt, with reasons stated
+in the tool.
+
+### Added - link checking, internal and external
+
+`tools/linkcheck.py --internal` resolves every href in the published site offline (448 links
+across 20 pages) and is gate G14. `--external` probes each cited URL and separates a dead link
+from a host that refuses automated clients. Run for the first time, it found:
+
+- **Three Microsoft symbol-store URLs returning 404**, printed in the BlackLotus section as
+  though they were retrievable evidence. The identifier pairs could not be verified, so they are
+  replaced by the documented pattern plus a note. An unverifiable identifier presented as evidence
+  is worse than the pattern it illustrates.
+- **The CI badge pointed at a workflow that did not exist** (404). Removed rather than left as
+  decoration.
+- Two citations blocked by policy rather than broken (`media.defense.gov`, `iso.org`), now
+  classified as blocked with the reason recorded.
+
+### Fixed - the changelog had one heading for eight releases
+
+Every release note since 0.5.0 was appended as a subsection under `[Unreleased]`. Corrected
+here, with the earlier structure described rather than silently reshaped, and the newest heading
+now checked against the package version.
+
+### Not done - CI is written but not running
+
+`.github/workflows/ci.yml` covers tests on 3.11 and 3.12, the gates, docs drift, both link
+checks, the wheel install and static analysis. It cannot be pushed: the file was listed in
+`.git/info/exclude`, and the OAuth app pushing here has no `workflow` scope, so GitHub refuses
+with "refusing to allow an OAuth App to create or update workflow". Adding the file through the
+GitHub web editor, or granting the scope, makes it live. Until then no badge is shown and the
+README says why.
+
+765 tests, fourteen gates.
+
+**On structure.** Until 0.13.1 every release note was appended as a subsection under a single
+`[Unreleased]` heading, so the file had one version heading for eight releases. Entries below the
+0.13.1 section are therefore accumulated rather than grouped, and per-release headings begin at
+0.13.1. The heading is now checked against the package version by gate G13.
+
+---
+
 ## [Unreleased] - policy denial (branch: feature/policy-denial)
 
 The policy matrix said what the settings are. Nothing said what happens to a caller that

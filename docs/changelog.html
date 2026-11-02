@@ -68,6 +68,50 @@ versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versionin
 <strong>HYPOTHESIS</strong>, <strong>UNKNOWN</strong>. See <code>report/EVIDENCE_POLICY.md</code> for what they mean and what
 they deliberately do not mean.</p>
 <hr />
+<h2 id="0131-2026-11-02">[0.13.1] - 2026-11-02</h2>
+<h3 id="fixed-a-gate-that-fails-now-stops-the-push">Fixed - a gate that fails now stops the push</h3>
+<p><code>.githooks/pre-push</code> runs all fourteen gates and exits nonzero on any failure; <code>bash
+tools/install_hooks.sh</code> points a clone at it. The gates already returned 1 on failure. What was
+missing was anything listening: a <code>| tail</code> in my own command swallowed the exit code and a broken
+commit reached main. <code>tools/reproduce.sh</code> and the CI workflow run with <code>set -o pipefail</code> for the
+same reason.</p>
+<h3 id="added-the-version-has-one-source">Added - the version has one source</h3>
+<p><code>qvault/__init__.py</code> is authoritative. <code>tools/sync_version.py --check</code> fails when the README,
+packaging metadata, <code>qvault --version</code> or the newest changelog heading disagree with it. Gate G13
+runs that check. This is the README-at-0.5.0 bug turned into a test: the copy went stale because
+nothing compared it to the code. CHANGELOG history and <code>vendor/</code> are exempt, with reasons stated
+in the tool.</p>
+<h3 id="added-link-checking-internal-and-external">Added - link checking, internal and external</h3>
+<p><code>tools/linkcheck.py --internal</code> resolves every href in the published site offline (448 links
+across 20 pages) and is gate G14. <code>--external</code> probes each cited URL and separates a dead link
+from a host that refuses automated clients. Run for the first time, it found:</p>
+<ul>
+<li><strong>Three Microsoft symbol-store URLs returning 404</strong>, printed in the BlackLotus section as
+  though they were retrievable evidence. The identifier pairs could not be verified, so they are
+  replaced by the documented pattern plus a note. An unverifiable identifier presented as evidence
+  is worse than the pattern it illustrates.</li>
+<li><strong>The CI badge pointed at a workflow that did not exist</strong> (404). Removed rather than left as
+  decoration.</li>
+<li>Two citations blocked by policy rather than broken (<code>media.defense.gov</code>, <code>iso.org</code>), now
+  classified as blocked with the reason recorded.</li>
+</ul>
+<h3 id="fixed-the-changelog-had-one-heading-for-eight-releases">Fixed - the changelog had one heading for eight releases</h3>
+<p>Every release note since 0.5.0 was appended as a subsection under <code>[Unreleased]</code>. Corrected
+here, with the earlier structure described rather than silently reshaped, and the newest heading
+now checked against the package version.</p>
+<h3 id="not-done-ci-is-written-but-not-running">Not done - CI is written but not running</h3>
+<p><code>.github/workflows/ci.yml</code> covers tests on 3.11 and 3.12, the gates, docs drift, both link
+checks, the wheel install and static analysis. It cannot be pushed: the file was listed in
+<code>.git/info/exclude</code>, and the OAuth app pushing here has no <code>workflow</code> scope, so GitHub refuses
+with "refusing to allow an OAuth App to create or update workflow". Adding the file through the
+GitHub web editor, or granting the scope, makes it live. Until then no badge is shown and the
+README says why.</p>
+<p>765 tests, fourteen gates.</p>
+<p><strong>On structure.</strong> Until 0.13.1 every release note was appended as a subsection under a single
+<code>[Unreleased]</code> heading, so the file had one version heading for eight releases. Entries below the
+0.13.1 section are therefore accumulated rather than grouped, and per-release headings begin at
+0.13.1. The heading is now checked against the package version by gate G13.</p>
+<hr />
 <h2 id="unreleased-policy-denial-branch-featurepolicy-denial">[Unreleased] - policy denial (branch: feature/policy-denial)</h2>
 <p>The policy matrix said what the settings are. Nothing said what happens to a caller that
 asks for something else, so an operator received a settings dict and no way to tell
