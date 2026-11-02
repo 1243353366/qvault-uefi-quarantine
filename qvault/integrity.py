@@ -69,6 +69,7 @@ GRADE_BY_PROVENANCE = {
 
 VERIFIED = "verified"
 MISMATCH = "mismatch"
+INCOMPARABLE = "incomparable"
 UNKNOWN_PROVENANCE = "unknown_provenance"
 UNVERIFIED = "unverified"
 
@@ -115,7 +116,8 @@ def build_manifest(root: str) -> dict:
     }
 
 
-def verify_tree(root: str, expected_digest: str, provenance: str = NONE) -> dict:
+def verify_tree(root: str, expected_digest: str, provenance: str = NONE,
+                expected_file_count: int | None = None) -> dict:
     """Compare a tree against a digest from outside it.
 
     `expected_digest` must come from somewhere else: a release page, a signed manifest,
@@ -135,7 +137,19 @@ def verify_tree(root: str, expected_digest: str, provenance: str = NONE) -> dict
             "who edits the module edits the recorded hash in the same change. Supply the "
             "digest from a release page, a signed manifest, or a hardware anchor."
         )
-    if provenance == NONE or not expected_digest:
+    # A digest only identifies a tree if it was computed over the same tree. Comparing a
+    # digest built for `qvault/` against the repository root yields a mismatch that says
+    # nothing about tampering, and reporting that as suspicion is how a self-check earns
+    # a reputation for crying wolf. If the reference declares a file count, use it.
+    if (expected_file_count is not None
+            and manifest["file_count"] != expected_file_count):
+        gaps.append(
+            "reference_describes_a_different_tree: the digest was computed over "
+            f"{expected_file_count} file(s) but this tree holds {manifest['file_count']}; "
+            "a difference here cannot distinguish tampering from a wrong reference"
+        )
+        status = INCOMPARABLE
+    elif provenance == NONE or not expected_digest:
         gaps.append(
             "unverified_self_measurement: this copy computed its own digest, so the "
             "result describes what is running, not whether it is the published build"
@@ -157,6 +171,7 @@ def verify_tree(root: str, expected_digest: str, provenance: str = NONE) -> dict
         "digest": manifest["digest"],
         "expected": expected_digest,
         "file_count": manifest["file_count"],
+        "expected_file_count": expected_file_count,
         "grade": grade if status == VERIFIED else None,
         "confidence": (F.confidence_grade(grade, tuple(gaps))
                        if status == VERIFIED and grade else F.UNKNOWN),
@@ -169,6 +184,10 @@ def verify_tree(root: str, expected_digest: str, provenance: str = NONE) -> dict
             UNVERIFIED: (
                 "digest computed but unverified: no external reference to compare against, "
                 "so this is a self-measurement, not an integrity claim"
+            ),
+            INCOMPARABLE: (
+                "not comparable: the reference digest describes a different tree, so this "
+                "result says nothing either way about tampering"
             ),
         }[status],
     }
@@ -276,14 +295,15 @@ def impersonation_checks(root: str, sys_path=None) -> list[dict]:
 
 
 def self_scan(root: str, expected_digest: str = "", provenance: str = NONE,
-              sys_path=None) -> dict:
+              sys_path=None, expected_file_count: int | None = None) -> dict:
     """Scan this installation as an artifact, not just the device it runs on.
 
     The result can be `suspicious` and can be `inconclusive`. It cannot be `clean`,
     because a clean result would require a trusted vantage point this process does not
     have.
     """
-    integ = verify_tree(root, expected_digest, provenance=provenance)
+    integ = verify_tree(root, expected_digest, provenance=provenance,
+                        expected_file_count=expected_file_count)
     checks = impersonation_checks(root, sys_path=sys_path)
     present = [c for c in checks if c["present"] and c["severity"] in ("high", "medium")]
     high = [c for c in present if c["severity"] == "high"]

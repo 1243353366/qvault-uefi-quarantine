@@ -115,6 +115,13 @@ def zero_error_upper_bound(n: int, confidence: float = 0.95) -> float:
 
 def evaluate(bench: Bench) -> dict:
     """Confusion matrix, rates, intervals, and what may honestly be claimed."""
+    if not isinstance(bench, Bench):
+        raise CalibrationError(
+            f"evaluate() takes a Bench, not {type(bench).__name__}. Build one with "
+            "Bench().add(case_id, expected, produced) so each case states what the "
+            "sample really was; a bare list of verdicts cannot measure false positives "
+            "or false negatives, because the truth is missing."
+        )
     if not bench.cases:
         raise CalibrationError("no cases: an empty corpus measures nothing")
 

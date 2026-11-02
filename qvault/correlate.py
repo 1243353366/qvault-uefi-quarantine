@@ -85,7 +85,28 @@ class Event:
 
     @property
     def normalised_subject(self) -> str:
-        return self.subject.strip().lower()
+        return normalise_subject(self.subject)
+
+
+def normalise_subject(value: str) -> str:
+    """Reduce a process/app/path identity to a comparable key.
+
+    Windows reports "System32/WINLOGON.EXE" with backslashes, an EDR may say
+    "winlogon.exe", and a filesystem walk gives "/usr/lib/.../chrome". All three name one
+    executable, and a correlation engine that fails to merge them silently misses the
+    case it exists for. Deliberately conservative: basename, case-folded, separators
+    unified, surrounding quotes and Windows trailing dots/spaces removed. It does not
+    resolve symlinks, compare hashes, or normalise install directories, so two different
+    binaries sharing a basename will still merge. That is a stated limit, not an
+    oversight.
+    """
+    v = (value or "").strip().strip('"').strip("'")
+    if not v:
+        return ""
+    v = v.replace(chr(92), "/")          # backslash -> slash, without escapes
+    if v.startswith("//?/"):             # extended-length prefix, already unified
+        v = v[4:]
+    return v.rsplit("/", 1)[-1].rstrip(". ").strip().lower()
 
 
 def _complementary(a: str, b: str) -> bool:

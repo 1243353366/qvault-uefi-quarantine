@@ -21,6 +21,7 @@ import sys
 import time
 
 from . import store
+from .store import write_once
 from .audit import AuditLog
 from .crypto import canonical_json
 from .ingest import ingest
@@ -213,6 +214,26 @@ def cmd_netobs(args) -> None:
     sys.exit(0 if not any(f.severity == "high" for f in findings) else 1)
 
 
+def cmd_enclave(args) -> None:
+    """Create an analysis enclave: the only place plaintext may be written.
+
+    retrieve() refuses an output directory without the sentinel, which is the control
+    that stops decrypted evidence landing in a shared folder. Nothing created the marked
+    directory, so the documented workflow was unreachable from the CLI.
+    """
+    path = os.path.abspath(args.path)
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+    sentinel = os.path.join(path, ".enclave")
+    if not os.path.exists(sentinel):
+        write_once(sentinel, b"qvault analysis enclave\n", mode=0o400)
+    _json_out({
+        "enclave": path,
+        "sentinel": sentinel,
+        "note": "plaintext may be written here and must be destroyed after analysis",
+    })
+
+
 def cmd_checkpoint(args) -> None:
     paths = store.VaultPaths.open(args.root)
     name = f"checkpoint-{int(time.time())}.json"
@@ -289,6 +310,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--input", required=True, help="JSON case file with host[], wire[], dns[]"
     )
     nb.set_defaults(func=cmd_netobs)
+
+    en = sub.add_parser("enclave", help="create an analysis enclave for plaintext")
+    en.add_argument("--path", required=True)
+    en.set_defaults(func=cmd_enclave)
 
     cp = sub.add_parser("checkpoint", help="sign the current audit head")
     cp.add_argument("--root", required=True)

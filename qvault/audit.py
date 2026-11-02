@@ -57,6 +57,14 @@ class AuditLog:
     path: str
     key_path: str | None = None
 
+    def __post_init__(self) -> None:
+        # `init` writes <vault>/audit-signing.key, but every other command built the log
+        # with no key_path at all, so the key existed and was never found: `checkpoint`
+        # failed with "signing key not initialised" on a vault that had one. Deriving the
+        # default here fixes every call site at once, including future ones.
+        if self.key_path is None:
+            self.key_path = os.path.join(os.path.dirname(self.path), "audit-signing.key")
+
     # ---------- key handling ----------
 
     def _load_private(self) -> Ed25519PrivateKey:

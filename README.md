@@ -1,4 +1,6 @@
-# qvault — a cryptographic quarantine vault for firmware evidence
+# qvault
+
+**Version 0.4.0** · [CHANGELOG](CHANGELOG.md) · [credits](CREDITS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
