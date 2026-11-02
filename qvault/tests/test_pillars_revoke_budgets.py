@@ -175,8 +175,8 @@ def test_unknown_component_budget_is_rejected():
 # --- the pillar ledger ---------------------------------------------------
 
 
-def test_all_seven_pillars_are_present():
-    assert [p["id"] for p in P.PILLARS] == ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
+def test_all_eight_pillars_are_present():
+    assert [p["id"] for p in P.PILLARS] == ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
 
 
 def test_every_requirement_resolves_to_real_code_and_a_real_test():
@@ -199,7 +199,7 @@ def test_containment_pillar_covers_both_new_capabilities():
 def test_audit_reports_counts_and_a_statement():
     out = P.audit()
     assert set(out["counts"]) == {P.IMPLEMENTED, P.PARTIAL, P.GAP}
-    assert sum(out["counts"].values()) == 7
+    assert sum(out["counts"].values()) == len(P.PILLARS)
     assert "Partial means" in out["statement"]
 
 

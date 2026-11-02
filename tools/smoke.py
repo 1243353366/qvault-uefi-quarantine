@@ -166,8 +166,8 @@ check("self-scan never says clean", scan["verdict"] != "clean", scan["verdict"])
 P.assert_traceable()
 P.assert_consistent()
 audit = P.audit()
-check("seven capabilities traced", audit["counts"]["GAP"] + audit["counts"]["PARTIAL"]
-      + audit["counts"]["IMPLEMENTED"] == 7, str(audit["counts"]))
+check("every capability traced", audit["counts"]["GAP"] + audit["counts"]["PARTIAL"]
+      + audit["counts"]["IMPLEMENTED"] == 8, str(audit["counts"]))
 sep = S.audit_separation()
 check("role separation holds", sep["violations"] == [], str(sep["violations"])[:160])
 

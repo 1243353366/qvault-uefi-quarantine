@@ -9,6 +9,33 @@ they deliberately do not mean.
 
 ---
 
+## [0.7.0] - 2026-11-02
+
+LAN layer (P8): a network is a communication environment, not a machine. Adds
+`qvault/lan.py`, 30 tests and `report/LAN_LAYER.md`.
+
+### Added
+- Device identity bound to an authenticated credential; `identity_key` refuses a wireless
+  label and refuses an address-only device. BSSID kept as context, never as identity.
+- Per-role least-privilege service policy with out-of-role detection carrying a
+  suspicion floor (lateral services grade higher than the rest).
+- Traffic baseline and deviation reporting (new peer, new service, first contact), every
+  entry with a benign reading.
+- Discovery monitoring for mDNS, LLMNR, NetBIOS, SSDP and UPnP: an unsanctioned response
+  is treated as a claim of authority over a name.
+- East-west correlation graded by independent layers with flow deduplication.
+- Infrastructure integrity for router, AP, switch, DNS and DHCP, including MAC-only
+  identity as a weakness.
+- Graded containment ladder, device-scoped by construction, refusing switch-dependent
+  steps when the enforcement plane is untrusted, and refusing any step that propagates
+  credentials, keys, config or binaries to other hosts.
+- `identity_inconsistency()`: the cross-layer verdict, requiring a firmware anchor.
+
+### Fixed
+- `identity_inconsistency()` counted `True` inside a list of layer names, so the gate
+  never fired and every case returned "insufficient". A containment gate that is
+  silently always-negative is worse than no gate.
+
 ## [0.6.0] - 2026-11-02
 
 Published-source fingerprints and their defensive inversion, for LoJax, MoonBounce and
