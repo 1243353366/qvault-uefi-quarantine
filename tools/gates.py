@@ -12,6 +12,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G6 no clean state      the persistence layer cannot report a clean result
   G7 denial invariance   a refusal does not vary with the resource that was asked for
   G8 scope gate          a live capture is refused without isolation and attestation
+  G9 behaviour matrix    every behaviour resolves to real code and the document is current
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -133,6 +134,21 @@ def g7_denial_invariance() -> tuple[bool, str]:
     return True, f"{refusals} refusals, identical across forbidden, absent and empty resources"
 
 
+def g9_behaviour_matrix() -> tuple[bool, str]:
+    """Every behaviour resolves to real code, and the generated document is current."""
+    from qvault import behaviors as B
+
+    B.assert_resolves()
+    sys.path.insert(0, str(ROOT / "tools"))
+    import gen_behavior_matrix  # noqa: PLC0415
+
+    on_disk = (ROOT / "report" / "THREAT_BEHAVIOR_MATRIX.md").read_text()
+    if on_disk != gen_behavior_matrix.render():
+        return False, "report/THREAT_BEHAVIOR_MATRIX.md is stale; run tools/gen_behavior_matrix.py"
+    gaps = len(B.gaps())
+    return True, f"{len(B.BEHAVIOURS)} behaviours resolve, {gaps} declared gaps, document current"
+
+
 def g8_scope() -> tuple[bool, str]:
     from qvault import persistence as P
     from qvault import separation as S
@@ -153,6 +169,7 @@ GATES = (
     ("G6", "no clean state", g6_no_clean),
     ("G7", "denial invariance", g7_denial_invariance),
     ("G8", "scope gate", g8_scope),
+    ("G9", "behaviour matrix", g9_behaviour_matrix),
 )
 
 

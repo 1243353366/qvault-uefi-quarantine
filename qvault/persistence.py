@@ -127,6 +127,11 @@ SIGNALS: dict[str, Signal] = {
         "dll_shadowing", "same-named DLL sits ahead of the legitimate one",
         "portable apps ship their own DLLs beside the binary",
         "compare against the install manifest; prefer full-path or signed loading"),
+    "ifeo_debugger": Signal(
+        "ifeo_debugger", "an Image File Execution Options Debugger value redirects an image",
+        "debuggers and application-compatibility shims set Debugger deliberately",
+        "alert on Debugger values pointing outside Program Files, and on any value for a "
+        "security-relevant image"),
 }
 
 _LOLBINS = ("rundll32", "regsvr32", "mshta", "powershell", "pwsh", "wscript", "cscript",
@@ -186,6 +191,14 @@ def _appinit(entry: AutostartEntry) -> tuple[str, ...]:
     found = list(_generic(entry))
     if entry.command.strip():
         found.append("appinit_populated")
+    return tuple(found)
+
+
+def _ifeo(entry: AutostartEntry) -> tuple[str, ...]:
+    """T1546.012: the Debugger value is what redirects the image, so it is the signal."""
+    found = list(_generic(entry))
+    if entry.command.strip() or "debugger" in f"{entry.location} {entry.command}".lower():
+        found.append("ifeo_debugger")
     return tuple(found)
 
 
@@ -273,6 +286,13 @@ MECHANISMS: dict[str, Mechanism] = {
            "portable applications ship their own DLLs beside the binary",
            "compare a signed binary's imports against its install manifest; a same-named "
            "DLL in a writable directory is the finding", _dll_search_order),
+        _m("ifeo", "Image File Execution Options Debugger",
+           "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution "
+           "Options\\<image>\\Debugger",
+           "debuggers and appcompat shims set Debugger on purpose; the key is not hostile "
+           "by itself",
+           "alert on a Debugger value outside Program Files and on any value set for a "
+           "security-relevant image", _ifeo),
         _m("rootkit_hiding", "Rootkit hiding", _NOTHING_VISIBLE, _NOT_APPLICABLE,
            "out-of-band comparison: an offline image read or memory acquisition against a "
            "golden reference, since what a rootkit hides is absent from the snapshot that "

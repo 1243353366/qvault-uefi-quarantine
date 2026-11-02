@@ -213,5 +213,5 @@ def test_the_fast_gates_pass():
 
 def test_every_gate_is_named_and_callable():
     gates = _gates()
-    assert [g[0] for g in gates.GATES] == [f"G{i}" for i in range(1, 9)]
+    assert [g[0] for g in gates.GATES] == [f"G{i}" for i in range(1, len(gates.GATES) + 1)]
     assert all(callable(g[2]) for g in gates.GATES)

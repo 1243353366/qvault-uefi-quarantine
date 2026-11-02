@@ -31,6 +31,7 @@ If a gate blocks a release, the release moves. The gate does not.
 | E3 Attestation and host trust | evidence classes, ceilings, self-report refusal | `qvault/separation.py`, `qvault/grading.py`, `qvault/firmware_integrity.py` | `test_module_trust.py`, `test_policy_semantics.py` |
 | E4 Persistence mechanism coverage | the eleven mechanisms, observability boundaries | `qvault/persistence.py` | `test_persistence.py` |
 | E5 Ledger and evidence validation | claim tags, bibliography, CSV contract | `report/CLAIMS_LEDGER.csv`, `tools/check_claims.py` | `test_persistence.py` ledger test |
+| E6 Attacker behaviour coverage | behaviour to control, with gaps named | `qvault/behaviors.py`, `report/THREAT_BEHAVIOR_MATRIX.md` | `test_behaviors.py`, gate G9 |
 
 ## The polyglot boundary
 
@@ -76,8 +77,9 @@ payload with no remedy.
 | G6 | Can the persistence layer still report a clean result? (It must not.) |
 | G7 | Is a refusal identical across forbidden, absent and empty resources? |
 | G8 | Is a live capture still refused without isolation and attestation? |
+| G9 | Does every behaviour still resolve to real code, with the matrix current? |
 
-Merge requires G1 through G8. Nothing here is advisory.
+Merge requires G1 through G9. Nothing here is advisory.
 
 ## Status
 
