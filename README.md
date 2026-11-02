@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg)](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml)
 
-CI runs the same fourteen-gate-plus suite this README describes: tests on 3.11 and 3.12, all sixteen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
+CI runs the suite this README describes: tests on 3.11 and 3.12, all sixteen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
 **Version 0.13.3** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
