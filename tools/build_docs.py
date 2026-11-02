@@ -78,6 +78,7 @@ PAGES = [
     ("SECURITY.md", "security-policy.html", "Security policy", "Assurance"),
     ("PROVENANCE.md", "provenance.html", "Provenance and verification", "Assurance"),
     ("CONTRIBUTING.md", "contributing.html", "Contributing", "Assurance"),
+    ("report/CDUP.md", "cdup.html", "CDUP: data usability protection", "Design"),
     ("report/TOOLING_RISK.md", "tooling-risk.html", "Tooling risk", "Assurance"),
     ("report/SECURITY_REPORT.md", "security-report.html",
      "Security report", "Assurance"),

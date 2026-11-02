@@ -86,6 +86,15 @@ REGISTER = {
               "undercount defect",
         gap="Third-party code is trusted at its pin. Its upstream changes are audited by hand, and "
             "that audit is not automated."),
+    "cdup.py": dict(
+        consumes="sealed ciphertext, wrapped keys and capability tokens, from a caller or an attacker",
+        guard="AEAD per chunk with AAD bound to the object id, so ciphertext cannot be relabelled; "
+              "capability MAC checked with `hmac.compare_digest` before any key is unwrapped; a "
+              "single-use replay set; refusals byte-identical across expiry, forgery, replay and "
+              "wrong-object",
+        gap="The authority trusts its own directory for the KEK and the replay set. An attacker who "
+            "can write that directory reads the key and rewrites spent capabilities; the separation "
+            "is deployment (another host, an HSM), not this module."),
     "wild.py": dict(
         consumes="the in-the-wild dataset (pinned snapshot)",
         guard="pinned snapshot; entries are metadata, not samples",
