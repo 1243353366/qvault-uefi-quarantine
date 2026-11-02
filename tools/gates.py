@@ -13,6 +13,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G7 denial invariance   a refusal does not vary with the resource that was asked for
   G8 scope gate          a live capture is refused without isolation and attestation
   G9 behaviour matrix    every behaviour resolves to real code and the document is current
+  G10 telemetry map      every mechanism has an evidence source or a stated reason
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -160,6 +161,22 @@ def g8_scope() -> tuple[bool, str]:
     return False, "a live capture was permitted"
 
 
+def g10_telemetry() -> tuple[bool, str]:
+    """Every mechanism has an evidence source or a stated reason, and the map is current."""
+    from qvault import telemetry as T
+
+    T.assert_complete()
+    sys.path.insert(0, str(ROOT / "tools"))
+    import gen_telemetry_map  # noqa: PLC0415
+
+    on_disk = (ROOT / "report" / "TELEMETRY_MAP.md").read_text()
+    if on_disk != gen_telemetry_map.render():
+        return False, "report/TELEMETRY_MAP.md is stale; run tools/gen_telemetry_map.py"
+    blind = T.mechanisms_without_host_evidence()
+    return True, (f"{len(T.MECHANISM_SOURCES)} mechanisms mapped to {len(T.SOURCES)} sources, "
+                  f"{len(blind)} with no host telemetry, map current")
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -170,6 +187,7 @@ GATES = (
     ("G7", "denial invariance", g7_denial_invariance),
     ("G8", "scope gate", g8_scope),
     ("G9", "behaviour matrix", g9_behaviour_matrix),
+    ("G10", "telemetry map", g10_telemetry),
 )
 
 

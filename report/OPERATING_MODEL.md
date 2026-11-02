@@ -32,6 +32,7 @@ If a gate blocks a release, the release moves. The gate does not.
 | E4 Persistence mechanism coverage | the eleven mechanisms, observability boundaries | `qvault/persistence.py` | `test_persistence.py` |
 | E5 Ledger and evidence validation | claim tags, bibliography, CSV contract | `report/CLAIMS_LEDGER.csv`, `tools/check_claims.py` | `test_persistence.py` ledger test |
 | E6 Attacker behaviour coverage | behaviour to control, with gaps named | `qvault/behaviors.py`, `report/THREAT_BEHAVIOR_MATRIX.md` | `test_behaviors.py`, gate G9 |
+| E7 Telemetry and hunting content | what feeds each detection, Sigma families, vendor field model | `qvault/telemetry.py`, `report/TELEMETRY_MAP.md` | `test_telemetry.py`, gate G10 |
 
 ## The polyglot boundary
 
@@ -78,8 +79,9 @@ payload with no remedy.
 | G7 | Is a refusal identical across forbidden, absent and empty resources? |
 | G8 | Is a live capture still refused without isolation and attestation? |
 | G9 | Does every behaviour still resolve to real code, with the matrix current? |
+| G10 | Does every mechanism have an evidence source or a stated blind spot? |
 
-Merge requires G1 through G9. Nothing here is advisory.
+Merge requires G1 through G10. Nothing here is advisory.
 
 ## Status
 

@@ -279,9 +279,42 @@ the URL and the reason it is cited.
 
 15 tests in `test_behaviors.py` (684 total), gate G9 added.
 
-### Note
+### Added - telemetry map (`qvault/telemetry.py`)
 
-Deliberately not merged: main remains at v0.11.0 until this is reviewed.
+Every mechanism now names the telemetry that would carry its evidence: 11 sources across
+Sysmon, Windows Security and System logs, PowerShell script-block logging and the TPM event
+log, with the fields to inspect for each.
+
+- Sysmon event semantics were read from the Microsoft documentation, not recalled:
+  1 process create, 7 image load, 11 file create, 12/13/14 registry, 19/20/21 WMI.
+- Sigma families are cited with real identifiers read from the SigmaHQ repository, and the
+  module notes they are hunting content rather than a dependency.
+- `rootkit_hiding` and `bootkit_boot` carry no host telemetry at all, because a host cannot
+  testify about what runs before it or hides from it. Both state where the answer does come
+  from instead.
+- `fileless` is classified separately as execution-time only: telemetry exists (process
+  ancestry, script blocks), but no autostart artefact does. An earlier version put it in the
+  "no telemetry" set, and the consistency check caught the contradiction.
+- EDR field names follow the Defender XDR schema so the map stays vendor-neutral.
+
+### Verified - sources for this round
+
+ATT&CK v20 uses Detection Strategy, Analytics and Data Components; the older "Data Sources"
+vocabulary no longer applies. Bibliography entries 59-66 cover Sysmon, the 4698 event, script
+block logging, the TPM 2.0 specification, the SigmaHQ repository, the Defender XDR schema,
+the MSRC update guide and Mandiant's threat-intelligence blog. Entries 62-66 were added only
+after the URLs resolved; a candidate measured-boot page returned 404 and was not cited.
+
+### Added - gate G10 and generated map
+
+`report/TELEMETRY_MAP.md` is rendered from the mapping, and G10 fails if the map is stale or
+if the mapping is incomplete. 16 tests in `test_telemetry.py` (700 total).
+
+### Released - merged to main
+
+`main` moves from v0.11.0 to v0.12.0. The branch carried the policy-denial hardening, the
+probe contract, the persistence detection matrix, the wire contract with gates, and the
+behaviour and telemetry maps. All ten gates pass on main after the merge.
 
 ## [0.11.0] - 2026-11-02
 
