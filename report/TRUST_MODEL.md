@@ -116,6 +116,22 @@ attested, and names which of the two is missing. Synthetic fixtures need neither
 5. Report observed and inferred separately, with the evidence class behind each grade.
 6. Refuse the verdict when the evidence class cannot carry it, and say which class would.
 
+## The honest split
+
+Two kinds of problem, and they should not be described in the same voice.
+
+**Cheap and reproducible**, at the authorization boundary: one constant-shaped refusal, a
+single public denial code, unknown treated as forbidden, denials recorded rather than
+returned, evaluation failure denying, and monotonicity checked against an explicit
+allowance table. All of it black-box, unit-testable, and now tested in
+`test_policy_semantics.py` (25 tests).
+
+**Architectural**, and not patchable: a host cannot certify itself, a self-scan is not
+proof, out-of-band evidence is required for a firmware claim, and a local filesystem is not
+WORM. The code's contribution there is limited to refusing the stronger conclusion and
+naming what would support it. Calling those "bugs" would misdescribe them, and claiming
+they are fixed because a test passes would be worse.
+
 ## Running the checks
 
 ```bash

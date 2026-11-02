@@ -79,6 +79,25 @@ it refuses to say.
 
 18 tests in `test_module_trust.py`, 554 in total.
 
+### Added - policy semantics on the authorization boundary
+
+The cheap, testable half of the trust problem, closed with black-box tests:
+
+- **One public denial code.** `PUBLIC_DENIAL_CODE = policy_denied` is the only code an
+  unprivileged caller ever sees. A richer taxonomy would be a partition function: which
+  code returned would say whether the resource existed and which gate was close to passing.
+- **Uniform unknown handling.** A made-up resource, an empty resource and a genuine
+  forbidden one produce byte-identical answers under every policy.
+- **Denials are recorded, not returned.** `authorize(..., audit=callable)` receives
+  resource, policy, codes and caller; the caller's answer is unchanged by recording.
+- **Fail closed.** An evaluator exception denies with the same shape as any other refusal,
+  is recorded by exception *type* (never message), and surfaces as
+  `DENY_EVALUATION_ERROR` only to an operator.
+- **Explicit allowance lattice.** `allowance(policy)` and `at_least_as_permissive` make
+  monotonicity a property of a table rather than a belief; a swept test asserts that a
+  dominating policy never refuses what a dominated one allows, across every request form.
+- 25 tests in `test_policy_semantics.py` (581 total).
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.

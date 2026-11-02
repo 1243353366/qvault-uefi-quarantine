@@ -44,6 +44,7 @@ W1 for why that separation matters.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 
 BSSID_RE = re.compile(r"^[0-9a-f]{2}([:-][0-9a-f]{2}){5}$")
@@ -370,6 +371,32 @@ def _deny(decision: "Decision", resource: str, code: str, required: str,
                   remedy=remedy, detail=detail)
 
 
+def allowance(policy: str) -> dict[str, int]:
+    """How much each gate permits under a policy. Higher is more permissive.
+
+    Monotonicity is a property of this table: if every entry for A is at least B's, then
+    nothing B allows may be refused by A. Keeping it explicit means the property can be
+    tested instead of believed.
+    """
+    if policy not in POLICIES:
+        raise KeyError(f"unknown policy {policy!r}; known: {sorted(POLICIES)}")
+    s = POLICIES[policy]
+    return {
+        "egress": 1 if s["allow_egress"] else 0,
+        "retention_days": int(s["retention_days"]),
+        "collection": _COLLECTION_RANK[s["collection"]],
+        "custody_ease": 5 - int(s["custody"][0]),
+        "attestation_waived": 0 if s["require_attestation"] else 1,
+        "unsealed_write": 1 - int(bool(s["seal_before_write"])),
+    }
+
+
+def at_least_as_permissive(a: str, b: str) -> bool:
+    """Whether policy `a` permits everything `b` permits."""
+    la, lb = allowance(a), allowance(b)
+    return all(la[k] >= lb[k] for k in la)
+
+
 def _evaluate(decision: "Decision", resource: str, *, requested=None,
               attested: bool | None = None, shares: int | None = None) -> Verdict:
     """Decide one request under the selected policy.
@@ -457,8 +484,14 @@ def _evaluate(decision: "Decision", resource: str, *, requested=None,
 
 #: Returned to callers that have not been granted detail. Byte-identical for an unknown
 #: resource, a forbidden one, and a policy that simply says no.
+#: The only public denial code. A taxonomy with more than one entry would be a partition
+#: function: which code came back would say whether the resource existed and which gate
+#: was close to passing.
+PUBLIC_DENIAL_CODE = "policy_denied"
+
 COARSE_REFUSAL: dict = {
     "allowed": False,
+    "code": PUBLIC_DENIAL_CODE,
     "denial": "refused",
     "remedy": "the request was refused by policy; the specific reason is available to the "
               "policy owner",
@@ -482,19 +515,55 @@ class Principal:
         return bool(self.sees_detail and self.role and self.name)
 
 
+def denial_record(decision: "Decision", resource: str, *, principal: Principal | None = None,
+                  requested=None, attested: bool | None = None,
+                  shares: int | None = None) -> dict:
+    """The reason, for the policy owner's log. Never returned to the caller."""
+    verdict = _evaluate(decision, resource, requested=requested, attested=attested,
+                        shares=shares)
+    return {"resource": resource, "allowed": verdict.allowed, "policy": decision.policy,
+            "trust": decision.trust, "codes": [d.code for d in verdict.denials],
+            "caller": (principal.name if principal else ""), "at": int(time.time())}
+
+
 def authorize(decision: "Decision", resource: str, *, principal: Principal | None = None,
               requested=None, attested: bool | None = None,
-              shares: int | None = None) -> dict:
+              shares: int | None = None, audit=None) -> dict:
     """Answer one request, saying as little as the caller has earned.
 
     The evaluation always runs, so a refusal costs the same work whichever rule produced
     it; only the report differs.
     """
-    verdict = _evaluate(decision, resource, requested=requested, attested=attested,
-                        shares=shares)
-    if principal is None or not principal.may_see_detail:
+    detailed = principal is not None and principal.may_see_detail
+    try:
+        verdict = _evaluate(decision, resource, requested=requested, attested=attested,
+                            shares=shares)
+    except Exception as exc:                     # noqa: BLE001 - a rule error is a denial
+        # Fail closed: an evaluator that cannot answer must not answer "allowed".
+        record = {"resource": resource, "allowed": False, "policy": decision.policy,
+                  "trust": decision.trust, "codes": ["EVALUATION_ERROR"],
+                  "error": type(exc).__name__, "at": int(time.time())}
+        if audit is not None:
+            audit(record)
+        if not detailed:
+            return dict(COARSE_REFUSAL)
+        return {"allowed": False, "resource": resource,
+                "denials": [{"resource": resource, "code": "DENY_EVALUATION_ERROR",
+                             "policy": decision.policy, "trust": decision.trust,
+                             "required": "an evaluable request",
+                             "observed": type(exc).__name__,
+                             "remedy": "fix the request or the policy; nothing was allowed "
+                                       "while the evaluator was failing"}]}
+
+    if not detailed:
         if verdict.allowed:
             return {"allowed": True}
+        if audit is not None:
+            audit({"resource": resource, "allowed": False, "policy": decision.policy,
+                   "trust": decision.trust,
+                   "codes": [d.code for d in verdict.denials],
+                   "caller": (principal.name if principal else ""),
+                   "at": int(time.time())})
         return dict(COARSE_REFUSAL)
     return {"allowed": verdict.allowed, "resource": resource,
             "denials": [d.to_dict() for d in verdict.denials]}
