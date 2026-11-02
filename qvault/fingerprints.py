@@ -226,26 +226,17 @@ def observations(hits: list[dict], gaps: tuple[str, ...] = ()) -> list[F.Observa
 
 
 def defender_inversion(family: str) -> list[dict]:
-    """The opposite effect: for each mechanism, the control that defeats it."""
+    """The opposite effect: for each mechanism, the control that defeats it.
+
+    Derived from the family's substrate rather than written per family. The rows used to be
+    identical for all three, which gave BlackLotus an SPI read and a reflash - a control that
+    would not find it and an eradication step that would not remove it.
+    """
+    from . import residency as _residency
+
     if family not in FAMILIES:
         raise ValueError(f"unknown family {family!r}")
-    return [
-        {"mechanism": "firmware written from the running OS", "control"
-         : "BIOS write protection, flash-descriptor lockdown and SMM_BWP; the write itself is "
-           "the event to alert on", "module": "containment, netpolicy"},
-        {"mechanism": "implant persists across OS reinstall", "control"
-         : "out-of-band SPI read against a vendor reference; never accept an OS scan as "
-           "firmware evidence", "module": "firmware_integrity"},
-        {"mechanism": "boot-chain trust bypassed by a vulnerable bootloader", "control"
-         : "apply dbx revocation, verify Secure Boot state instead of assuming it, and anchor "
-           "measurement in hardware", "module": "firmware_integrity"},
-        {"mechanism": "platform defences disabled by the bootkit", "control"
-         : "tamper protection with a management-side baseline; alert on local change",
-         "module": "findings, pillars"},
-        {"mechanism": "evidence of the compromise destroyed by the implant", "control"
-         : "seal evidence in the vault before analysis, so a hostile host cannot edit what was "
-           "already captured", "module": "provenance, crypto, store"},
-    ]
+    return _residency.controls(family)
 
 
 def assert_catalogue_integrity() -> None:

@@ -18,6 +18,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G12 documentation site the published site is a current render of the repository
   G13 version source     the version has one source and every copy agrees with it
   G14 internal links     every link in the published site resolves
+  G15 residency taxonomy substrate per family, and no document merges them
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -246,6 +247,36 @@ def g14_internal_links() -> tuple[bool, str]:
                   f"{len(linkcheck.published())} pages")
 
 
+def g15_residency() -> tuple[bool, str]:
+    """Three implants, two substrates: the catalogue, the docs and the prose must agree."""
+    from qvault import fingerprints as F  # noqa: PLC0415
+    from qvault import residency as R  # noqa: PLC0415
+
+    R.assert_taxonomy()
+    problems = [f"{f} has no residency entry" for f in F.FAMILIES if f not in R.RESIDENCY]
+    problems += [f"{f} is in the taxonomy but not the catalogue"
+                 for f in R.RESIDENCY if f not in F.FAMILIES]
+
+    for path in [ROOT / "README.md"] + sorted((ROOT / "report").glob("*.md")):
+        for sentence in R.conflation_claims(path.read_text()):
+            problems.append(f"{path.name}: conflates substrate: {sentence[:70]}")
+
+    page = ROOT / "report" / "ACQUISITION_AND_ANALYSIS.md"
+    if not page.exists():
+        problems.append("acquisition page is missing")
+    else:
+        text = page.read_text()
+        for row in R.summary_rows():
+            if f"| {row['family']} | {row['substrate']} |" not in text:
+                problems.append(f"acquisition page has a stale row for {row['family']}")
+
+    if problems:
+        return False, "; ".join(problems[:3])
+    esp = sum(1 for r in R.RESIDENCY.values() if not r.hardware_resident)
+    return True, (f"{len(R.RESIDENCY)} families, {esp} not hardware-resident, "
+                  f"no document merges them")
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -261,6 +292,7 @@ GATES = (
     ("G12", "documentation site", g12_documentation_site),
     ("G13", "version source", g13_version_single_sourced),
     ("G14", "internal links", g14_internal_links),
+    ("G15", "residency taxonomy", g15_residency),
 )
 
 

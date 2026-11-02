@@ -33,6 +33,8 @@ PAGES = [
     ("report/TELEMETRY_MAP.md", "telemetry-map.html", "Telemetry map", "Research"),
     ("report/PERSISTENCE.md", "persistence.html", "Persistence detection", "Controls"),
     ("report/FINGERPRINTS.md", "fingerprints.html", "Family fingerprints", "Research"),
+    ("report/ACQUISITION_AND_ANALYSIS.md", "acquisition.html",
+     "Acquisition and analysis", "Assurance"),
     ("report/LAN_LAYER.md", "lan-layer.html", "LAN containment", "Controls"),
     ("report/NETOBS_MODULE.md", "netobs.html", "Network observation", "Controls"),
     ("report/TRUST_MODEL.md", "trust-model.html", "Trust model", "Assurance"),

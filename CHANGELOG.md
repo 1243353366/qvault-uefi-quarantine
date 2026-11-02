@@ -9,6 +9,45 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.2] - 2026-11-02
+
+### Fixed - BlackLotus was being described as a firmware implant
+
+The generated control table was identical for all three families, so BlackLotus inherited
+"firmware written from the running OS" and "out-of-band SPI read against a vendor reference".
+Neither applies. BlackLotus keeps files on the EFI System Partition and defeats Secure Boot by
+chaining through a signed-but-vulnerable bootloader; an SPI read finds nothing, and a clean result
+would have been read as exoneration. The rows are now generated from substrate.
+
+`qvault/residency.py` holds the taxonomy: LoJax and MoonBounce in SPI flash (survive disk wipe and
+OS reinstall, found only out of band, removed only by reflash, revocation insufficient),
+BlackLotus on the ESP (survives reinstall that keeps the ESP, removed by ESP rebuild plus
+`dbx`/SVN revocation, where revocation is an effective control). `assert_taxonomy()` refuses a
+table that offers an SPI read for an ESP-resident family, and `conflation_claims()` flags prose
+that places one in flash - explicitly negated statements excepted.
+
+### Added - acquisition and analysis boundaries
+
+`report/ACQUISITION_AND_ANALYSIS.md`: work from a dump rather than a live infected board, acquire
+with an external SPI programmer because in-OS readers can be answered by the implant, diff against
+a clean vendor image for the exact board, carve with UEFITool NE or `uefi-firmware-parser`,
+disassemble in Ghidra with an EFI loader or IDA with efiXplorer, keep the analysis box air-gapped,
+and own a programmer and a verified known-good image before touching hardware. It also states
+what this project will not produce, and that a machine you suspect is infected is a containment
+problem first and an analysis problem second.
+
+### Added - the emulator boundary (A5)
+
+QEMU/OVMF does not reproduce `BIOS_CNTL`, the protected range registers, the SPI descriptor or SMM
+locking, so a write that hardware blocks succeeds in a guest. A write-protection conclusion
+reached only under emulation is a HYPOTHESIS regardless of how often the test passes.
+
+### Gates and tests
+
+G15 checks the taxonomy, the generated tables and the prose together. Twenty tests in
+`test_residency.py`, including that the control rows differ by substrate and that correct
+statements are not flagged. 787 tests, fifteen gates.
+
 ## [0.13.1] - 2026-11-02
 
 ### Fixed - a gate that fails now stops the push

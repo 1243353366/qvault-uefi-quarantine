@@ -7,7 +7,7 @@
 > `tools/linkcheck.py` was right to fail it. Locally, `.githooks/pre-push` runs all fourteen
 > gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.1** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.2** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -45,6 +45,7 @@ The full documentation is published at
 | [Behaviour to control](https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix) | 17 attacker behaviours, the control that answers each, and the gaps named |
 | [Telemetry map](https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map) | What feeds each detection: Sysmon, Windows events, script blocks, TPM log |
 | [Persistence](https://1243353366.github.io/qvault-uefi-quarantine/persistence) | Fourteen autostart mechanisms and four result classes |
+| [Acquisition and analysis](https://1243353366.github.io/qvault-uefi-quarantine/acquisition) | Dump-based workflow, tooling, air-gap, and what an emulator cannot tell you |
 | [Trust model](https://1243353366.github.io/qvault-uefi-quarantine/trust-model) · [Limitations](https://1243353366.github.io/qvault-uefi-quarantine/limitations) | What is programmatically enforced, and what is deployment-dependent |
 | [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations) | All 68 sources, each with where it is used |
 

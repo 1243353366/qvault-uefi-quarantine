@@ -71,9 +71,9 @@ attack.
 | mechanism | control | implemented in |
 |---|---|---|
 | firmware written from the running OS | BIOS write protection, flash-descriptor lockdown and SMM_BWP; the write itself is the event to alert on | `containment, netpolicy` |
-| implant persists across OS reinstall | out-of-band SPI read against a vendor reference; never accept an OS scan as firmware evidence | `firmware_integrity` |
-| boot-chain trust bypassed by a vulnerable bootloader | apply dbx revocation, verify Secure Boot state instead of assuming it, and anchor measurement in hardware | `firmware_integrity` |
-| platform defences disabled by the bootkit | tamper protection with a management-side baseline; alert on local change | `findings, pillars` |
+| implant persists across OS reinstall and disk wipe | out-of-band SPI read with an external programmer, diffed against the vendor image for this board and firmware version; never accept an OS scan as firmware evidence | `firmware_integrity` |
+| in-OS firmware readers are answered by the implant itself | treat chipsec and similar in-OS readers as a lead generator only; the SMM and SPI controller they query are inside the boundary under suspicion | `firmware_integrity, separation` |
+| revocation does not remove it | reflash is the eradication; a dbx update closes the boot path but leaves the module in place, so a read-back comparison is the closure criterion | `containment, findings` |
 | evidence of the compromise destroyed by the implant | seal evidence in the vault before analysis, so a hostile host cannot edit what was already captured | `provenance, crypto, store` |
 
 ### moonbounce
@@ -81,20 +81,38 @@ attack.
 | mechanism | control | implemented in |
 |---|---|---|
 | firmware written from the running OS | BIOS write protection, flash-descriptor lockdown and SMM_BWP; the write itself is the event to alert on | `containment, netpolicy` |
-| implant persists across OS reinstall | out-of-band SPI read against a vendor reference; never accept an OS scan as firmware evidence | `firmware_integrity` |
-| boot-chain trust bypassed by a vulnerable bootloader | apply dbx revocation, verify Secure Boot state instead of assuming it, and anchor measurement in hardware | `firmware_integrity` |
-| platform defences disabled by the bootkit | tamper protection with a management-side baseline; alert on local change | `findings, pillars` |
+| implant persists across OS reinstall and disk wipe | out-of-band SPI read with an external programmer, diffed against the vendor image for this board and firmware version; never accept an OS scan as firmware evidence | `firmware_integrity` |
+| in-OS firmware readers are answered by the implant itself | treat chipsec and similar in-OS readers as a lead generator only; the SMM and SPI controller they query are inside the boundary under suspicion | `firmware_integrity, separation` |
+| revocation does not remove it | reflash is the eradication; a dbx update closes the boot path but leaves the module in place, so a read-back comparison is the closure criterion | `containment, findings` |
 | evidence of the compromise destroyed by the implant | seal evidence in the vault before analysis, so a hostile host cannot edit what was already captured | `provenance, crypto, store` |
 
 ### blacklotus
 
 | mechanism | control | implemented in |
 |---|---|---|
-| firmware written from the running OS | BIOS write protection, flash-descriptor lockdown and SMM_BWP; the write itself is the event to alert on | `containment, netpolicy` |
-| implant persists across OS reinstall | out-of-band SPI read against a vendor reference; never accept an OS scan as firmware evidence | `firmware_integrity` |
-| boot-chain trust bypassed by a vulnerable bootloader | apply dbx revocation, verify Secure Boot state instead of assuming it, and anchor measurement in hardware | `firmware_integrity` |
+| files written to the boot partition, with no firmware write at all | integrity monitoring of the EFI System Partition against a known-good manifest, and a measured-boot log; the ESP write is the event to alert on | `firmware_integrity, provenance` |
+| implant survives an OS reinstall while the boot partition is preserved | reformat and recreate the ESP, then compare its contents against the vendor manifest; an OS reinstall that keeps the ESP is not remediation | `findings, containment` |
+| boot-chain trust bypassed through a signed-but-vulnerable bootloader (CVE-2022-21894) | apply dbx/SVN revocation for the vulnerable bootloader and verify Secure Boot state instead of assuming it; here revocation is an effective control | `firmware_integrity, pillars` |
+| attacker-controlled key enrolled in the Machine Owner Key database | inventory MOK entries against an approved list, remove keys that were not enrolled from clean media, and keep the enrolment surface under change control | `pillars, containment` |
 | platform defences disabled by the bootkit | tamper protection with a management-side baseline; alert on local change | `findings, pillars` |
 | evidence of the compromise destroyed by the implant | seal evidence in the vault before analysis, so a hostile host cannot edit what was already captured | `provenance, crypto, store` |
+
+
+## Residency: three implants, two substrates
+
+The control table below is generated per family from `qvault/residency.py`, because one table
+copied for all three families gave BlackLotus an SPI read and a reflash. Those are a control that
+would not find it and an eradication step that would not remove it.
+
+| family | substrate | hardware-resident | survives | removed by | revocation |
+|---|---|---|---|---|---|
+| lojax | SPI flash | yes | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; read-back comparison against the vendor image before returning to service | not sufficient on its own |
+| moonbounce | SPI flash | yes | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; NVRAM considered separately, since the implant used it for storage | not sufficient on its own |
+| blacklotus | EFI System Partition | no | os reinstall preserving esp | reformat and recreate the ESP; apply dbx/SVN revocation for the vulnerable bootloader | sufficient with ESP rebuild |
+
+BlackLotus is **not** hardware-resident. An SPI read finds nothing on such a machine, and an OS
+reinstall that keeps the ESP preserves it. LoJax and MoonBounce are the reverse: an ESP rebuild
+does nothing and only a reflash removes them.
 
 
 ## Detection discipline

@@ -62,8 +62,26 @@ FOOTER = """
 """
 
 
+RESIDENCY_NOTE = """
+## Residency: three implants, two substrates
+
+The control table below is generated per family from `qvault/residency.py`, because one table
+copied for all three families gave BlackLotus an SPI read and a reflash. Those are a control that
+would not find it and an eradication step that would not remove it.
+
+"""
+
+RESIDENCY_CLOSE = """
+BlackLotus is **not** hardware-resident. An SPI read finds nothing on such a machine, and an OS
+reinstall that keeps the ESP preserves it. LoJax and MoonBounce are the reverse: an ESP rebuild
+does nothing and only a reflash removes them.
+
+"""
+
+
 def main() -> None:
     import sys
+    import qvault.residency as R
     check = "--check" in sys.argv
     P.assert_catalogue_integrity()
     lines = [HEADER]
@@ -94,6 +112,14 @@ def main() -> None:
         for item in P.defender_inversion(family):
             lines.append(f"| {item['mechanism']} | {item['control']} | `{item['module']}` |\n")
         lines.append("\n")
+
+    lines.append(RESIDENCY_NOTE)
+    lines.append("| family | substrate | hardware-resident | survives | removed by | "
+                 "revocation |\n|---|---|---|---|---|---|\n")
+    for row in R.summary_rows():
+        lines.append(f"| {row['family']} | {row['substrate']} | {row['hardware']} | "
+                     f"{row['survives']} | {row['removed_by']} | {row['revocation']} |\n")
+    lines.append(RESIDENCY_CLOSE)
 
     lines.append(FOOTER)
     rendered = "".join(lines)

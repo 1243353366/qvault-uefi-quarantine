@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acquisition and analysis · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.2 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="acquisition.html" class="current">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="acquisition-and-analysis-boundaries">Acquisition and analysis boundaries</h1>
+<p>How this project treats firmware samples, what the lab has to look like, and what an emulator
+cannot tell you. Written because "we reverse engineer UEFI implants" invites two very different
+readings, and only one of them is in scope here.</p>
+<h2 id="what-is-in-scope">What is in scope</h2>
+<p>Analysis of <strong>published-source material and firmware images you are authorised to hold</strong>: a dump
+from hardware you own, a vendor image, or an artefact already documented in the literature. The
+deliverable is detection, attribution discipline and remediation - never a working implant.</p>
+<h2 id="what-is-not-in-scope-and-will-not-be-produced-here">What is not in scope, and will not be produced here</h2>
+<p>No new bootkit, implant or persistence mechanism. No patch to a known implant to make it
+undetectable. No bypass of Secure Boot or of flash write protection. The mechanism is published;
+reproducing it adds nothing to defence and everything to the supply of attack tooling.</p>
+<h2 id="three-cases-not-one-claim">Three cases, not one claim</h2>
+<p>"Persists in hardware past Secure Boot" is the sort of sentence that makes a limitations page
+weaker, because it merges three situations with different evidence and different remediation.
+The taxonomy in <code>qvault/residency.py</code> is the single source; the table below is generated from it.</p>
+<table>
+<thead>
+<tr>
+<th>family</th>
+<th>substrate</th>
+<th>hardware-resident</th>
+<th>survives</th>
+<th>removed by</th>
+<th>revocation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>lojax</td>
+<td>SPI flash</td>
+<td>yes</td>
+<td>os reinstall, disk wipe, esp reformat, bootloader update</td>
+<td>external reflash with a vendor image from a programmer; read-back comparison against the vendor image before returning to service</td>
+<td>not sufficient on its own</td>
+</tr>
+<tr>
+<td>moonbounce</td>
+<td>SPI flash</td>
+<td>yes</td>
+<td>os reinstall, disk wipe, esp reformat, bootloader update</td>
+<td>external reflash with a vendor image from a programmer; NVRAM considered separately, since the implant used it for storage</td>
+<td>not sufficient on its own</td>
+</tr>
+<tr>
+<td>blacklotus</td>
+<td>EFI System Partition</td>
+<td>no</td>
+<td>os reinstall preserving esp</td>
+<td>reformat and recreate the ESP; apply dbx/SVN revocation for the vulnerable bootloader</td>
+<td>sufficient with ESP rebuild</td>
+</tr>
+</tbody>
+</table>
+<p>Three consequences follow, and they are the reason the table is code rather than prose:</p>
+<ul>
+<li><strong>Evidence differs.</strong> For an SPI-resident implant only an out-of-band read is ground truth.
+  For an ESP-resident implant an SPI read finds nothing, and the evidence is boot-partition
+  content plus MOK, <code>dbx</code>/SVN and measured-boot state.</li>
+<li><strong>Remediation differs.</strong> Reflash removes a flash module. It does nothing to a file on the
+  ESP, and reformatting the ESP does nothing to a flash module.</li>
+<li><strong>Revocation differs.</strong> <code>dbx</code> revocation is an effective control for BlackLotus's
+  signed-but-vulnerable bootloader. It closes the boot path for a flash module without removing
+  the module, so a read-back comparison is the closure criterion, not a revocation date.</li>
+</ul>
+<h2 id="working-from-a-dump-not-a-live-board">Working from a dump, not a live board</h2>
+<p>The rule that matters most: <strong>do not analyse an actively infected board you depend on.</strong> Take an
+image, then work from the image.</p>
+<ol>
+<li><strong>Acquire with an external SPI programmer.</strong> Ground truth is the flash device's own contents,
+   read by something outside the platform. Software readers (chipsec and friends) query the same
+   SMM and SPI controller the implant may control, so they can be answered with a forgery. They
+   are a lead generator, never the evidence.</li>
+<li><strong>Diff against a clean vendor image</strong> for that exact board and firmware version. A dump alone
+   is not a finding; a difference from the vendor's own bytes is.</li>
+<li><strong>Carve modules</strong> with UEFITool NE or <code>uefi-firmware-parser</code>. Record section offsets and
+   hashes so another analyst can reach the same bytes from the same image.</li>
+<li><strong>Disassemble DXE drivers</strong> in Ghidra with an EFI loader, or IDA with efiXplorer. Treat names
+   as attacker-supplied until proven otherwise.</li>
+<li><strong>Air-gap the analysis box.</strong> Samples and tooling stay off the network, and the acquisition
+   host is not the analysis host. This is separation of duties applied to a lab bench.</li>
+<li><strong>Own the recovery path before you touch anything.</strong> A programmer plus a verified known-good
+   image for every board in the rack. Persistence in firmware means a mistake costs a reflash,
+   and a board with no image and no programmer is a brick with a story attached.</li>
+</ol>
+<p>Every artefact that leaves the bench carries source, timestamps, SHA-256 and chain of custody -
+the same requirements <code>qvault/provenance.py</code> enforces, for the same reason: an analysed sample
+whose provenance is unrecorded is not evidence.</p>
+<h2 id="what-an-emulator-cannot-tell-you">What an emulator cannot tell you</h2>
+<p>QEMU with OVMF is useful for logic, bootkit control flow and driver behaviour. It is not a model
+of the platform's write protection, and that is where a large part of this class lives or dies.</p>
+<ul>
+<li><strong><code>BIOS_CNTL</code> and the protected range registers are not emulated.</strong> Whether a flash region is
+  writable, and by whom, depends on the chipset's registers, the flash descriptor and SMM. A
+  guest in QEMU has none of that state, so a write that would be blocked on real hardware
+  succeeds, and a write that would succeed may be reported as blocked.</li>
+<li><strong>SPI controller behaviour is absent.</strong> Anything that reasons about write-enable cycles,
+  descriptor regions or lockdown timing cannot be validated in emulation.</li>
+<li><strong>SMM is not the real SMM.</strong> SMI delivery, SMRAM locking and the interaction with the flash
+  controller are approximations at best.</li>
+<li><strong>Measured boot is simulated.</strong> A TPM in emulation reproduces the interface, not the assurance.</li>
+</ul>
+<p>So: use the emulator to understand code, and use hardware when the question is a security
+property. A claim about write protection that was only ever tested under OVMF is a hypothesis,
+and <code>qvault/residency.py</code> plus the trust model exist to stop that hypothesis being reported as
+a finding.</p>
+<h2 id="the-first-step-depends-on-why-you-are-looking">The first step depends on why you are looking</h2>
+<p>This page describes project work: dumps you are authorised to hold, analysed to improve detection
+and remediation. If instead you suspect <strong>one of your own machines</strong> is infected, the workflow is
+different and starts elsewhere: stop using it for anything sensitive, do not run scanners from it
+and trust the result, take the acquisition out of band (external programmer for firmware, a
+read-only copy of the ESP for boot-partition cases), and preserve evidence before attempting
+eradication. Analysis is the second step, not the first. A machine you are trying to clean is not
+a lab bench.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

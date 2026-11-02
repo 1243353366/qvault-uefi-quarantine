@@ -138,7 +138,34 @@ changes as security events, not housekeeping.
 
 ---
 
-## What the four have in common
+## A5. Emulation is not a model of write protection
+
+QEMU with OVMF reproduces boot logic; it does not reproduce the platform state that decides
+whether firmware can be written. `BIOS_CNTL`, the protected range registers, the SPI descriptor
+and SMM locking are not emulated, so a write blocked on real hardware succeeds in a guest, and a
+write that would succeed may look blocked. A conclusion about write protection reached only under
+emulation is a **HYPOTHESIS** regardless of how many times the test passes, and the trust model
+will not promote it.
+
+The same boundary applies to measured boot: a simulated TPM reproduces the interface, not the
+assurance. Use the emulator to understand code; use hardware when the question is a security
+property.
+
+## Residency is a claim about substrate, not a mood
+
+A second boundary worth naming here, because it changes what evidence and remediation are even
+applicable. LoJax and MoonBounce are DXE modules in SPI flash: they survive a disk wipe, they are
+found only by an out-of-band read, and only a reflash removes them. BlackLotus is not in hardware
+at all - it keeps files on the EFI System Partition and defeats Secure Boot through a
+signed-but-vulnerable bootloader, so an SPI read finds nothing and `dbx`/SVN revocation combined
+with an ESP rebuild is the answer.
+
+Treating the three as one class produces controls that do not work: an out-of-band SPI read aimed
+at BlackLotus comes back clean and is read as exoneration, and an ESP rebuild aimed at LoJax
+changes nothing. `qvault/residency.py` holds the taxonomy and gate G15 refuses a document that
+merges them.
+
+## What the five have in common
 
 Each control increases *coverage* and none of them increases *integrity*. Coverage
 is how much you can see; integrity is whether what you see is true. Live response

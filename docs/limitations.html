@@ -57,8 +57,8 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <div class="layout">
 <nav>
   <a class="brand" href="index">QVault</a>
-  <p class="ver">v0.13.1 · prototype</p>
-  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html" class="current">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+  <p class="ver">v0.13.2 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html" class="current">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
 </nav>
 <main>
 <h1 id="architectural-limitations">Architectural limitations</h1>
@@ -204,7 +204,28 @@ no compromise.</p>
 (<code>supports_malicious_claim</code> is only true for <code>corroborated</code>). Treat whitelist
 changes as security events, not housekeeping.</p>
 <hr />
-<h2 id="what-the-four-have-in-common">What the four have in common</h2>
+<h2 id="a5-emulation-is-not-a-model-of-write-protection">A5. Emulation is not a model of write protection</h2>
+<p>QEMU with OVMF reproduces boot logic; it does not reproduce the platform state that decides
+whether firmware can be written. <code>BIOS_CNTL</code>, the protected range registers, the SPI descriptor
+and SMM locking are not emulated, so a write blocked on real hardware succeeds in a guest, and a
+write that would succeed may look blocked. A conclusion about write protection reached only under
+emulation is a <strong>HYPOTHESIS</strong> regardless of how many times the test passes, and the trust model
+will not promote it.</p>
+<p>The same boundary applies to measured boot: a simulated TPM reproduces the interface, not the
+assurance. Use the emulator to understand code; use hardware when the question is a security
+property.</p>
+<h2 id="residency-is-a-claim-about-substrate-not-a-mood">Residency is a claim about substrate, not a mood</h2>
+<p>A second boundary worth naming here, because it changes what evidence and remediation are even
+applicable. LoJax and MoonBounce are DXE modules in SPI flash: they survive a disk wipe, they are
+found only by an out-of-band read, and only a reflash removes them. BlackLotus is not in hardware
+at all - it keeps files on the EFI System Partition and defeats Secure Boot through a
+signed-but-vulnerable bootloader, so an SPI read finds nothing and <code>dbx</code>/SVN revocation combined
+with an ESP rebuild is the answer.</p>
+<p>Treating the three as one class produces controls that do not work: an out-of-band SPI read aimed
+at BlackLotus comes back clean and is read as exoneration, and an ESP rebuild aimed at LoJax
+changes nothing. <code>qvault/residency.py</code> holds the taxonomy and gate G15 refuses a document that
+merges them.</p>
+<h2 id="what-the-five-have-in-common">What the five have in common</h2>
 <p>Each control increases <em>coverage</em> and none of them increases <em>integrity</em>. Coverage
 is how much you can see; integrity is whether what you see is true. Live response
 sees more of a system that may be lying. Independent firmware acquisition widens
