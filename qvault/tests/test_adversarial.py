@@ -50,9 +50,9 @@ def artifact(tmp_path, data=b"firmware bytes", *, acquired_at_ms=NOW_MS):
 
 
 def ev(ts, subject="proc", kind=C.CONTACT, plane="historical_record",
-       grade=F.INFERRED, fingerprint="", source=""):
+       grade=F.INFERRED, fingerprint="", source="", collector=""):
     return C.Event(ts=ts, subject=subject, kind=kind, plane=plane, grade=grade,
-                   fingerprint=fingerprint, source=source)
+                   fingerprint=fingerprint, source=source, collector=collector)
 
 
 def build_fv(files, *, declared_len=None, sig=True, hdr_len=0x38):
@@ -175,9 +175,12 @@ def test_identical_events_without_a_fingerprint_also_collapse():
 
 def test_independent_evidence_still_raises_a_grade():
     events = [
-        ev(1000, kind=C.INSTALL, plane="historical_record", fingerprint="a", grade=F.CORROBORATED),
-        ev(1010, kind=C.EXECUTION, plane="live_state", fingerprint="b", grade=F.CORROBORATED),
-        ev(1020, kind=C.CONTACT, plane="wire", fingerprint="c", grade=F.CORROBORATED),
+        ev(1000, kind=C.INSTALL, plane="historical_record", fingerprint="a",
+           grade=F.CORROBORATED, collector="edr-a"),
+        ev(1010, kind=C.EXECUTION, plane="live_state", fingerprint="b",
+           grade=F.CORROBORATED, collector="edr-b"),
+        ev(1020, kind=C.CONTACT, plane="wire", fingerprint="c",
+           grade=F.CORROBORATED, collector="sensor-c"),
     ]
     out = C.assess_cluster(events)
     assert out["duplicate_evidence"] is False

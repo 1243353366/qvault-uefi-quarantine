@@ -9,6 +9,48 @@ they deliberately do not mean.
 
 ---
 
+## [0.11.0] - 2026-11-02
+
+Plane errors, the third class, and the one that makes the other two compound: an
+operator acts on evidence produced by the party under investigation.
+
+### Fixed (plane)
+
+- **correlate** trusted a plane *label* as a source of truth. One compromised collector
+  could write three labels and manufacture corroboration, which the fingerprint rule did
+  not stop because fingerprints are optional. Independence now requires a named collector
+  per plane; unattributed planes cannot raise a grade. Three existing tests had asserted
+  the grade this used to hand out for free, and were corrected to supply attribution
+  rather than weakened to keep passing.
+- **lan** accepted `{"trusted": true}` as evidence that an enforcement plane is sound.
+  Containment moves to an attacker-controlled plane exactly when that claim is wrong, so
+  a boolean is no longer accepted: attestation requires `attested_by`, `evidence` and
+  `at`, and a plane may not attest to itself. The refusal now names which of those failed.
+- **verify** judged a disk it had read, and said nothing about it. Every report now
+  carries `attestation: host_only` and states that a clean verdict is consistency, not
+  independent evidence of integrity.
+
+### Fixed (pilot)
+
+- `LICENSE` contained the MIT text while `pyproject.toml` declared Apache-2.0 and the
+  vendored engine is Apache-2.0. Resolved to Apache-2.0 with the full text; the
+  discrepancy is recorded here rather than quietly overwritten.
+- `MANIFEST.in`: an sdist now carries `report/`, `tools/` and the lock file, which
+  reproduction needs and which the wheel correctly omits.
+
+### Added
+
+- 13 plane tests (479 total), covering unattributed planes, one collector in three
+  labels, boolean and self-attestation refusal, the host-derived verdict, licence
+  consistency and sdist completeness.
+
+### Oracle sweep
+
+No new oracle defect was found this round. The four previously closed (uniform
+authentication failure, uniform store absence, constant-time key-id comparison, no
+secret-derived comparison) are pinned by 9 tests, including a guard that fails the suite
+if the class returns.
+
 ## [0.10.0] - 2026-11-02
 
 Packaging is now proven rather than declared, and CI enforces it.

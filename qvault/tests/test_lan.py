@@ -14,6 +14,11 @@ WS = dev("ws1", N.WORKSTATION, "10.0.0.5", cert_fp="AA")
 NAS = dev("nas1", N.NAS, "10.0.0.9", cert_fp="BB")
 SW = dev("sw1", N.SWITCH, "10.0.0.2", mac="CC")
 IOT = dev("cam1", N.IOT, "10.0.0.30", mac="DD")
+# A plane whose integrity is evidenced, not asserted: this is the only shape that
+# containment is willing to trust.
+ATTESTED = {"switch": {"attested_by": "golden-config-hash", "evidence": "sha256:9f",
+                       "at": 1000}}
+
 DEVICES = {d.id: d for d in (WS, NAS, SW, IOT)}
 
 
@@ -190,12 +195,12 @@ def test_untrusted_switch_plane_cannot_enforce_isolation():
 
 
 def test_trusted_plane_allows_the_full_ladder():
-    plan = N.containment_plan({"suspicion": True}, {"switch": {"trusted": True}})
+    plan = N.containment_plan({"suspicion": True}, ATTESTED)
     assert len(plan["steps"]) == len(N.LADDER)
 
 
 def test_every_step_is_device_scoped_and_names_verification():
-    plan = N.containment_plan({"suspicion": True}, {"switch": {"trusted": True}})
+    plan = N.containment_plan({"suspicion": True}, ATTESTED)
     for step in plan["steps"]:
         assert step["blast_radius_devices"] == 1
         assert step["verify_by"]
@@ -211,12 +216,12 @@ def test_containment_that_would_spread_is_refused():
 
 
 def test_no_plan_pushes_material_to_other_hosts():
-    plan = N.containment_plan({"suspicion": True}, {"switch": {"trusted": True}})
+    plan = N.containment_plan({"suspicion": True}, ATTESTED)
     for step in plan["steps"]:
         assert step["action_kind"] if "action_kind" in step else True
     assert "credential" in plan["forbidden_actions"]
 
 
 def test_low_suspicion_does_not_escalate():
-    plan = N.containment_plan({"suspicion": False}, {"switch": {"trusted": True}})
+    plan = N.containment_plan({"suspicion": False}, ATTESTED)
     assert plan["escalate"] is False

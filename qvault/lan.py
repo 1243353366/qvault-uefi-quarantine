@@ -456,6 +456,24 @@ LADDER = (
 FORBIDDEN_PROPAGATION = ("credential", "key", "config", "agent_binary", "policy_bundle")
 
 
+def _plane_attested(plane: dict) -> tuple[bool, str]:
+    """Whether an enforcement plane's integrity is evidenced rather than asserted.
+
+    A caller writing `{"trusted": true}` is making a claim about a device the attacker may
+    already own. Containment moves to a plane the attacker controls exactly when that
+    claim is wrong, so a boolean is not accepted as evidence.
+    """
+    if not isinstance(plane, dict) or not plane:
+        return False, "no enforcement plane declared"
+    if plane.get("attested_by") and plane.get("evidence") and plane.get("at"):
+        if str(plane["attested_by"]).strip().lower() in ("self", plane.get("plane", "")):
+            return False, "a plane cannot attest to its own integrity"
+        return True, f"attested by {plane['attested_by']}"
+    if plane.get("trusted") is True:
+        return False, "trust was asserted as a boolean, not attested: a claim is not evidence"
+    return False, plane.get("reason") or "plane unattested"
+
+
 def containment_plan(assessment: dict, enforcement: dict) -> dict:
     """Recommend graded steps, and refuse the ones the enforcement plane cannot be trusted to carry out.
 
@@ -481,10 +499,11 @@ def containment_plan(assessment: dict, enforcement: dict) -> dict:
         }
         if name in ("isolate_port", "microsegment"):
             plane = enforcement.get("switch", {})
-            if not plane.get("trusted", False):
+            _ok, _why = _plane_attested(plane)
+            if not _ok:
                 refusals.append({
                     "step": name,
-                    "reason": plane.get("reason", "switch plane untrusted or unattested"),
+                    "reason": _why,
                     "consequence": "containment must move to a plane the attacker does not control",
                     "alternatives": ["physical_disconnect", "upstream_port_disable", "revoke_credential"],
                 })

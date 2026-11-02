@@ -79,6 +79,11 @@ class Event:
     #: claims: relabelling a duplicate must not manufacture independence.
     fingerprint: str = ""     # upstream's usual_reason, when it offered one
 
+    #: Who produced this record. A plane is a label the writer chooses, so three labels
+    #: from one collector are one source wearing three hats. Empty means unattributed,
+    #: and an unattributed plane cannot corroborate anything.
+    collector: str = ""
+
     def __post_init__(self) -> None:
         if self.kind not in KINDS:
             raise CorrelationError(f"unknown event kind {self.kind!r}; known: {KINDS}")
@@ -189,12 +194,24 @@ def assess_cluster(cluster) -> dict:
     subjects = {e.subject for e in cluster}
     base_rank = max(_RANK[e.grade] for e in cluster)
 
+    # Independence requires a named collector per plane. Trusting the label alone lets a
+    # single compromised collector manufacture corroboration by writing three of them.
+    collectors: dict[str, str] = {}
+    for e in cluster:
+        name = (e.collector or "").strip()
+        if not name:
+            collectors = {}
+            break
+        collectors.setdefault(e.plane, name)
+    independent_planes = (len(set(collectors.values())) if collectors else 1)
+    unattributed = not collectors and len(planes) > 1
+
     raised = base_rank
-    if len(kinds) >= 3 and len(planes) >= 2:
+    if len(kinds) >= 3 and independent_planes >= 2:
         raised = min(_RANK[F.CONFIRMED], base_rank + 1)
 
     # One plane is one source of truth, however many events it contributes.
-    capped = len(planes) == 1 or duplicate_evidence
+    capped = independent_planes == 1 or duplicate_evidence
     if capped:
         raised = min(raised, _RANK[F.INFERRED])
 
@@ -212,6 +229,8 @@ def assess_cluster(cluster) -> dict:
         "events": len(cluster),
         "kinds": sorted(kinds),
         "planes": sorted(planes),
+        "independent_planes": independent_planes,
+        "planes_unattributed": unattributed,
         "span_s": cluster[-1].ts - cluster[0].ts,
         "base_grade": _GRADE[base_rank],
         "grade": grade,

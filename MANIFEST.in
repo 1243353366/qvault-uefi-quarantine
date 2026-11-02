@@ -1,0 +1,5 @@
+include README.md CHANGELOG.md LICENSE CREDITS.md
+include requirements.txt requirements-lock.txt pyproject.toml
+recursive-include report *.md *.csv
+recursive-include tools *.py *.sh
+recursive-include vendor *.md

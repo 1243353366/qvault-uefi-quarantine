@@ -52,11 +52,20 @@ class VerifyReport:
             "audit_entries": self.audit_entries,
             "errors": self.errors,
             "warnings": self.warnings,
+            "attestation": "host_only",
         }
+
+
+#: Stated on every report. The audit chain and the evidence sit on the same disk, so a
+#: writer who can alter one can reconcile the other; a clean verdict here is a
+#: consistency check, not independent evidence of integrity.
+HOST_DERIVED = ("verdict is host-derived: this process read the same disk it judged, so "
+                "a clean result is consistency, not independent evidence of integrity")
 
 
 def verify_vault(paths: store.VaultPaths) -> VerifyReport:
     rep = VerifyReport()
+    rep.warnings.append(HOST_DERIVED)
 
     for env in store.list_objects(paths):
         oid = env.get("object_id", "")

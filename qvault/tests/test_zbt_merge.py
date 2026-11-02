@@ -184,8 +184,9 @@ def test_ioc_evidence_has_no_adversarial_value():
 
 
 def ev(ts, subject="com.x", kind=C.EXECUTION, plane="historical_record",
-       grade=F.INFERRED, benign="") -> C.Event:
-    return C.Event(ts=ts, subject=subject, kind=kind, plane=plane, grade=grade, benign=benign)
+       grade=F.INFERRED, benign="", collector="") -> C.Event:
+    return C.Event(ts=ts, subject=subject, kind=kind, plane=plane, grade=grade,
+                   benign=benign, collector=collector)
 
 
 def test_same_subject_clusters_across_time():
@@ -227,9 +228,12 @@ def test_temporal_proximity_alone_never_raises_a_grade():
 
 def test_three_kinds_across_two_planes_raises_the_grade():
     cluster = [
-        ev(1000, kind=C.INSTALL, plane="historical_record", grade=F.CORROBORATED),
-        ev(1050, kind=C.EXECUTION, plane="live_state", grade=F.CORROBORATED),
-        ev(1090, kind=C.CONTACT, plane="wire", grade=F.CORROBORATED),
+        ev(1000, kind=C.INSTALL, plane="historical_record", grade=F.CORROBORATED,
+           collector="edr-a"),
+        ev(1050, kind=C.EXECUTION, plane="live_state", grade=F.CORROBORATED,
+           collector="edr-b"),
+        ev(1090, kind=C.CONTACT, plane="wire", grade=F.CORROBORATED,
+           collector="sensor-c"),
     ]
     a = C.assess_cluster(cluster)
     assert a["raised"] is True
