@@ -158,12 +158,16 @@ retrieve ──► K-of-N shares ──► 2-person approval ──► enclave s
 <td>Dump-based workflow, tooling, air-gap, and what an emulator cannot tell you</td>
 </tr>
 <tr>
+<td><a href="https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response">Endpoint response</a></td>
+<td>Suspending, quarantining and de-persisting a suspected keylogger, reversibly</td>
+</tr>
+<tr>
 <td><a href="https://1243353366.github.io/qvault-uefi-quarantine/trust-model">Trust model</a> · <a href="https://1243353366.github.io/qvault-uefi-quarantine/limitations">Limitations</a></td>
 <td>What is programmatically enforced, and what is deployment-dependent</td>
 </tr>
 <tr>
 <td><a href="https://1243353366.github.io/qvault-uefi-quarantine/citations">Citations</a></td>
-<td>All 68 sources, each with where it is used</td>
+<td>Every source, each with where it is used</td>
 </tr>
 </tbody>
 </table>
@@ -655,6 +659,21 @@ prologue the implant compares against). Exit code 0 means clean.</p>
 <p>Limits, stated in the module docstring: compressed sections are compared as
 opaque bytes, TE images are detected but not section-parsed, and a byte diff can
 tell you a module changed but not which function, without symbols.</p>
+<h2 id="containing-a-keylogger-on-the-endpoint">Containing a keylogger on the endpoint</h2>
+<p>Firmware is one boundary; a keylogger on the running host is another, and containment there has to be
+reversible or it is just damage. <code>response/crush-klog.sh</code> and <code>response/Crush-Klog.ps1</code> suspend,
+isolate, quarantine and de-persist a suspected software keylogger: dry run by default, <code>--apply</code> to
+act, and a generated restore script that undoes the whole run.</p>
+<p>The order is the design. Evidence is copied and hashed first, because socket maps and process metadata
+decay the moment you touch anything. Suspension goes children first, because a watchdog is usually the
+child of the thing it protects and suspends the parent first only frees it to put the autostart entry
+back. Persistence is removed after suspension for the same reason. Quarantine is a rename, never a
+deletion, and a system directory is refused rather than renamed.</p>
+<p>What it does not do: it does not prove the process was a keylogger, it cannot remove a kernel-mode
+implant, a protected process will not suspend, and the clock is never touched, because skewing it would
+destroy the timeline the run exists to preserve. The full account, including the defects in the draft
+this was built from, is in
+<a href="https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response">the response page</a>.</p>
 <h2 id="what-the-tests-prove">What the tests prove</h2>
 <p><code>python -m pytest qvault/tests -q</code> exercises, among others:</p>
 <ul>

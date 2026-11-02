@@ -83,8 +83,9 @@ The full documentation is published at
 | [Telemetry map](https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map)                                                                              | What feeds each detection: Sysmon, Windows events, script blocks, TPM log                |
 | [Persistence](https://1243353366.github.io/qvault-uefi-quarantine/persistence)                                                                                  | Fourteen autostart mechanisms and four result classes                                    |
 | [Acquisition and analysis](https://1243353366.github.io/qvault-uefi-quarantine/acquisition)                                                                     | Dump-based workflow, tooling, air-gap, and what an emulator cannot tell you              |
+| [Endpoint response](https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response)                                                                      | Suspending, quarantining and de-persisting a suspected keylogger, reversibly             |
 | [Trust model](https://1243353366.github.io/qvault-uefi-quarantine/trust-model) · [Limitations](https://1243353366.github.io/qvault-uefi-quarantine/limitations) | What is programmatically enforced, and what is deployment-dependent                      |
-| [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations)                                                                                      | All 68 sources, each with where it is used                                               |
+| [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations)                                                                                      | Every source, each with where it is used                                                 |
 
 Every claim in the reports carries a source, a tag, a status and a falsifier in
 `report/CLAIMS_LEDGER.csv`; gate G3 fails if a claim has no source and gate G12 fails if the
@@ -408,6 +409,25 @@ prologue the implant compares against). Exit code 0 means clean.
 Limits, stated in the module docstring: compressed sections are compared as
 opaque bytes, TE images are detected but not section-parsed, and a byte diff can
 tell you a module changed but not which function, without symbols.
+
+## Containing a keylogger on the endpoint
+
+Firmware is one boundary; a keylogger on the running host is another, and containment there has to be
+reversible or it is just damage. `response/crush-klog.sh` and `response/Crush-Klog.ps1` suspend,
+isolate, quarantine and de-persist a suspected software keylogger: dry run by default, `--apply` to
+act, and a generated restore script that undoes the whole run.
+
+The order is the design. Evidence is copied and hashed first, because socket maps and process metadata
+decay the moment you touch anything. Suspension goes children first, because a watchdog is usually the
+child of the thing it protects and suspends the parent first only frees it to put the autostart entry
+back. Persistence is removed after suspension for the same reason. Quarantine is a rename, never a
+deletion, and a system directory is refused rather than renamed.
+
+What it does not do: it does not prove the process was a keylogger, it cannot remove a kernel-mode
+implant, a protected process will not suspend, and the clock is never touched, because skewing it would
+destroy the timeline the run exists to preserve. The full account, including the defects in the draft
+this was built from, is in
+[the response page](https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response).
 
 ## What the tests prove
 
