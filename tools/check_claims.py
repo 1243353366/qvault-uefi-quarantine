@@ -48,6 +48,12 @@ def report_sections() -> set[str]:
     return found
 
 
+def _bibliography_max(report_text: str) -> int:
+    """Highest numbered bibliography entry actually present in the report."""
+    numbers = [int(m) for m in re.findall(r"^(\d+)\. ", report_text, flags=re.MULTILINE)]
+    return max(numbers) if numbers else 0
+
+
 def main() -> int:
     if not LEDGER.exists():
         print(f"FAIL: ledger not found at {LEDGER}")
@@ -55,6 +61,7 @@ def main() -> int:
 
     sections = report_sections()
     errors: list[str] = []
+    bib_max = _bibliography_max(REPORT.read_text())
     tag_counts: dict[str, int] = {}
     ver_counts: dict[str, int] = {}
 
@@ -90,7 +97,7 @@ def main() -> int:
             errors.append(f"{cid}: {row['tag']} requires a bibliography number, got {bib!r}")
         if bib and bib != "n/a" and not bib.isdigit():
             errors.append(f"{cid}: bib {bib!r} is not numeric")
-        if bib.isdigit() and not (1 <= int(bib) <= 60):
+        if bib.isdigit() and not (1 <= int(bib) <= bib_max):
             errors.append(f"{cid}: bib {bib} outside expected bibliography range")
         if not bib and "reasoning" not in row["locator"].lower():
             errors.append(f"{cid}: no citation and not marked as author reasoning")

@@ -9,6 +9,313 @@ they deliberately do not mean.
 
 ---
 
+## [Unreleased] - policy denial (branch: feature/policy-denial)
+
+The policy matrix said what the settings are. Nothing said what happens to a caller that
+asks for something else, so an operator received a settings dict and no way to tell
+"refused" from "allowed but empty".
+
+### Added
+
+- `netpolicy.authorize()` returns a verdict carrying structured denials rather than a
+  boolean: `DENY_EGRESS`, `DENY_UNSEALED_WRITE`, `DENY_OVERCOLLECTION`,
+  `DENY_OVER_RETENTION`, `DENY_INSUFFICIENT_CUSTODY`, `DENY_NO_ATTESTATION`,
+  `DENY_UNKNOWN_RESOURCE`.
+- Each denial names the requirement, the observation, and the remedy, so a refusal is
+  actionable instead of final.
+- Unknown resources are refused rather than permitted: a request nobody wrote a rule for
+  is not thereby allowed.
+- Observations are counts and labels only. No share material, key identifier or
+  credential reaches a denial, so the refusal cannot become the leak the oracle tests
+  exist to prevent.
+- `authorize_all()` aggregates several requests deterministically, so two runs over the
+  same inputs diff cleanly.
+- 19 tests, including monotonicity against a more permissive policy and a check that a
+  denial's text carries no material.
+
+### Fixed - the denial was an oracle
+
+The first version of this denial logic leaked. `DENY_UNKNOWN_RESOURCE` versus
+`DENY_INSUFFICIENT_CUSTODY`, plus the echoed resource name, told an unauthenticated caller
+that a resource existed and which condition was nearly satisfied. Refusals are now coarse
+and byte-identical for a real, a forbidden, and a nonexistent resource; detail requires a
+principal with a granted flag, and bulk results do not report counts to unprivileged
+callers. Rule-engine tests moved to `_evaluate`, and the public surface is tested for what
+it refuses to say.
+
+### Added - trust model enforcement
+
+- `separation.grade_ceiling` and `assert_claim_supported`: a claim above what its evidence
+  class can support is refused, naming the class that would be enough. A self-report
+  supports no conclusion at all; volume of one class is not a stronger class.
+- `pipeline_conflicts` / `assert_pipeline_separated`: one identity may not hold acquisition
+  and verification, analysis and verification, or storage and verification.
+- `assert_custody_claim`: append-only history cannot be claimed on non-WORM storage.
+- `assert_scope`: live capture is refused unless the acquisition path is isolated and
+  attested.
+- `report/TRUST_MODEL.md` maps all six gaps, marking which are enforced in code, which are
+  architectural, and which are deployment properties. Assumption A1 (the principal's detail
+  grant is not authenticated here) is stated rather than papered over.
+
+### Fixed - the gaps in the modules that make the claims
+
+- **firmware_integrity**: `grade_for` promoted any anchor with two independent sources
+  straight to `CONFIRMED`. Firmware that measured itself, measured twice, came out
+  confirmed. Promotion is now capped by the anchor's evidence class:
+  `pre_os_measured` stays `HYPOTHESIS` at fifty sources, `oob_flash_read` caps at
+  `CORROBORATED`, `os_mediated` stays `UNKNOWN`. Every anchor declares a class.
+- **store**: durability is declared, never guessed. `storage_class` reads
+  `storage.json` or `QVAULT_STORAGE_CLASS`, defaults to `not_worm`, and refuses an
+  unrecognised value rather than treating it as durable. `custody_summary` reports
+  whether an append-only claim is supported and why not.
+- **retrieve**: approvals are checked before the envelope is touched. Reading the envelope
+  first made "no such object" distinguishable from "not approved", so anyone holding an
+  object id could enumerate the vault without an approval. Both now return the same
+  refusal, proven by a test that fails if the envelope is read early.
+- **separation**: `certify_host` is granted to verification only and refused to
+  acquisition, analysis and storage; `claim_custody` belongs to analysis and storage and
+  not to verification. The duty matrix now covers the certification actions, so `may()`
+  answers for them.
+
+18 tests in `test_module_trust.py`, 554 in total.
+
+### Added - policy semantics on the authorization boundary
+
+The cheap, testable half of the trust problem, closed with black-box tests:
+
+- **One public denial code.** `PUBLIC_DENIAL_CODE = policy_denied` is the only code an
+  unprivileged caller ever sees. A richer taxonomy would be a partition function: which
+  code returned would say whether the resource existed and which gate was close to passing.
+- **Uniform unknown handling.** A made-up resource, an empty resource and a genuine
+  forbidden one produce byte-identical answers under every policy.
+- **Denials are recorded, not returned.** `authorize(..., audit=callable)` receives
+  resource, policy, codes and caller; the caller's answer is unchanged by recording.
+- **Fail closed.** An evaluator exception denies with the same shape as any other refusal,
+  is recorded by exception *type* (never message), and surfaces as
+  `DENY_EVALUATION_ERROR` only to an operator.
+- **Explicit allowance lattice.** `allowance(policy)` and `at_least_as_permissive` make
+  monotonicity a property of a table rather than a belief; a swept test asserts that a
+  dominating policy never refuses what a dominated one allows, across every request form.
+- 25 tests in `test_policy_semantics.py` (581 total).
+
+### Added - the probe contract (`qvault/probe.py`)
+
+A read-only view of one policy decision, built so it cannot become an attack surface:
+
+- **Passive.** No mutation, no filesystem, no connection, no command execution. Tested by
+  importing the module source and asserting it contains no socket, urllib, subprocess,
+  eval, exec or open, and by snapshotting `POLICIES` around a batch of probes.
+- **Coarse.** `ask(resource)` returns one token: `ALLOW`, `DENY` or `UNKNOWN`.
+  `context()` reports the caller's own gates by label. Neither names a resource the caller
+  did not supply.
+- **Bounded.** `Budget(max_seconds, max_calls)`, one attempt by default, no retries, no
+  recursion, no discovery loop. An exhausted budget or a slow evaluation returns `UNKNOWN`.
+- **Fail closed.** Any evaluator exception returns `UNKNOWN` after exactly one attempt.
+  "I could not observe" never becomes "it is absent".
+- **Non-oracular.** Forbidden and nonexistent resources return the same token *and* the
+  same work: every gate is evaluated regardless of what was asked, verified by an
+  evaluation trace and a loose timing ratio.
+
+### Fixed - uniform evaluation work
+
+`_evaluate` returned early for an unknown resource. The words were uniform; the work was
+not, and a difference in work is a timing oracle. Every gate is now computed for every
+request. That change surfaced a genuine crash: `requested="minimal"` reached the retention
+gate and `int()` threw, so a caller could turn a type error into a 500. Request fields are
+now coerced with `_as_int`, and a wrong-typed field yields `DENY_INVALID_REQUEST` with the
+requirement and a remedy.
+
+### Changed - token precedence
+
+`UNATTESTED` could never surface: every policy that requires attestation also denies
+egress, so a denial always came first. Missing attestation now outranks a denial, because
+nothing can be concluded from an evidence class that was never established. The individual
+gate verdicts remain visible in `context()`, so the denial is not hidden.
+
+24 tests in `test_probe.py` (605 total).
+
+### Added - autostart surface assessment (`qvault/persistence.py`)
+
+Implements the eleven persistence mechanisms in Daulaguphu, "11 Critical Malware
+Persistence Mechanisms" (tech-zealots.com, 7 April 2022) as detection, never as technique.
+The module has no code that creates or enables an autostart entry.
+
+- Thirteen catalogue entries covering the article's eleven mechanisms (Run/RunOnce,
+  Policies\Explorer\Run, startup folders, scheduled tasks, services and ServiceDll,
+  BootExecute, hive loading, BHOs, AppInit_DLLs, DLL search order, plus rootkit, bootkit
+  and fileless).
+- Seven behavioural signals: user-writable location, unsigned binary, LOLBin proxy,
+  encoded command, hidden task, service outside System32, nonstandard BootExecute,
+  hive outside config, populated AppInit_DLLs.
+- Grading follows the collection basis, not the suspicion: `live_host` is a self-report and
+  yields no graded finding, `offline_image` caps at CORROBORATED, `attested_image` at
+  CONFIRMED. A ceiling is a limit, not a target.
+- Rootkit, bootkit and fileless are marked `not observable` rather than silently clean: a
+  snapshot cannot see what hides from it.
+- `coverage()` reports observed / not_observed / not_observable and states that a mechanism
+  not observed was not thereby shown to be absent. Nothing is ever reported CLEAN.
+- Every observation carries a benign twin and a control, enforced by
+  `assert_catalogue_integrity()` at import.
+
+### Fixed - BootExecute detection
+
+The first version tested whether the default string appeared in the value, so a payload
+appended to `autocheck autochk *` passed as normal. It is now an equality check after
+whitespace normalisation, which is what "has any value beyond the default" actually means.
+
+30 tests in `test_persistence.py` (635 total).
+
+### Changed - persistence is a detection matrix, not a flag
+
+Restructured against the contract the source article implies, rather than a generic
+"autostart observed" boolean:
+
+- **Descriptors.** Each mechanism is a `Mechanism(id, name, observable_path,
+  benign_default, control, predicate, observable)`. `_m()` validates at construction that an
+  observable mechanism has a predicate and an unobservable one does not, so a descriptor
+  cannot claim detection it does not perform.
+- **Four result classes.** `detected`, `benign`, `unknown_not_observable`, `not_observed`.
+  One row per mechanism is returned for every snapshot, including mechanisms the snapshot
+  never mentioned.
+- **No clean state.** `CLEAN_STATES` is empty, `assert_not_clean()` raises on any attempt to
+  report one, and `summarise()` carries `clean_state_available: False`.
+- **Reviewable detection.** Predicates are separate, named functions (`_boot_execute`,
+  `_service`, `_hive`, `_appinit`, `_dll_search_order`) beside the descriptor table that
+  says what each mechanism is and what removes it.
+- **Row shape is constant.** Every matrix row carries the same keys whatever its result;
+  the earlier version only added `benign_readings` when an entry existed, which was a shape
+  oracle about the snapshot.
+
+### Added - `qvault/grading.py`, a public grade API
+
+`cap_grade(basis=..., signal_count=..., attestation_state=...)` plus `explain()` for the
+reasoning. The persistence layer no longer touches `separation._RANK` and no longer computes
+ceilings itself; a test asserts the module source contains neither `_RANK` nor
+`grade_ceiling`. Ceilings are derived from the evidence-class table, and an `attested_image`
+whose attestation did not verify is downgraded to the offline ceiling before use.
+
+### Added - ledger contract test
+
+Two mistakes were made while writing the previous commit: a URL in the numeric bibliography
+column, and a ninth column that shifted `tag` and `verification` out of place. Both were
+repaired in the data, and `test_the_claims_ledger_obeys_its_own_contract` now asserts the
+header width, every row width, the tag and verification vocabularies, and a numeric-or-n/a
+bibliography for independently verified rows.
+
+40 tests in `test_persistence.py` (645 total).
+
+### Added - the wire contract (`contract/verdict.schema.json`, `qvault/contract.py`)
+
+The interface other runtimes are allowed to see, and nothing more:
+
+- One payload: mechanism, basis, attestation state, observed signals and counts, verdict
+  token, cap grade, denial codes, remedy, statement.
+- **`subject.resource` is always null in a policy payload.** The type has no field in which
+  to echo what the caller asked about, so a refusal cannot become a probe about what exists.
+  A payload that fills it in is rejected by both validators.
+- `denial_codes` is a closed vocabulary with exactly one public value, so no adapter can
+  invent a taxonomy that partitions resources by which gate nearly passed.
+- Persistence payloads must carry a basis and a cap grade and no denial codes; policy payloads
+  must carry neither, because an authorisation answer is not an evidence claim.
+- Validation runs in two runtimes: `qvault/contract.py` (no dependencies) and
+  `adapters/verdict_lint.mjs` (node). Both reject a payload with no remedy, and the test suite
+  asserts the Python constants and the schema enums have not drifted apart.
+
+### Added - pre-merge gates (`tools/gates.py`)
+
+G1 tests, G2 smoke, G3 evidence ledger, G4 wire contract in two runtimes, G5 single owner,
+G6 no clean state, G7 denial invariance, G8 scope gate. Merge requires all eight.
+`assert_single_owner()` fails if an engine module contains a process, socket or shell call or
+imports an adapter; the forbidden tokens are assembled rather than written literally so the
+checker does not trip on its own source.
+
+### Fixed - gate G7 compared an allow with a refusal
+
+The denial-invariance sweep included `retention`, which an untrusted policy permits with no
+requested value, so the gate reported two shapes and looked like an oracle. It now compares
+refusals only, and fails if the sweep produces fewer than two of them.
+
+### Added - `report/OPERATING_MODEL.md`
+
+Scrum for backlog, sprints, acceptance and release gates; explicit gates for architecture,
+threat model and evidence. Epics E1-E5 mapped to modules and tests, the polyglot boundary as a
+table, and the statement that a red gate moves the release rather than the gate.
+
+24 tests in `test_contract.py` (669 total).
+
+### Added - attacker behaviour to control (`qvault/behaviors.py`)
+
+Seventeen behaviours, each naming its ATT&CK technique, the evidence it leaves, the control
+here that answers it, and the limit of that control. Coverage is `implemented` (7),
+`partial` (6) or `absent` (4), and `absent` is a normal value.
+
+- Every row resolves to a real module and symbol; `resolve()` raises if it does not, so the
+  matrix cannot describe code that no longer exists.
+- Every row cites a bibliography number, and a test asserts the cited entry names the same
+  ATT&CK identifier the row claims.
+- Kernel exploitation, browser sandbox escapes, LPE, WMI subscriptions, fileless execution
+  and DLL side-loading are recorded as `absent` rather than implied to be covered.
+- `report/THREAT_BEHAVIOR_MATRIX.md` is generated by `tools/gen_behavior_matrix.py`; a test
+  and gate G9 fail if the document and the catalogue disagree.
+
+### Added - IFEO, from the source review
+
+`T1546.012` Image File Execution Options injection was in ATT&CK and absent from the
+catalogue, so `persistence.ifeo` and an `ifeo_debugger` signal were added: a Debugger value
+outside Program Files, or on a security-relevant image, is detected; appcompat shims are the
+benign twin. Fourteen mechanisms now.
+
+### Verified - technique identifiers
+
+Each ATT&CK identifier in the bibliography was confirmed by reading the page title, not from
+memory. Two consequences: `T1574.001` is now titled *Hijack Execution Flow: DLL*, not the
+older "DLL Search Order Hijacking", and `T1574.002` and `T1562.001` could not be verified and
+were left out rather than guessed.
+
+### Added - 15 bibliography entries
+
+`44`-`58` in `report/UEFI_Malware_Deep_Dive_Report.md`, one per cited technique, each with
+the URL and the reason it is cited.
+
+15 tests in `test_behaviors.py` (684 total), gate G9 added.
+
+### Added - telemetry map (`qvault/telemetry.py`)
+
+Every mechanism now names the telemetry that would carry its evidence: 11 sources across
+Sysmon, Windows Security and System logs, PowerShell script-block logging and the TPM event
+log, with the fields to inspect for each.
+
+- Sysmon event semantics were read from the Microsoft documentation, not recalled:
+  1 process create, 7 image load, 11 file create, 12/13/14 registry, 19/20/21 WMI.
+- Sigma families are cited with real identifiers read from the SigmaHQ repository, and the
+  module notes they are hunting content rather than a dependency.
+- `rootkit_hiding` and `bootkit_boot` carry no host telemetry at all, because a host cannot
+  testify about what runs before it or hides from it. Both state where the answer does come
+  from instead.
+- `fileless` is classified separately as execution-time only: telemetry exists (process
+  ancestry, script blocks), but no autostart artefact does. An earlier version put it in the
+  "no telemetry" set, and the consistency check caught the contradiction.
+- EDR field names follow the Defender XDR schema so the map stays vendor-neutral.
+
+### Verified - sources for this round
+
+ATT&CK v20 uses Detection Strategy, Analytics and Data Components; the older "Data Sources"
+vocabulary no longer applies. Bibliography entries 59-66 cover Sysmon, the 4698 event, script
+block logging, the TPM 2.0 specification, the SigmaHQ repository, the Defender XDR schema,
+the MSRC update guide and Mandiant's threat-intelligence blog. Entries 62-66 were added only
+after the URLs resolved; a candidate measured-boot page returned 404 and was not cited.
+
+### Added - gate G10 and generated map
+
+`report/TELEMETRY_MAP.md` is rendered from the mapping, and G10 fails if the map is stale or
+if the mapping is incomplete. 16 tests in `test_telemetry.py` (700 total).
+
+### Released - merged to main
+
+`main` moves from v0.11.0 to v0.12.0. The branch carried the policy-denial hardening, the
+probe contract, the persistence detection matrix, the wire contract with gates, and the
+behaviour and telemetry maps. All ten gates pass on main after the merge.
+
 ## [0.11.0] - 2026-11-02
 
 Plane errors, the third class, and the one that makes the other two compound: an

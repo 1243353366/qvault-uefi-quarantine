@@ -36,3 +36,14 @@ table.
 `pip install .` installs `qvault`, the CLI entry point and the pinned `vendor` tree. The
 vendored detection engine must ship with the package: `qvault/zbt_bridge.py` raises an
 explanatory ImportError if `vendor/zbtriage` is missing rather than failing obscurely.
+
+## Pre-merge gates
+
+```
+python3 tools/gates.py          # all gates, exit non-zero on any failure
+python3 tools/gates.py --list   # name the gates
+python3 tools/gates.py G4 G7    # run a subset
+```
+
+G4 validates the wire contract in Python and in node, so a second runtime has to agree with
+the first about the shape of a verdict.
