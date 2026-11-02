@@ -98,6 +98,42 @@ The cheap, testable half of the trust problem, closed with black-box tests:
   dominating policy never refuses what a dominated one allows, across every request form.
 - 25 tests in `test_policy_semantics.py` (581 total).
 
+### Added - the probe contract (`qvault/probe.py`)
+
+A read-only view of one policy decision, built so it cannot become an attack surface:
+
+- **Passive.** No mutation, no filesystem, no connection, no command execution. Tested by
+  importing the module source and asserting it contains no socket, urllib, subprocess,
+  eval, exec or open, and by snapshotting `POLICIES` around a batch of probes.
+- **Coarse.** `ask(resource)` returns one token: `ALLOW`, `DENY` or `UNKNOWN`.
+  `context()` reports the caller's own gates by label. Neither names a resource the caller
+  did not supply.
+- **Bounded.** `Budget(max_seconds, max_calls)`, one attempt by default, no retries, no
+  recursion, no discovery loop. An exhausted budget or a slow evaluation returns `UNKNOWN`.
+- **Fail closed.** Any evaluator exception returns `UNKNOWN` after exactly one attempt.
+  "I could not observe" never becomes "it is absent".
+- **Non-oracular.** Forbidden and nonexistent resources return the same token *and* the
+  same work: every gate is evaluated regardless of what was asked, verified by an
+  evaluation trace and a loose timing ratio.
+
+### Fixed - uniform evaluation work
+
+`_evaluate` returned early for an unknown resource. The words were uniform; the work was
+not, and a difference in work is a timing oracle. Every gate is now computed for every
+request. That change surfaced a genuine crash: `requested="minimal"` reached the retention
+gate and `int()` threw, so a caller could turn a type error into a 500. Request fields are
+now coerced with `_as_int`, and a wrong-typed field yields `DENY_INVALID_REQUEST` with the
+requirement and a remedy.
+
+### Changed - token precedence
+
+`UNATTESTED` could never surface: every policy that requires attestation also denies
+egress, so a denial always came first. Missing attestation now outranks a denial, because
+nothing can be concluded from an evidence class that was never established. The individual
+gate verdicts remain visible in `context()`, so the denial is not hidden.
+
+24 tests in `test_probe.py` (605 total).
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.

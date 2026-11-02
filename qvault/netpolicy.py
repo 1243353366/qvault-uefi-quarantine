@@ -312,6 +312,7 @@ DENY_RETENTION = "DENY_OVER_RETENTION"
 DENY_CUSTODY = "DENY_INSUFFICIENT_CUSTODY"
 DENY_ATTESTATION = "DENY_NO_ATTESTATION"
 DENY_UNKNOWN_RESOURCE = "DENY_UNKNOWN_RESOURCE"
+DENY_INVALID_REQUEST = "DENY_INVALID_REQUEST"
 
 #: Resources a caller may request, in the order they are evaluated. Anything absent from
 #: this table is refused rather than permitted: an unknown request is not a safe request.
@@ -320,6 +321,16 @@ RESOURCES: tuple[str, ...] = (
 )
 
 _COLLECTION_RANK = {"minimal": 0, "standard": 1, "forensic": 2}
+
+
+def _as_int(value) -> int | None:
+    """Coerce a request field to an int, or None. Booleans are not counts."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -397,8 +408,8 @@ def at_least_as_permissive(a: str, b: str) -> bool:
     return all(la[k] >= lb[k] for k in la)
 
 
-def _evaluate(decision: "Decision", resource: str, *, requested=None,
-              attested: bool | None = None, shares: int | None = None) -> Verdict:
+def _evaluate_one(decision: "Decision", resource: str, *, requested=None,
+                  attested: bool | None = None, shares: int | None = None) -> Verdict:
     """Decide one request under the selected policy.
 
     `requested` is a collection level or a retention period in days, depending on the
@@ -440,8 +451,14 @@ def _evaluate(decision: "Decision", resource: str, *, requested=None,
                        "whose integrity is not yet established"))
 
     elif resource == "retention":
-        want = int(requested if requested is not None else 0)
-        if want > int(settings["retention_days"]):
+        want = 0 if requested is None else _as_int(requested)
+        if want is None:
+            denials.append(_deny(
+                decision, resource, DENY_INVALID_REQUEST, "retention in whole days",
+                type(requested).__name__,
+                "pass an integer number of days; a collection level is not a retention "
+                "period"))
+        elif want > int(settings["retention_days"]):
             denials.append(_deny(
                 decision, resource, DENY_RETENTION,
                 f"retention_days <= {settings['retention_days']}",
@@ -452,8 +469,13 @@ def _evaluate(decision: "Decision", resource: str, *, requested=None,
 
     elif resource == "custody":
         need = int(settings["custody"][0])
-        have = need if shares is None else int(shares)
-        if have < need:
+        have = need if shares is None else _as_int(shares)
+        if have is None:
+            denials.append(_deny(
+                decision, resource, DENY_INVALID_REQUEST, "a count of custodians",
+                type(shares).__name__, "pass an integer count; share material is never "
+                                       "accepted here"))
+        elif have < need:
             denials.append(_deny(
                 decision, resource, DENY_CUSTODY, f"{need} of {settings['custody'][1]} custodians",
                 f"{have} custodians",
@@ -470,6 +492,26 @@ def _evaluate(decision: "Decision", resource: str, *, requested=None,
 
     denials.sort(key=lambda d: (d.code, d.resource))
     return Verdict(resource=resource, allowed=not denials, denials=denials)
+
+
+def _evaluate(decision: "Decision", resource: str, *, requested=None,
+              attested: bool | None = None, shares: int | None = None) -> Verdict:
+    """Evaluate every gate, then answer for the one requested.
+
+    Every gate is computed whatever was asked for. Returning early for an unknown
+    resource made the refusal shape uniform but left a measurable difference in work, and
+    a difference in work is a timing oracle however identical the words are.
+    """
+    for gate in RESOURCES:
+        _evaluate_one(decision, gate, requested=requested, attested=attested, shares=shares)
+    return _evaluate_one(decision, resource, requested=requested, attested=attested,
+                         shares=shares)
+
+
+def evaluation_trace(decision: "Decision", resource: str, **kwargs) -> tuple[str, ...]:
+    """The gates evaluated for a resource. Identical for known and unknown inputs."""
+    _evaluate(decision, resource, **kwargs)
+    return RESOURCES
 
 
 # --------------------------------------------------------------------------------------

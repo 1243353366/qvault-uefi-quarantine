@@ -132,6 +132,24 @@ WORM. The code's contribution there is limited to refusing the stronger conclusi
 naming what would support it. Calling those "bugs" would misdescribe them, and claiming
 they are fixed because a test passes would be worse.
 
+## The probe contract
+
+`qvault/probe.py` is the instrument side of the boundary, and it is deliberately unable to
+answer anything but "what did I observe":
+
+| Requirement | How it is met | How it is tested |
+|-------------|---------------|------------------|
+| No new way to learn hidden facts | One token per request; identical for forbidden and absent | `test_a_forbidden_resource_and_a_missing_one_are_indistinguishable` |
+| No behaviour on the target | No connections, no execution, no files | source scan for socket/urllib/subprocess/eval/exec/open; empty tmpdir |
+| No remote resource use | Pure local evaluation of an existing decision | no imports that can reach out |
+| No unauthorised distinctions | Closed token vocabulary; gate labels only for the caller's own context | `test_the_vocabulary_is_closed` |
+| Bounded | `Budget`, one attempt, no retries or recursion | `test_a_second_call_gives_unknown_not_another_attempt` |
+| Refuses on ambiguity | Missing attestation outranks a denial; incomplete context is `PARTIAL`, never "absent" | `test_incomplete_context_is_partial_not_absent` |
+| No timing signal | Every gate computed for every request | evaluation trace plus a 3x timing bound |
+
+What it cannot do: prove the host, establish an evidence class it was not given, or make a
+local filesystem append-only. Those remain in the architectural column.
+
 ## Running the checks
 
 ```bash
