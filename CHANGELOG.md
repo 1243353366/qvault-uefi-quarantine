@@ -34,6 +34,27 @@ field, and cycles are refused). Twenty-four tests, written from the analyst's si
 Off `main`: naming wallets and channels is a different publication from quarantining firmware, and
 that legal reading should be settled on purpose.
 
+### Added - evidence brief for filing
+
+`qvault/evidence_brief.py` builds a custody-grade brief: per-artefact SHA-256 recomputed from bytes,
+acquisition time with a mandatory timezone, acquiring party, documented method, source provenance,
+immutability checked from the mode bits, a timeline, computed attribution grades, the hypothesis
+carried as a hypothesis beside a required competing explanation, and a manifest hash that
+`verify` recomputes.
+
+Refusal is the design. A hash mismatch, a naive or future timestamp, an undocumented acquisition
+method, an unattributed artefact, a missing original, a writable original, a self-declared
+CORROBORATED grade, a missing alternative, or a hypothesis that names a person all stop the brief.
+No `owner`, `identity` or `suspect` field exists in the structure, so a name cannot be written beside
+an artefact.
+
+Two checks that were quietly broken, both found here: `os.access(W_OK)` is True for a 0400 file as
+root, so the immutability check passed on everything in a container and now reads mode bits; and git
+preserves no mode but the exec bit, so a committed example artefact would arrive writable and be
+correctly refused, hence the demo case stays local.
+
+Nineteen tests, plus a CLI that exits 2 and says "refused" rather than writing a defective document.
+
 ## [0.13.12] - 2026-11-02
 
 ### Fixed - the two riskiest rows, hardened and re-graded

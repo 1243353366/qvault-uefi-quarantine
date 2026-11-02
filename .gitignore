@@ -13,3 +13,7 @@ p0.tar.gz
 # transient: the Project Zero archive is read once to build the pinned index
 p0.tar.gz
 .p0src/
+
+# Local demonstration case. Not committed: git cannot store the 0400 mode an original needs, so a
+# checked-out copy would be writable and correctly refused by the brief builder.
+demo/

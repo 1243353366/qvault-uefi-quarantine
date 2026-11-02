@@ -73,6 +73,46 @@ A derived observation once hashed to its parent's id, so a two-step derivation m
 
 The tests were written from the analyst's side of the desk rather than the attacker's: try to launder one source into four, promote a wallet to an owner, and turn a rotation into an attribution. Twenty-four tests; the ceilings hold.
 
+## Evidence before attribution: the filing brief
+
+`qvault/evidence_brief.py` turns a case into a document that can be handed to an investigator, and refuses to produce one when the custody chain has a defect. Refusal is the design: a brief annotated "warning: hash mismatch" invites a reader to trust a package the analyst already knew was broken.
+
+| Defect                       | Why it stops the brief                                         |
+| ---------------------------- | -------------------------------------------------------------- |
+| Hash mismatch                | the bytes on disk do not hash to the recorded digest           |
+| Timestamp in the future      | a clock is wrong, or the record was written ahead of the event |
+| Naive timestamp              | a local time with no timezone is not evidence                  |
+| Undocumented method          | acquisition method outside the recorded set                    |
+| Unattributed artefact        | no acquiring party recorded                                    |
+| Artefact missing             | the original is not where the case says it is                  |
+| Writable original            | immutability is a mode, not a promise in a header              |
+| Phrasing that names a person | the hypothesis equates an artefact with a person               |
+| Self-declared CORROBORATED   | a hypothesis cannot grade itself; cite observations            |
+| No competing explanation     | an attribution claim without an alternative is an accusation   |
+
+Acquisition methods accepted: `disk_image`, `log_export`, `memory_image`, `passive_capture`, `provider_disclosure`, `public_record`, `sample_analysis`.
+
+There is no `owner`, `identity` or `suspect` field anywhere in the structure, so the shortcut of writing a name beside an artefact is not available. The hypothesis is carried with a grade and next to a required competing explanation. The identity lint is 4 patterns for attributive phrasing; it catches "is operated by <Name>" and cannot catch implication by layout or by a name left in a filename. The structural limits do the work; the lint is a tripwire.
+
+Every brief carries a manifest hash over its artefacts, hypothesis and grade, and `python -m qvault.evidence_brief verify FILE.json` recomputes it: a mismatch means the document was edited after generation.
+
+### Where it goes next
+
+| Jurisdiction         | Channel                                   | Action                                |
+| -------------------- | ----------------------------------------- | ------------------------------------- |
+| US cybercrime        | FBI Internet Crime Complaint Center (IC3) | file the brief and custody manifest   |
+| National CERT        | the CERT of the victim's jurisdiction     | notify and attach the manifest hash   |
+| Hosting or registrar | the provider's abuse desk, per artefact   | report the artefact                   |
+| Exchange             | compliance team, for a wallet artefact    | submit the intelligence, not a demand |
+
+The brief states that it contacted nobody. Filing is the analyst's act, not the tool's.
+
+### Two checks that were quietly broken
+
+`os.access(path, os.W_OK)` returns True for a 0400 file when the process runs as root, so the obvious immutability check passed on every artefact in a root container, which is where this runs. The check now reads the mode bits.
+
+Git does not preserve anything but the executable bit, so an example artefact checked out of a repository arrives writable and is correctly refused. The demo case is therefore local only, listed in `.gitignore`, rather than committed as a broken example.
+
 ## The research direction this page takes, and why
 
 Two directions were on the table: **A**, the financial trail, and **B**, the operational graph.

@@ -258,6 +258,97 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <h2 id="two-bugs-this-module-found-in-itself">Two bugs this module found in itself</h2>
 <p>A derived observation once hashed to its parent's id, so a two-step derivation made the provenance walk follow itself and the test <strong>hung instead of failing</strong>. Identity now covers every field, and the walk refuses cycles. Both are tested.</p>
 <p>The tests were written from the analyst's side of the desk rather than the attacker's: try to launder one source into four, promote a wallet to an owner, and turn a rotation into an attribution. Twenty-four tests; the ceilings hold.</p>
+<h2 id="evidence-before-attribution-the-filing-brief">Evidence before attribution: the filing brief</h2>
+<p><code>qvault/evidence_brief.py</code> turns a case into a document that can be handed to an investigator, and refuses to produce one when the custody chain has a defect. Refusal is the design: a brief annotated "warning: hash mismatch" invites a reader to trust a package the analyst already knew was broken.</p>
+<table>
+<thead>
+<tr>
+<th>Defect</th>
+<th>Why it stops the brief</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hash mismatch</td>
+<td>the bytes on disk do not hash to the recorded digest</td>
+</tr>
+<tr>
+<td>Timestamp in the future</td>
+<td>a clock is wrong, or the record was written ahead of the event</td>
+</tr>
+<tr>
+<td>Naive timestamp</td>
+<td>a local time with no timezone is not evidence</td>
+</tr>
+<tr>
+<td>Undocumented method</td>
+<td>acquisition method outside the recorded set</td>
+</tr>
+<tr>
+<td>Unattributed artefact</td>
+<td>no acquiring party recorded</td>
+</tr>
+<tr>
+<td>Artefact missing</td>
+<td>the original is not where the case says it is</td>
+</tr>
+<tr>
+<td>Writable original</td>
+<td>immutability is a mode, not a promise in a header</td>
+</tr>
+<tr>
+<td>Phrasing that names a person</td>
+<td>the hypothesis equates an artefact with a person</td>
+</tr>
+<tr>
+<td>Self-declared CORROBORATED</td>
+<td>a hypothesis cannot grade itself; cite observations</td>
+</tr>
+<tr>
+<td>No competing explanation</td>
+<td>an attribution claim without an alternative is an accusation</td>
+</tr>
+</tbody>
+</table>
+<p>Acquisition methods accepted: <code>disk_image</code>, <code>log_export</code>, <code>memory_image</code>, <code>passive_capture</code>, <code>provider_disclosure</code>, <code>public_record</code>, <code>sample_analysis</code>.</p>
+<p>There is no <code>owner</code>, <code>identity</code> or <code>suspect</code> field anywhere in the structure, so the shortcut of writing a name beside an artefact is not available. The hypothesis is carried with a grade and next to a required competing explanation. The identity lint is 4 patterns for attributive phrasing; it catches "is operated by <Name>" and cannot catch implication by layout or by a name left in a filename. The structural limits do the work; the lint is a tripwire.</p>
+<p>Every brief carries a manifest hash over its artefacts, hypothesis and grade, and <code>python -m qvault.evidence_brief verify FILE.json</code> recomputes it: a mismatch means the document was edited after generation.</p>
+<h3 id="where-it-goes-next">Where it goes next</h3>
+<table>
+<thead>
+<tr>
+<th>Jurisdiction</th>
+<th>Channel</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>US cybercrime</td>
+<td>FBI Internet Crime Complaint Center (IC3)</td>
+<td>file the brief and custody manifest</td>
+</tr>
+<tr>
+<td>National CERT</td>
+<td>the CERT of the victim's jurisdiction</td>
+<td>notify and attach the manifest hash</td>
+</tr>
+<tr>
+<td>Hosting or registrar</td>
+<td>the provider's abuse desk, per artefact</td>
+<td>report the artefact</td>
+</tr>
+<tr>
+<td>Exchange</td>
+<td>compliance team, for a wallet artefact</td>
+<td>submit the intelligence, not a demand</td>
+</tr>
+</tbody>
+</table>
+<p>The brief states that it contacted nobody. Filing is the analyst's act, not the tool's.</p>
+<h3 id="two-checks-that-were-quietly-broken">Two checks that were quietly broken</h3>
+<p><code>os.access(path, os.W_OK)</code> returns True for a 0400 file when the process runs as root, so the obvious immutability check passed on every artefact in a root container, which is where this runs. The check now reads the mode bits.</p>
+<p>Git does not preserve anything but the executable bit, so an example artefact checked out of a repository arrives writable and is correctly refused. The demo case is therefore local only, listed in <code>.gitignore</code>, rather than committed as a broken example.</p>
 <h2 id="the-research-direction-this-page-takes-and-why">The research direction this page takes, and why</h2>
 <p>Two directions were on the table: <strong>A</strong>, the financial trail, and <strong>B</strong>, the operational graph.</p>
 <p><strong>B first.</strong> The financial trail dead-ends exactly where the doctrine requires it to: exchange records

@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import tables  # noqa: E402
 from qvault import __version__  # noqa: E402
+from qvault.evidence_brief import (ALLOWED_METHODS, IDENTITY_PATTERNS,  # noqa: E402
+                                   LAWFUL_ROUTES)
 from qvault.threatintel import CLAIM_CEILINGS, FORBIDDEN_SOURCES, REPORT_CHANNELS  # noqa: E402
 
 OUT = ROOT / "report" / "THREAT_INTEL.md"
@@ -42,6 +44,19 @@ DOCTRINE = [
      "`disruption_plan` emits report/notify/preserve/submit against named external channels, and "
      "refuses any other verb",
      "test_disruption_is_reporting_only"),
+]
+
+REFUSALS = [
+    ("Hash mismatch", "the bytes on disk do not hash to the recorded digest"),
+    ("Timestamp in the future", "a clock is wrong, or the record was written ahead of the event"),
+    ("Naive timestamp", "a local time with no timezone is not evidence"),
+    ("Undocumented method", "acquisition method outside the recorded set"),
+    ("Unattributed artefact", "no acquiring party recorded"),
+    ("Artefact missing", "the original is not where the case says it is"),
+    ("Writable original", "immutability is a mode, not a promise in a header"),
+    ("Phrasing that names a person", "the hypothesis equates an artefact with a person"),
+    ("Self-declared CORROBORATED", "a hypothesis cannot grade itself; cite observations"),
+    ("No competing explanation", "an attribution claim without an alternative is an accusation"),
 ]
 
 RESEARCH = """## The research direction this page takes, and why
@@ -121,6 +136,41 @@ def render() -> str:
     o.append("The tests were written from the analyst's side of the desk rather than the attacker's: try to "
              "launder one source into four, promote a wallet to an owner, and turn a rotation into an "
              "attribution. Twenty-four tests; the ceilings hold.\n\n")
+
+    o.append("## Evidence before attribution: the filing brief\n\n")
+    o.append("`qvault/evidence_brief.py` turns a case into a document that can be handed to an "
+             "investigator, and refuses to produce one when the custody chain has a defect. Refusal is the "
+             "design: a brief annotated \"warning: hash mismatch\" invites a reader to trust a package the "
+             "analyst already knew was broken.\n\n")
+    o.append("| Defect | Why it stops the brief |\n|---|---|\n")
+    for defect, why in REFUSALS:
+        o.append(f"| {defect} | {why} |\n")
+    o.append("\n")
+    o.append("Acquisition methods accepted: " +
+             ", ".join(f"`{m}`" for m in sorted(ALLOWED_METHODS)) + ".\n\n")
+    o.append("There is no `owner`, `identity` or `suspect` field anywhere in the structure, so the shortcut "
+             "of writing a name beside an artefact is not available. The hypothesis is carried with a "
+             "grade and next to a required competing explanation. The identity lint is "
+             f"{len(IDENTITY_PATTERNS)} patterns for attributive phrasing; it catches \"is operated by "
+             "<Name>\" and cannot catch implication by layout or by a name left in a filename. The "
+             "structural limits do the work; the lint is a tripwire.\n\n")
+    o.append("Every brief carries a manifest hash over its artefacts, hypothesis and grade, and "
+             "`python -m qvault.evidence_brief verify FILE.json` recomputes it: a mismatch means the "
+             "document was edited after generation.\n\n")
+
+    o.append("### Where it goes next\n\n")
+    o.append("| Jurisdiction | Channel | Action |\n|---|---|---|\n")
+    for jurisdiction, channel, action in LAWFUL_ROUTES:
+        o.append(f"| {jurisdiction} | {channel} | {action} |\n")
+    o.append("\nThe brief states that it contacted nobody. Filing is the analyst's act, not the tool's.\n\n")
+
+    o.append("### Two checks that were quietly broken\n\n")
+    o.append("`os.access(path, os.W_OK)` returns True for a 0400 file when the process runs as root, so the "
+             "obvious immutability check passed on every artefact in a root container, which is where this "
+             "runs. The check now reads the mode bits.\n\n")
+    o.append("Git does not preserve anything but the executable bit, so an example artefact checked out of a "
+             "repository arrives writable and is correctly refused. The demo case is therefore local only, "
+             "listed in `.gitignore`, rather than committed as a broken example.\n\n")
 
     o.append(RESEARCH)
     o.append("\n## Why this is off `main`\n\n")

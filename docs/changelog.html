@@ -86,6 +86,22 @@ provenance walk followed itself and the test <strong>hung instead of failing</st
 field, and cycles are refused). Twenty-four tests, written from the analyst's side.</p>
 <p>Off <code>main</code>: naming wallets and channels is a different publication from quarantining firmware, and
 that legal reading should be settled on purpose.</p>
+<h3 id="added-evidence-brief-for-filing">Added - evidence brief for filing</h3>
+<p><code>qvault/evidence_brief.py</code> builds a custody-grade brief: per-artefact SHA-256 recomputed from bytes,
+acquisition time with a mandatory timezone, acquiring party, documented method, source provenance,
+immutability checked from the mode bits, a timeline, computed attribution grades, the hypothesis
+carried as a hypothesis beside a required competing explanation, and a manifest hash that
+<code>verify</code> recomputes.</p>
+<p>Refusal is the design. A hash mismatch, a naive or future timestamp, an undocumented acquisition
+method, an unattributed artefact, a missing original, a writable original, a self-declared
+CORROBORATED grade, a missing alternative, or a hypothesis that names a person all stop the brief.
+No <code>owner</code>, <code>identity</code> or <code>suspect</code> field exists in the structure, so a name cannot be written beside
+an artefact.</p>
+<p>Two checks that were quietly broken, both found here: <code>os.access(W_OK)</code> is True for a 0400 file as
+root, so the immutability check passed on everything in a container and now reads mode bits; and git
+preserves no mode but the exec bit, so a committed example artefact would arrive writable and be
+correctly refused, hence the demo case stays local.</p>
+<p>Nineteen tests, plus a CLI that exits 2 and says "refused" rather than writing a defective document.</p>
 <h2 id="01312-2026-11-02">[0.13.12] - 2026-11-02</h2>
 <h3 id="fixed-the-two-riskiest-rows-hardened-and-re-graded">Fixed - the two riskiest rows, hardened and re-graded</h3>
 <p><code>store.py</code> and <code>audit.py</code> were the two entries in <code>report/TOOLING_RISK.md</code> that trust data written by
