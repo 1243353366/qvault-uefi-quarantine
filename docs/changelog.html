@@ -89,6 +89,11 @@ producing ragged rows made four generators report themselves stale, and the gate
 <code>gen_telemetry_map</code>, <code>gen_in_the_wild</code> and <code>gen_fingerprints</code> now emit aligned tables, the gates
 compare aligned output, and <code>tools/fix_tables.py --write</code> repairs any file by hand.</p>
 <p>791 tests, sixteen gates.</p>
+<p><strong>The first run was red, and the second was green.</strong> Every job installed
+<code>requirements-lock.txt</code>, which carries the runtime deps and pytest but not <code>markdown</code>, so
+<code>test_docs</code> and G12 had no renderer. <code>requirements-dev.txt</code> now pins markdown, build and ruff
+against the versions the gates were verified with. With that, all six jobs pass, and the badge is
+back in the README - it was removed earlier precisely because nothing was behind it.</p>
 <h2 id="0132-2026-11-02">[0.13.2] - 2026-11-02</h2>
 <h3 id="fixed-blacklotus-was-being-described-as-a-firmware-implant">Fixed - BlackLotus was being described as a firmware implant</h3>
 <p>The generated control table was identical for all three families, so BlackLotus inherited

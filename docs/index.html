@@ -62,14 +62,8 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 </nav>
 <main>
 <h1 id="qvault">qvault</h1>
-<blockquote>
-<p><strong>Gates run locally, not yet in CI.</strong> <code>.github/workflows/ci.yml</code> is written and validated,
-but this repository has no <code>workflow</code> scope available to the automation that pushes here, so
-the file cannot be pushed from a scripted session. Until it is added through the GitHub
-editor, the badge that used to sit here pointed at a workflow that did not exist, and
-<code>tools/linkcheck.py</code> was right to fail it. Locally, <code>.githooks/pre-push</code> runs all fourteen
-gates and blocks a push that fails one: <code>bash tools/install_hooks.sh</code>.</p>
-</blockquote>
+<p><a href="https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg" /></a></p>
+<p>CI runs the same fourteen-gate-plus suite this README describes: tests on 3.11 and 3.12, all sixteen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under <code>set -o pipefail</code>. Locally, <code>.githooks/pre-push</code> runs the same gates and blocks a push that fails one: <code>bash tools/install_hooks.sh</code>.</p>
 <p><strong>Version 0.13.3</strong> · <a href="https://1243353366.github.io/qvault-uefi-quarantine/">documentation site</a> · <a href="changelog.html">CHANGELOG</a> · <a href="citations.html">citations</a> · <a href="capability-map.html">capability map</a> — a cryptographic quarantine vault for firmware evidence</p>
 <blockquote>
 <p><strong>Status: prototype, not hardened.</strong> The code was written before the threat model

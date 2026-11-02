@@ -150,10 +150,12 @@ def test_the_workflow_exists_and_covers_the_gates():
     assert "tools/sync_version.py --check" in workflow
 
 
-def test_the_readme_does_not_advertise_a_workflow_that_does_not_exist():
+def test_the_badge_points_at_the_workflow_that_actually_runs():
+    """A badge is a claim. It may only point at a workflow file that exists and is pushed."""
     readme = (ROOT / "README.md").read_text()
-    assert "badge.svg" not in readme, "do not show a CI badge until CI actually runs"
-    assert "Gates run locally, not yet in CI" in readme
+    assert "actions/workflows/ci.yml/badge.svg" in readme
+    assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
+    assert "Gates run locally, not yet in CI" not in readme
 
 
 def test_reproduce_runs_every_gate():

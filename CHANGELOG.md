@@ -38,6 +38,12 @@ compare aligned output, and `tools/fix_tables.py --write` repairs any file by ha
 
 791 tests, sixteen gates.
 
+**The first run was red, and the second was green.** Every job installed
+`requirements-lock.txt`, which carries the runtime deps and pytest but not `markdown`, so
+`test_docs` and G12 had no renderer. `requirements-dev.txt` now pins markdown, build and ruff
+against the versions the gates were verified with. With that, all six jobs pass, and the badge is
+back in the README - it was removed earlier precisely because nothing was behind it.
+
 ## [0.13.2] - 2026-11-02
 
 ### Fixed - BlackLotus was being described as a firmware implant
