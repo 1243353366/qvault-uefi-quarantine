@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security report · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.13.6 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-report.html" class="current">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="security-report-qvault-0136">Security report - qvault 0.13.6</h1>
+<p>This is the point-in-time security report for release <strong>0.13.6</strong>. It describes what
+the system enforces, what it can prove about itself, and what remains open. It is generated
+from the tree it describes: the counts, the gate list and the grade census are read at build
+time, so a stale claim fails the build rather than sitting in a document.</p>
+<blockquote>
+<p><strong>Scope.</strong> Defensive firmware forensics: acquisition, quarantine, evidence grading and
+containment for UEFI-resident malware. No live host, no real SPI flash and no physical
+programmer were available, so every hardware-plane statement is graded accordingly and
+gathered in <a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/limitations.html">the limitations page</a>.</p>
+</blockquote>
+<h2 id="1-what-was-verified-and-how">1. What was verified, and how</h2>
+<p>The release passes <strong>17 gates</strong>, each of which refuses the push that would
+break it. The gates are not a checklist; each one exists because something went wrong first:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>unit tests</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>smoke</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>evidence ledger</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>wire contract</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>single owner</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>no clean state</td>
+</tr>
+<tr>
+<td>G7</td>
+<td>denial invariance</td>
+</tr>
+<tr>
+<td>G8</td>
+<td>scope gate</td>
+</tr>
+<tr>
+<td>G9</td>
+<td>behaviour matrix</td>
+</tr>
+<tr>
+<td>G10</td>
+<td>telemetry map</td>
+</tr>
+<tr>
+<td>G11</td>
+<td>in-the-wild set</td>
+</tr>
+<tr>
+<td>G12</td>
+<td>documentation site</td>
+</tr>
+<tr>
+<td>G13</td>
+<td>version source</td>
+</tr>
+<tr>
+<td>G14</td>
+<td>internal links</td>
+</tr>
+<tr>
+<td>G15</td>
+<td>residency taxonomy</td>
+</tr>
+<tr>
+<td>G16</td>
+<td>table alignment</td>
+</tr>
+<tr>
+<td>G17</td>
+<td>denial model</td>
+</tr>
+</tbody>
+</table>
+<p>The unit suite is run by G1 and the end-to-end lifecycle by G2. CI repeats the whole set on
+two Python versions alongside a wheel install outside the checkout, so the evidence is
+reproducible without trusting the author's machine.</p>
+<h2 id="2-evidence-base">2. Evidence base</h2>
+<p>The claims ledger holds <strong>172</strong> claims. Every one carries a source, a locator, a tag and
+a falsifier. The census at this release:</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Claims</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CONFIRMED</td>
+<td>160</td>
+</tr>
+<tr>
+<td>CORROBORATED</td>
+<td>0</td>
+</tr>
+<tr>
+<td>INFERRED</td>
+<td>9</td>
+</tr>
+<tr>
+<td>HYPOTHESIS</td>
+<td>2</td>
+</tr>
+<tr>
+<td>UNKNOWN</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Verification method</th>
+<th>Claims</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>independent</td>
+<td>121</td>
+</tr>
+<tr>
+<td>none</td>
+<td>51</td>
+</tr>
+</tbody>
+</table>
+<p><strong>51 claims carry no independent verification.</strong> They are cited to a source
+and graded no higher than the source supports, and they are counted here rather than
+rounded away: a report that only lists verified claims is a report about the easy half.</p>
+<p>68 sources are catalogued and individually linked on the
+<a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/citations.html">citations page</a>.</p>
+<h2 id="3-what-the-system-enforces">3. What the system enforces</h2>
+<p>Three denial postures, each recorded with the condition that ends it:</p>
+<table>
+<thead>
+<tr>
+<th>Posture</th>
+<th>Denies</th>
+<th>Ceiling on a good plane</th>
+<th>Ends when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deny_access</code></td>
+<td>the payload is usable: the bytes are there, the key is not</td>
+<td>CORROBORATED</td>
+<td>the key becomes available inside the attacker's reach, at which point the payload is as readable as it was before</td>
+</tr>
+<tr>
+<td><code>deny_capability</code></td>
+<td>the code reaches what it needs: execution, communication, persistence</td>
+<td>CORROBORATED</td>
+<td>the isolation is lifted, or the attacker finds a path that was never in the enumeration, and the capability returns without any alarm having fired</td>
+</tr>
+<tr>
+<td><code>deny_execution</code></td>
+<td>the code starts: on disk, unverified, and unable to run</td>
+<td>CORROBORATED</td>
+<td>the verifier's root is compromised, or the allow list is stale against a signed-but-hostile component, and execution is permitted by policy</td>
+</tr>
+</tbody>
+</table>
+<p>No denial claim reaches CONFIRMED and gate G17 enforces that. Inability is inferred from
+the absence of a success, and this project does not promote absence.</p>
+<p>The full model, including what each posture does not do, is
+<a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/denial-model.html">the denial model page</a>.</p>
+<h2 id="4-open-findings">4. Open findings</h2>
+<p>These are live limits, not historical notes. Each carries its grade and the observation
+that would close it.</p>
+<h3 id="a1-host-trust-gap-confirmed">A1 - Host trust gap (CONFIRMED)</h3>
+<p>Every control that runs on the target is void once the kernel or the boot chain below it is compromised, which is exactly the case a bootkit creates.</p>
+<p><strong>Would be closed by:</strong> A control exercised on a host with a malicious kernel that still reports success.</p>
+<h3 id="a5-self-scan-cannot-establish-its-own-integrity-confirmed">A5 - Self-scan cannot establish its own integrity (CONFIRMED)</h3>
+<p>A tool that reads its own stack through that stack cannot prove the reading. Self-scan detects accidental damage and casual tampering, not a capable adversary.</p>
+<p><strong>Would be closed by:</strong> A self-scan passing on a host where the tool's own binary was modified.</p>
+<h3 id="a7-no-identity-binding-for-dual-control-confirmed">A7 - No identity binding for dual control (CONFIRMED)</h3>
+<p>Two approvals are required and both are recorded, but an approver name is not bound to a verified principal, so one person with two keys satisfies the check.</p>
+<p><strong>Would be closed by:</strong> A documented case where one operator produced both approvals.</p>
+<h3 id="h1-hardware-protection-state-in-emulation-hypothesis">H1 - Hardware protection state in emulation (HYPOTHESIS)</h3>
+<p>OVMF has no SPI controller registers, so a write-protected flash state observed in QEMU is a property of the emulator, not of firmware.</p>
+<p><strong>Would be closed by:</strong> The same read on real hardware disagreeing with the emulated result.</p>
+<h3 id="h4-protection-state-reading-methods-hypothesis">H4 - Protection state reading methods (HYPOTHESIS)</h3>
+<p>Software readers of SPI protection bits run on the platform they are measuring; a compromised firmware can report protected while unprotected.</p>
+<p><strong>Would be closed by:</strong> An out-of-band programmer reading protection bits that contradict the software reader.</p>
+<h3 id="d2-retroactive-encryption-has-a-boundary-corroborated">D2 - Retroactive encryption has a boundary (CORROBORATED)</h3>
+<p>Encrypting evidence denies access from the moment the key is withheld. It does not undo a key or a plaintext copy taken before that moment, and it does not touch a bootkit that needs no payload to decrypt.</p>
+<p><strong>Would be closed by:</strong> Evidence recovered from a snapshot taken before the key was withheld.</p>
+<h2 id="5-what-this-report-does-not-claim">5. What this report does not claim</h2>
+<p>It does not claim any host is clean, any implant is absent, or any hardware protection
+is active on real firmware. Absence of a finding is not evidence of absence: the
+system distinguishes <em>no finding</em> from <em>no observation</em>, and only the second is a gap
+in the evidence.</p>
+<p>It also does not claim the denial postures are independent of each other. Three controls
+enforced by one authority are one control, and the composition table in the denial
+model says so.</p>
+<h2 id="6-reproducing-this-report">6. Reproducing this report</h2>
+<pre><code class="language-bash">git clone https://github.com/1243353366/qvault-uefi-quarantine
+cd qvault-uefi-quarantine
+pip install -r requirements-dev.txt
+python -m pytest qvault/tests -q
+python3 tools/gates.py
+python3 tools/gen_security_report.py
+</code></pre>
+<p>Release artifact: <code>v0.13.6</code>. The gate list, the census and the posture ceilings
+above are regenerated from the code at every build.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

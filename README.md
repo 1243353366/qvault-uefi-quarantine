@@ -4,7 +4,7 @@
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all sixteen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.5** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.6** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -60,6 +60,9 @@ validation.
 
 - [`report/EVIDENCE_POLICY.md`](report/EVIDENCE_POLICY.md) — the three rules this
 - [`report/DENIAL_MODEL.md`](report/DENIAL_MODEL.md) — the three ways to deny an attacker
+- [`report/SECURITY_REPORT.md`](report/SECURITY_REPORT.md) — the point-in-time report
+  for this release: what is enforced, the claims census including the unverified ones,
+  and six open findings with the observation that would close each
   (access, capability, execution), each with its non-claims and the condition under
   which the denial ends; no denial claim reaches CONFIRMED
   project is held to, revised tag semantics, and a self-audit of where it broke them.
