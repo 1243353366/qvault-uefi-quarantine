@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Block a push when any gate fails.
+#
+# This exists because a failing gate was once piped into `tail`, the pipeline reported success,
+# and a broken commit reached main. The gates already exited nonzero; nothing was listening.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+echo "pre-push: running the gates"
+if ! python3 tools/gates.py; then
+  echo
+  echo "pre-push: gates failed. Nothing was pushed."
+  echo "pre-push: fix the failure above, or push with --no-verify if you know why."
+  exit 1
+fi
+echo "pre-push: gates passed"

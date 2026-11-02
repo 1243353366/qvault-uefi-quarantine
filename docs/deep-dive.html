@@ -57,7 +57,7 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <div class="layout">
 <nav>
   <a class="brand" href="index">QVault</a>
-  <p class="ver">v0.13.0 · prototype</p>
+  <p class="ver">v0.13.1 · prototype</p>
   <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html" class="current">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
 </nav>
 <main>
@@ -1074,11 +1074,15 @@ the recovery procedure is a reformat.</p>
 <h3 id="43-installation">4.3 Installation</h3>
 <p>The installer comes in offline and online variants; the online variant downloads
 its vulnerable victims directly from the <strong>Microsoft symbol store</strong>
-[CONFIRMED, ESET]:</p>
-<pre><code>https://msdl.microsoft.com/download/symbols/bootmgfw.efi/7144BCD31C0000/bootmgfw.efi
-https://msdl.microsoft.com/download/symbols/bootmgr.efi/98B063A61BC000/bootmgr.efi
-https://msdl.microsoft.com/download/symbols/hvloader.efi/559F396411D000/hvloader.efi
+[CONFIRMED, ESET]. The store is addressed by build-specific identifiers, so the form
+is the checkable part:</p>
+<pre><code>https://msdl.microsoft.com/download/symbols/&lt;file&gt;/&lt;TimeDateStamp&gt;&lt;SizeOfImage&gt;/&lt;file&gt;
 </code></pre>
+<p>Three concrete URLs stood here until they were checked on 2 November 2026 and returned
+404. They are not reproduced: the identifier pairs could not be verified against the
+symbol store, and an unverifiable identifier presented as evidence is worse than the
+pattern it illustrates. What the source supports is the channel and the mechanism,
+which is what the paragraph below relies on. <code>tools/linkcheck.py</code> is what caught this.</p>
 <p>Note what this means: the attacker's payload is fetched from Microsoft, over TLS,
 with a valid signature. Any control that trusts "signed by Microsoft" is
 satisfied. Revocation (<code>dbx</code>) is the only answer, and revocation had not happened.</p>

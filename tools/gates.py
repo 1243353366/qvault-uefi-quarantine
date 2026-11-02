@@ -16,6 +16,8 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G10 telemetry map      every mechanism has an evidence source or a stated reason
   G11 in-the-wild set    the pinned reference set is intact and its report is current
   G12 documentation site the published site is a current render of the repository
+  G13 version source     the version has one source and every copy agrees with it
+  G14 internal links     every link in the published site resolves
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -218,6 +220,32 @@ def g12_documentation_site() -> tuple[bool, str]:
     return True, f"{len(build_docs.PAGES)} pages current, {entries} sources cited"
 
 
+def g13_version_single_sourced() -> tuple[bool, str]:
+    """One source of truth for the version, and every copy agrees with it."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import sync_version  # noqa: PLC0415
+
+    want = sync_version.source_version()
+    drift = [f"{name}={got}" for name, got in sync_version.claimed() if got != want]
+    if sync_version.cli_version() != want:
+        drift.append("qvault --version disagrees")
+    if drift:
+        return False, f"{want}: " + ", ".join(drift) + " (run tools/sync_version.py --write)"
+    return True, f"{want} in source, README, packaging and CLI"
+
+
+def g14_internal_links() -> tuple[bool, str]:
+    """Every link in the published site resolves. No network, so it is safe to gate on."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import linkcheck  # noqa: PLC0415
+
+    problems = linkcheck.check_internal()
+    if problems:
+        return False, "; ".join(problems[:3])
+    return True, (f"{len(linkcheck.internal_links())} links resolve across "
+                  f"{len(linkcheck.published())} pages")
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -231,6 +259,8 @@ GATES = (
     ("G10", "telemetry map", g10_telemetry),
     ("G11", "in-the-wild set", g11_in_the_wild),
     ("G12", "documentation site", g12_documentation_site),
+    ("G13", "version source", g13_version_single_sourced),
+    ("G14", "internal links", g14_internal_links),
 )
 
 

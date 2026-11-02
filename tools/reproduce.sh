@@ -19,5 +19,11 @@ python3 tools/check_claims.py | tail -2
 echo "== generated documents =="
 python3 tools/gen_fingerprints.py --check
 
+echo "== every gate, one command =="
+python3 tools/gates.py
+
+echo "== internal links =="
+python3 tools/linkcheck.py --internal
+
 echo "== capability assessment =="
 python3 -c "from qvault import pillars as P; a=P.audit(); print(a['statement'])"
