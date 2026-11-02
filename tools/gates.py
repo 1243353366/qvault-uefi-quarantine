@@ -14,6 +14,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G8 scope gate          a live capture is refused without isolation and attestation
   G9 behaviour matrix    every behaviour resolves to real code and the document is current
   G10 telemetry map      every mechanism has an evidence source or a stated reason
+  G11 in-the-wild set    the pinned reference set is intact and its report is current
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -177,6 +178,22 @@ def g10_telemetry() -> tuple[bool, str]:
                   f"{len(blind)} with no host telemetry, map current")
 
 
+def g11_in_the_wild() -> tuple[bool, str]:
+    """The pinned reference set is intact, and the report on it is current."""
+    from qvault import wild as W
+
+    W.assert_dataset_integrity()
+    sys.path.insert(0, str(ROOT / "tools"))
+    import gen_in_the_wild  # noqa: PLC0415
+
+    on_disk = (ROOT / "report" / "IN_THE_WILD.md").read_text()
+    if on_disk != gen_in_the_wild.render():
+        return False, "report/IN_THE_WILD.md is stale; run tools/gen_in_the_wild.py"
+    summary = W.summary()
+    return True, (f"{summary['entries']} entries pinned at {W.load()['source']['commit'][:8]}, "
+                  f"report current")
+
+
 GATES = (
     ("G1", "unit tests", g1_tests),
     ("G2", "smoke", g2_smoke),
@@ -188,6 +205,7 @@ GATES = (
     ("G8", "scope gate", g8_scope),
     ("G9", "behaviour matrix", g9_behaviour_matrix),
     ("G10", "telemetry map", g10_telemetry),
+    ("G11", "in-the-wild set", g11_in_the_wild),
 )
 
 

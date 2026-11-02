@@ -310,6 +310,42 @@ after the URLs resolved; a candidate measured-boot page returned 404 and was not
 `report/TELEMETRY_MAP.md` is rendered from the mapping, and G10 fails if the map is stale or
 if the mapping is incomplete. 16 tests in `test_telemetry.py` (700 total).
 
+### Added - the in-the-wild reference set (`vendor/p0_0days`, `qvault/wild.py`)
+
+Google Project Zero's `0days-in-the-wild` is merged in as a pinned, hash-verified index:
+70 root-cause analyses, 2019-2024, 28 products, at commit `e21be4bb`, Apache-2.0.
+
+- The 18 MB of upstream markdown is not vendored; `index.json` records each RCA's CVE, year
+  folder, title, product, disclosure date, upstream path, size and SHA-256, so an edited
+  upstream document is visible at the next audit.
+- Upstream is never read at run time. Updating means a new commit, a regenerated index and a
+  reviewed diff, the same rule the vendored triage engine follows.
+- The linked tracking spreadsheet reports "Last updated: 2023-04-20" and is not
+  commit-pinnable, so it is not used.
+- `year_is_exploitation_year()` records that `CVE-2019-17026` is filed under 2020: upstream
+  files by year of exploitation, not year of CVE assignment.
+- One RCA (`CVE-2021-30858`) has no heading title upstream. Recorded as an upstream gap
+  rather than silently defaulted.
+
+### Honest result - the overlap is small and that is the point
+
+Of 70 entries, 2 mention persistence or boot artefacts and none are firmware cases.
+`boundary_assessment()` states that QVault does not detect exploitation, that the layer bounds
+blast radius and preserves evidence for the persistence cases, and that the remainder is out of
+scope and not counted as coverage. The corpus is not used to tune any rule.
+
+### Refused - adding Google Project Zero as a collaborator
+
+GitHub only supports user accounts as outside collaborators. The API refused with
+`"googleprojectzero is not a user"` (404). Attribution is recorded in `CONTRIBUTORS.md` and
+`NOTICE` instead, which also satisfies Apache-2.0 notice retention. No invitation is pending,
+and no individual at Google was invited.
+
+### Added - gate G11
+
+`test_wild.py` (18 tests) plus G11: the index is intact and `report/IN_THE_WILD.md` is current.
+718 tests total.
+
 ### Released - merged to main
 
 `main` moves from v0.11.0 to v0.12.0. The branch carried the policy-denial hardening, the

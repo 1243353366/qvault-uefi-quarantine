@@ -1,0 +1,11 @@
+QVault — UEFI malware analysis and cryptographic quarantine research
+Copyright 2026 the QVault contributors
+
+This product includes a derived index of material from Google Project Zero's
+"0days-in-the-wild" repository (https://github.com/googleprojectzero/0days-in-the-wild),
+licensed under the Apache License, Version 2.0. The derived index is at
+vendor/p0_0days/index.json; the upstream commit and archive hash are recorded there and in
+vendor/p0_0days/SOURCE.md. Upstream documents are not redistributed here.
+
+This product includes a vendored snapshot of the Zero-Breach-Toolkit, used for detection
+research; its provenance and pin are recorded in the evidence ledger.

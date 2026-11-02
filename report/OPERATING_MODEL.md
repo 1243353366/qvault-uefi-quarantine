@@ -80,8 +80,9 @@ payload with no remedy.
 | G8 | Is a live capture still refused without isolation and attestation? |
 | G9 | Does every behaviour still resolve to real code, with the matrix current? |
 | G10 | Does every mechanism have an evidence source or a stated blind spot? |
+| G11 | Is the pinned in-the-wild reference set intact, and its report current? |
 
-Merge requires G1 through G10. Nothing here is advisory.
+Merge requires G1 through G11. Nothing here is advisory.
 
 ## Status
 

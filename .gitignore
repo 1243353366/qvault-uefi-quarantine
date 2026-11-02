@@ -5,3 +5,11 @@ dist/
 build/
 .venv/
 .pytest_cache/
+
+# transient: the Project Zero archive is read once to build the pinned index
+p0.tar.gz
+.p0src/
+
+# transient: the Project Zero archive is read once to build the pinned index
+p0.tar.gz
+.p0src/
