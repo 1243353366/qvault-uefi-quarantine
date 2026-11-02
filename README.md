@@ -4,7 +4,7 @@
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.16.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.17.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 [`SECURITY.md`](SECURITY.md) (report a vulnerability privately) · [`PROVENANCE.md`](PROVENANCE.md) (licence, verifying a release, what signing does not cover) · [`CONTRIBUTING.md`](CONTRIBUTING.md) (how a claim earns a grade)
 
@@ -428,6 +428,43 @@ implant, a protected process will not suspend, and the clock is never touched, b
 destroy the timeline the run exists to preserve. The full account, including the defects in the draft
 this was built from, is in
 [the response page](https://1243353366.github.io/qvault-uefi-quarantine/endpoint-response).
+
+## Authorization as four separately verifiable elements
+
+The fourth question - can you tell an operator from compromised infrastructure - needed its own
+boundary, because a name is not evidence. "Requester is not the approver" was a comparison of strings:
+anyone who could run the CLI could approve as `reviewer2`. Authority is now split into four elements,
+each carrying its own evidence and its own verdict, in `qvault/authorization.py`.
+
+| Element       | What it is bound to                                                                                 | What produces the verdict                                                                      | What makes it fail                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Identity**  | An Ed25519 key fingerprint. A human name is an annotation on a fingerprint, never the proof itself. | Signature verification of the requester and of every approver.                                 | A signature relabelled as a different key; an unsigned request.               |
+| **Authority** | A policy document signed by a root key that never signs an approval itself.                         | Policy signature, capability grant, quorum, and requester not among approvers.                 | Tampered policy, expired policy, unentitled approver, self-approval.          |
+| **Intent**    | Object id, ciphertext hash, purpose, expiry and a single-use nonce, all inside the signed bytes.    | Digest equality per approval, plus a nonce store asked whether it is spent.                    | An approval for another object, a replay, an expired or future-dated request. |
+| **Execution** | The artefact, not the host's account of itself.                                                     | Receipt signature bound to the intent digest and object, against a hash the verifier computed. | A receipt naming bytes the verifier does not hold.                            |
+
+Verification runs anywhere, from files:
+
+```bash
+qvault authz bundle.json --root <hex> --keys keys.json \
+    --plaintext-sha256 <hash of the bytes you received> --attested <executor fingerprint>
+```
+
+Each element is computed independently and none short-circuits another, so a missing requester key
+still reports what authority, intent and execution had to say; `blocked_by` names exactly what failed.
+Execution reaches `CONFIRMED` only when the executing key was confirmed out of band, because a host
+that lies about what it did can also lie in its own receipt. Without that witness the run is
+`CORROBORATED`, a missing receipt makes it `INCOMPLETE`, and a receipt whose hash contradicts the bytes
+you hold is `REFUSED`. That last case is the one that distinguishes a contradicted claim from an
+unchecked one, and the two are never collapsed.
+
+What this does not do. It makes authorization checkable; it does not prevent the action, and a host
+that never asks permission is still unconstrained. If the custodian's signing device is compromised,
+identity is compromised, which is the residual and is smaller than "anyone with a shell". `attested`
+means the verifier learned the executor's key through some other channel: no TPM quote is verified
+here. There is no revocation list, so a withdrawn custodian's old signature remains valid for a run
+that predates the withdrawal. And if you read the bundle from the compromised host, you are trusting it
+to tell you what it did.
 
 ## What the tests prove
 

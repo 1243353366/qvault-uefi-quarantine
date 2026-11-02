@@ -29,6 +29,29 @@ host that answers whatever asks is an envelope, not a boundary.
 
 Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
 =======
+## [0.17.0] - 2026-11-02
+
+### Added - authorization split into four separately verifiable elements
+
+`qvault/authorization.py` replaces the string comparison that passed for dual control. Identity is an
+Ed25519 fingerprint with the name as annotation; authority is a signed policy with capability, quorum
+and separation of duties; intent binds object, ciphertext hash, purpose, expiry and a single-use nonce
+inside the signed bytes; execution is a receipt checked against a hash the verifier computed itself.
+Every element is evaluated independently, so one failure cannot hide another, and `blocked_by` reports
+what actually failed.
+
+`qvault authz` verifies a bundle from files on any machine, needing no vault and no host state.
+
+Three bugs found while building it, all in this release: `Intent.sign` signed the payload before
+binding the requester fingerprint into it, so every request failed its own signature check; the
+identity verdict was derived from a substring search over reason strings rather than from the
+verification result; and a contradicted receipt was graded `INCOMPLETE` instead of `REFUSED`, which
+would have softened the one finding that matters most.
+
+`attested` is a claim about where the verifier learned a key, not about hardware: no TPM quote is
+verified, and the page and README both say so rather than implying an attestation this code cannot
+perform.
+
 ## [0.16.0] - 2026-11-02
 
 ### Added - endpoint response tools, reversible by construction

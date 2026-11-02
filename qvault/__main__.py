@@ -267,6 +267,28 @@ def cmd_checkpoint(args) -> None:
     _json_out({"checkpoint": name, **cp})
 
 
+def cmd_authz(args) -> None:
+    """Verify the four elements from files. Runs anywhere: it needs no vault and no host state."""
+    from . import authorization as authz
+
+    with open(args.bundle, "r", encoding="utf-8") as fh:
+        bundle = json.load(fh)
+    with open(args.keys, "r", encoding="utf-8") as fh:
+        keys = json.load(fh)
+    out = authz.verify_bundle(
+        bundle,
+        root_public_hex=args.root,
+        public_keys=keys,
+        attested_executors=[x for x in args.attested.split(",") if x],
+        observed_plaintext_sha256=args.plaintext_sha256,
+        used_nonces=authz.NonceStore(args.nonces) if args.nonces else None,
+    )
+    _json_out(out)
+    # A refusal is a result, not a crash: report it and exit nonzero so scripts can branch on it.
+    if out["overall"] in ("REFUSED", "MALFORMED"):
+        raise SystemExit(2)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="qvault", description=__doc__)
     from . import __version__
@@ -348,6 +370,15 @@ def build_parser() -> argparse.ArgumentParser:
     ln.add_argument("--case", required=True)
     ln.set_defaults(func=cmd_lan)
 
+    az = sub.add_parser("authz", help="verify a four-element authorization bundle from files alone")
+    az.add_argument("bundle", help="bundle JSON: intent, approvals, policy, receipt")
+    az.add_argument("--root", required=True, help="hex Ed25519 public key of the policy root")
+    az.add_argument("--keys", required=True, help="JSON mapping fingerprint -> hex public key")
+    az.add_argument("--plaintext-sha256", help="sha256 of the bytes you actually received")
+    az.add_argument("--attested", default="", help="comma-separated executor fingerprints confirmed "
+                                                   "out of band")
+    az.add_argument("--nonces", help="nonce store file, to refuse replays across runs")
+    az.set_defaults(func=cmd_authz)
     cp = sub.add_parser("checkpoint", help="sign the current audit head")
     cp.add_argument("--root", required=True)
     cp.set_defaults(func=cmd_checkpoint)

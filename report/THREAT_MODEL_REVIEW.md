@@ -128,6 +128,10 @@ The gate opens when all of the following are true, and not before:
 1. An independent reviewer has worked through §6 and every answer is recorded.
 2. Every **High** finding from review is either fixed with a test, or accepted in
    writing with a named owner and a residual-risk statement.
+W1 (approvals are a name comparison) is addressed from 0.17.0 by `qvault/authorization.py`: approvals are
+Ed25519 signatures over a canonical intent, checked against a policy signed by a root key, with the
+approver fingerprint recomputed rather than read. W2-W4 remain open.
+
 3. W1-W4 are resolved, because each of them individually reduces "dual control"
    or "tamper-evident audit" to a claim rather than a property.
 4. The adversarial tests derived from the review exist in `qvault/tests/` and

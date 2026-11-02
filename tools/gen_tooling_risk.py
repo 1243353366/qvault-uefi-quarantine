@@ -60,6 +60,18 @@ REGISTER = {
         gap="Both controls sit on the same volume. Rewriting the mark and the log together, or "
             "holding the signing key, defeats them; closing that needs an off-box anchor (RFC 3161, "
             "a transparency log, paper custody), which is deployment and not code."),
+    "authorization.py": dict(
+        consumes="authorization bundles: intent, approvals, policy and receipt as JSON, from whoever "
+                "presents them",
+        guard="every element is verified before it is believed: Ed25519 signatures over "
+              "domain-separated canonical bytes, the approver fingerprint recomputed from the key "
+              "rather than read from the file, the policy checked against a supplied root key, the "
+              "receipt checked against a hash the verifier computed itself, and a bundle version "
+              "check that refuses anything unexpected",
+        gap="Parsing itself is unbounded: a large members map or a huge approvals list is processed "
+            "before any signature is examined, so a hostile bundle can spend CPU and memory. No "
+            "fuzzing has been done on the JSON surface. A malformed bundle is reported as MALFORMED "
+            "rather than raised, which is a behaviour claim, not a hardening claim."),
     "provenance.py": dict(
         consumes="manifests and vendored-source trees",
         guard="`hmac.compare_digest` for secret-derived comparisons",
