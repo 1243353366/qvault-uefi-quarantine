@@ -57,12 +57,12 @@ footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <div class="layout">
 <nav>
   <a class="brand" href="index">QVault</a>
-  <p class="ver">v0.13.6 · prototype</p>
+  <p class="ver">v0.13.7 · prototype</p>
   <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-report.html" class="current">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
 </nav>
 <main>
-<h1 id="security-report-qvault-0136">Security report - qvault 0.13.6</h1>
-<p>This is the point-in-time security report for release <strong>0.13.6</strong>. It describes what
+<h1 id="security-report-qvault-0137">Security report - qvault 0.13.7</h1>
+<p>This is the point-in-time security report for release <strong>0.13.7</strong>. It describes what
 the system enforces, what it can prove about itself, and what remains open. It is generated
 from the tree it describes: the counts, the gate list and the grade census are read at build
 time, so a stale claim fails the build rather than sitting in a document.</p>
@@ -70,7 +70,7 @@ time, so a stale claim fails the build rather than sitting in a document.</p>
 <p><strong>Scope.</strong> Defensive firmware forensics: acquisition, quarantine, evidence grading and
 containment for UEFI-resident malware. No live host, no real SPI flash and no physical
 programmer were available, so every hardware-plane statement is graded accordingly and
-gathered in <a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/limitations.html">the limitations page</a>.</p>
+gathered in <a href="limitations.html">the limitations page</a>.</p>
 </blockquote>
 <h2 id="1-what-was-verified-and-how">1. What was verified, and how</h2>
 <p>The release passes <strong>17 gates</strong>, each of which refuses the push that would
@@ -211,7 +211,7 @@ a falsifier. The census at this release:</p>
 and graded no higher than the source supports, and they are counted here rather than
 rounded away: a report that only lists verified claims is a report about the easy half.</p>
 <p>68 sources are catalogued and individually linked on the
-<a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/citations.html">citations page</a>.</p>
+<a href="citations.html">citations page</a>.</p>
 <h2 id="3-what-the-system-enforces">3. What the system enforces</h2>
 <p>Three denial postures, each recorded with the condition that ends it:</p>
 <table>
@@ -247,7 +247,7 @@ rounded away: a report that only lists verified claims is a report about the eas
 <p>No denial claim reaches CONFIRMED and gate G17 enforces that. Inability is inferred from
 the absence of a success, and this project does not promote absence.</p>
 <p>The full model, including what each posture does not do, is
-<a href="https://github.com/1243353366/qvault-uefi-quarantine/blob/main/denial-model.html">the denial model page</a>.</p>
+<a href="denial-model.html">the denial model page</a>.</p>
 <h2 id="4-open-findings">4. Open findings</h2>
 <p>These are live limits, not historical notes. Each carries its grade and the observation
 that would close it.</p>
@@ -285,7 +285,7 @@ python -m pytest qvault/tests -q
 python3 tools/gates.py
 python3 tools/gen_security_report.py
 </code></pre>
-<p>Release artifact: <code>v0.13.6</code>. The gate list, the census and the posture ceilings
+<p>Release artifact: <code>v0.13.7</code>. The gate list, the census and the posture ceilings
 above are regenerated from the code at every build.</p>
 <footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
 render of a Markdown file in the repo, so the site cannot claim more than the code does.

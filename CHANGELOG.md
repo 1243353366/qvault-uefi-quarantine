@@ -9,6 +9,27 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.7] - 2026-11-02
+
+### Fixed - three links that only worked on the site
+
+The security report linked to its sibling pages by published slug: `limitations.html`,
+`denial-model.html`, `citations.html`. That resolves on the static site, because `docs/` contains
+those files, and 404s in the repository, which does not. The internal link check walks published
+pages, so it saw nothing wrong; the external citation check resolved the same hrefs against the
+repository and reported three broken links on the first CI run.
+
+Links now name the Markdown source. The builder rewrites it to the page slug for the site, and the
+repository resolves it as a file, so one href is correct in both places. A test refuses a relative
+`.html` link in the report.
+
+External citations now read 74 unique (72 answering, 2 blocked, 0 broken). The two that answer 403
+to automated clients - a DoD PDF and an ISO catalogue page - are recorded as blockers in
+`tools/linkcheck.py` rather than dropped, because "our client is refused" is not "the source is
+gone".
+
+827 tests, seventeen gates.
+
 ## [0.13.6] - 2026-11-02
 
 ### Added - the security report for this release

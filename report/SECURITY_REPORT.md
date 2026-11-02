@@ -1,6 +1,6 @@
-# Security report - qvault 0.13.6
+# Security report - qvault 0.13.7
 
-This is the point-in-time security report for release **0.13.6**. It describes what
+This is the point-in-time security report for release **0.13.7**. It describes what
 the system enforces, what it can prove about itself, and what remains open. It is generated
 from the tree it describes: the counts, the gate list and the grade census are read at build
 time, so a stale claim fails the build rather than sitting in a document.
@@ -8,7 +8,7 @@ time, so a stale claim fails the build rather than sitting in a document.
 > **Scope.** Defensive firmware forensics: acquisition, quarantine, evidence grading and
 > containment for UEFI-resident malware. No live host, no real SPI flash and no physical
 > programmer were available, so every hardware-plane statement is graded accordingly and
-> gathered in [the limitations page](limitations.html).
+> gathered in [the limitations page](ARCHITECTURAL_LIMITATIONS.md).
 
 ## 1. What was verified, and how
 
@@ -62,7 +62,7 @@ and graded no higher than the source supports, and they are counted here rather 
 rounded away: a report that only lists verified claims is a report about the easy half.
 
 68 sources are catalogued and individually linked on the
-[citations page](citations.html).
+[citations page](../CITATIONS.md).
 
 ## 3. What the system enforces
 
@@ -78,7 +78,7 @@ No denial claim reaches CONFIRMED and gate G17 enforces that. Inability is infer
 the absence of a success, and this project does not promote absence.
 
 The full model, including what each posture does not do, is
-[the denial model page](denial-model.html).
+[the denial model page](DENIAL_MODEL.md).
 
 ## 4. Open findings
 
@@ -143,5 +143,5 @@ python3 tools/gates.py
 python3 tools/gen_security_report.py
 ```
 
-Release artifact: `v0.13.6`. The gate list, the census and the posture ceilings
+Release artifact: `v0.13.7`. The gate list, the census and the posture ceilings
 above are regenerated from the code at every build.

@@ -79,3 +79,17 @@ def test_the_report_refuses_to_call_the_system_clean(text):
     lowered = text.lower()
     assert "is malware-free" not in lowered
     assert "absence of a finding is not evidence of absence" in lowered
+
+
+def test_the_report_links_by_repository_path_not_by_site_slug(text):
+    """`.html` links only resolve on the published site; in the repo they are dead links.
+
+    The repository is the source of truth - the site is generated from it - so a cross-page link
+    must name the Markdown file and let the builder rewrite it to a slug. This failed once: three
+    `.html` links passed locally because the page existed in docs/, and the external citation check
+    caught them by 404ing against the repository.
+    """
+    for target in re.findall(r"\]\(([^)]+)\)", text):
+        if target.startswith(("http://", "https://", "#", "mailto:")):
+            continue
+        assert not target.endswith(".html"), f"{target} is a site slug, not a repository path"

@@ -100,7 +100,7 @@ def render() -> str:
         "> **Scope.** Defensive firmware forensics: acquisition, quarantine, evidence grading and\n"
         "> containment for UEFI-resident malware. No live host, no real SPI flash and no physical\n"
         "> programmer were available, so every hardware-plane statement is graded accordingly and\n"
-        "> gathered in [the limitations page](limitations.html).\n\n")
+        "> gathered in [the limitations page](ARCHITECTURAL_LIMITATIONS.md).\n\n")
 
     out.append("## 1. What was verified, and how\n\n")
     out.append(
@@ -131,7 +131,7 @@ def render() -> str:
         "and graded no higher than the source supports, and they are counted here rather than\n"
         "rounded away: a report that only lists verified claims is a report about the easy half.\n\n")
     out.append(f"{sources} sources are catalogued and individually linked on the\n"
-               "[citations page](citations.html).\n\n")
+               "[citations page](../CITATIONS.md).\n\n")
 
     out.append("## 3. What the system enforces\n\n")
     out.append("Three denial postures, each recorded with the condition that ends it:\n\n")
@@ -144,7 +144,7 @@ def render() -> str:
         "\nNo denial claim reaches CONFIRMED and gate G17 enforces that. Inability is inferred from\n"
         "the absence of a success, and this project does not promote absence.\n\n")
     out.append("The full model, including what each posture does not do, is\n"
-               "[the denial model page](denial-model.html).\n\n")
+               "[the denial model page](DENIAL_MODEL.md).\n\n")
 
     out.append("## 4. Open findings\n\n")
     out.append("These are live limits, not historical notes. Each carries its grade and the observation\n"
