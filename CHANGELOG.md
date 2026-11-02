@@ -204,6 +204,45 @@ bibliography for independently verified rows.
 
 40 tests in `test_persistence.py` (645 total).
 
+### Added - the wire contract (`contract/verdict.schema.json`, `qvault/contract.py`)
+
+The interface other runtimes are allowed to see, and nothing more:
+
+- One payload: mechanism, basis, attestation state, observed signals and counts, verdict
+  token, cap grade, denial codes, remedy, statement.
+- **`subject.resource` is always null in a policy payload.** The type has no field in which
+  to echo what the caller asked about, so a refusal cannot become a probe about what exists.
+  A payload that fills it in is rejected by both validators.
+- `denial_codes` is a closed vocabulary with exactly one public value, so no adapter can
+  invent a taxonomy that partitions resources by which gate nearly passed.
+- Persistence payloads must carry a basis and a cap grade and no denial codes; policy payloads
+  must carry neither, because an authorisation answer is not an evidence claim.
+- Validation runs in two runtimes: `qvault/contract.py` (no dependencies) and
+  `adapters/verdict_lint.mjs` (node). Both reject a payload with no remedy, and the test suite
+  asserts the Python constants and the schema enums have not drifted apart.
+
+### Added - pre-merge gates (`tools/gates.py`)
+
+G1 tests, G2 smoke, G3 evidence ledger, G4 wire contract in two runtimes, G5 single owner,
+G6 no clean state, G7 denial invariance, G8 scope gate. Merge requires all eight.
+`assert_single_owner()` fails if an engine module contains a process, socket or shell call or
+imports an adapter; the forbidden tokens are assembled rather than written literally so the
+checker does not trip on its own source.
+
+### Fixed - gate G7 compared an allow with a refusal
+
+The denial-invariance sweep included `retention`, which an untrusted policy permits with no
+requested value, so the gate reported two shapes and looked like an oracle. It now compares
+refusals only, and fails if the sweep produces fewer than two of them.
+
+### Added - `report/OPERATING_MODEL.md`
+
+Scrum for backlog, sprints, acceptance and release gates; explicit gates for architecture,
+threat model and evidence. Epics E1-E5 mapped to modules and tests, the polyglot boundary as a
+table, and the statement that a red gate moves the release rather than the gate.
+
+24 tests in `test_contract.py` (669 total).
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.

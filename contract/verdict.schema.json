@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qvault.invalid/contract/verdict.schema.json",
+  "title": "QVault verdict wire format",
+  "description": "The contract between the verdict engine and any adapter in any language. The engine is single-language and single-owner; this document is how other runtimes participate without touching the decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "layer", "subject", "basis", "attestation_state", "observed", "verdict", "cap_grade", "denial_codes", "remedy", "statement"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "kind": { "const": "verdict" },
+    "layer": { "enum": ["persistence", "policy"] },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism", "resource"],
+      "properties": {
+        "mechanism": { "type": ["string", "null"] },
+        "resource": {
+          "type": ["string", "null"],
+          "description": "Always null. The wire has no place to echo the resource a caller asked about, so a refusal cannot become a probe."
+        }
+      }
+    },
+    "basis": {
+      "enum": ["synthetic", "live_host", "offline_image", "attested_image", null],
+      "description": "Evidence basis for a persistence finding. Null for policy answers, which are authorisation results rather than evidence claims."
+    },
+    "attestation_state": { "enum": ["verified", "absent", "unknown", null] },
+    "observed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signals", "entries", "coverage"],
+      "properties": {
+        "signals": { "type": "array", "items": { "type": "string" } },
+        "entries": { "type": "integer", "minimum": 0 },
+        "coverage": { "type": ["object", "null"] }
+      }
+    },
+    "verdict": {
+      "enum": ["detected", "benign", "unknown_not_observable", "not_observed", "allow", "refused", "unknown", "partial", "unattested"]
+    },
+    "cap_grade": { "enum": ["CONFIRMED", "CORROBORATED", "INFERRED", "HYPOTHESIS", "UNKNOWN", null] },
+    "denial_codes": {
+      "type": "array",
+      "items": { "enum": ["policy_denied"] },
+      "description": "Closed vocabulary with exactly one public code. A richer taxonomy would partition resources by which gate was nearly passing."
+    },
+    "remedy": { "type": "string", "minLength": 1 },
+    "statement": { "type": "string" }
+  }
+}
