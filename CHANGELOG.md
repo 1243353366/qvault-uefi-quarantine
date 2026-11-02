@@ -9,6 +9,34 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.12] - 2026-11-02
+
+### Fixed - the two riskiest rows, hardened and re-graded
+
+`store.py` and `audit.py` were the two entries in `report/TOOLING_RISK.md` that trust data written by
+an adversary who knows it is being collected. Both now refuse attacks that were previously only
+described.
+
+**store.py** opens every read with `O_NOFOLLOW`, `O_NONBLOCK` and an `S_ISREG` check, so a symlink
+where an object should be is refused rather than followed to `/etc/shadow`, and a FIFO is refused
+rather than blocking the reader forever. An object chmod'd group- or world-writable after seal is
+refused, ids cannot traverse, and `seal_object` fsyncs the directory so a crash cannot lose the link
+while keeping the bytes.
+
+**audit.py** keeps its hash chain and signed checkpoint, and adds a persisted high-water mark that
+refuses to append to a log shorter than the last recorded count. That closes the specific attack
+`verify()` could never see: truncate the head, then keep appending so the log looks continuous. The
+log is also opened without following a symlink.
+
+Nine new tests build each attack and assert the refusal: symlink, FIFO, widened mode, traversal,
+truncate-then-append, symlinked log, plus a regression that a valid object and chain still work.
+
+What is **not** closed, and is now written in the register rather than implied: the store refuses a
+link and a widened mode but not a regular 0400 file an attacker substituted, so content integrity is
+still the envelope hash plus the chain. And both audit controls live on the same volume, so an
+attacker who rewrites the mark and the log together, or holds the signing key, defeats both; only an
+off-box anchor closes that, and that is deployment, not code.
+
 ## [0.13.11] - 2026-11-02
 
 ### Added - the four risks get a section on the front door

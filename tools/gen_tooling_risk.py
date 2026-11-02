@@ -6,7 +6,8 @@ problem. This register exists so that surface is inspectable before someone runs
 new parser cannot be added without saying what it does not handle.
 
 The register is deliberately pessimistic. "none observed" is a real value: where no guard was found
-by reading the module, the entry says so rather than describing the intent.
+by reading the module, the entry says so rather than describing the intent. A hardened row keeps the
+residual gap written down, because closing one attack path is not closing the class.
 """
 from __future__ import annotations
 
@@ -44,14 +45,21 @@ REGISTER = {
             "not to. That is an assumption, not a check."),
     "store.py": dict(
         consumes="on-disk store files, writable by anyone who reaches the volume",
-        guard="refuses a second open for writing; unrecognised enum values refused, not defaulted",
-        gap="The store trusts file permissions (seal 0400) plus the audit chain. A writer with the "
-            "volume mounted can replace a file; detection is the chain's job, not the store's."),
+        guard="`O_NOFOLLOW` + `S_ISREG` + `O_NONBLOCK` on every read, so a symlink, FIFO or device in "
+              "the namespace is refused rather than followed or hung on; an object made "
+              "group/world-writable after seal is refused; ids cannot traverse; the seal fsyncs the "
+              "directory so a crash cannot lose the link while keeping the bytes",
+        gap="The reader refuses a link and a widened mode, not a regular 0400 file an attacker wrote "
+            "as a substitute. Content integrity is the envelope hash plus the audit chain; this open "
+            "path does not establish it."),
     "audit.py": dict(
         consumes="audit log entries, attacker-writable between runs",
-        guard="hash chain plus checkpoint verification, so deletion mid-chain fails verification",
-        gap="Truncation at the head is detected only against a checkpoint held elsewhere; if both "
-            "are replaced, the shorter chain verifies as valid."),
+        guard="hash chain with prev_hash and seq continuity; signed Ed25519 checkpoint catches head "
+              "truncation; a persisted high-water mark refuses to append to a log shorter than the "
+              "last recorded count, which closes truncate-then-keep-appending",
+        gap="Both controls sit on the same volume. Rewriting the mark and the log together, or "
+            "holding the signing key, defeats them; closing that needs an off-box anchor (RFC 3161, "
+            "a transparency log, paper custody), which is deployment and not code."),
     "provenance.py": dict(
         consumes="manifests and vendored-source trees",
         guard="`hmac.compare_digest` for secret-derived comparisons",

@@ -1,6 +1,6 @@
-# Security report - qvault 0.13.11
+# Security report - qvault 0.13.12
 
-This is the point-in-time security report for release **0.13.11**. It describes what
+This is the point-in-time security report for release **0.13.12**. It describes what
 the system enforces, what it can prove about itself, and what remains open. It is generated
 from the tree it describes: the counts, the gate list and the grade census are read at build
 time, so a stale claim fails the build rather than sitting in a document.
@@ -143,5 +143,5 @@ python3 tools/gates.py
 python3 tools/gen_security_report.py
 ```
 
-Release artifact: `v0.13.11`. The gate list, the census and the posture ceilings
+Release artifact: `v0.13.12`. The gate list, the census and the posture ceilings
 above are regenerated from the code at every build.

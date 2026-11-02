@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Iterator
@@ -59,6 +60,42 @@ class VaultPaths:
         return p
 
 
+def _check_id(object_id: str) -> None:
+    """An object id is an opaque name, never a path. Refuse anything that could traverse."""
+    if not object_id or object_id in (".", "..") or "/" in object_id or "\\" in object_id:
+        raise StoreError("object not available")
+
+
+def _open_ro(path: str, what: str = "object") -> int:
+    """Open read-only, refusing symlinks, special files, and objects made writable.
+
+    The store is opened by a process reading data an adversary may have written. Following a
+    symlink would let that adversary redirect a read to /etc/shadow; opening a FIFO or a device
+    would block or read forever. O_NOFOLLOW plus an S_ISREG check closes the link and
+    special-file classes; the mode check refuses an object that was chmod'd writable after seal.
+
+    O_NONBLOCK matters as much as O_NOFOLLOW: opening a FIFO read-only blocks forever without
+    it, which turns a crafted store into a hang rather than a refusal.
+
+    Every failure raises the same coarse error on purpose: the caller learns that the object is
+    not available, not which test it failed, so the refusal is not an oracle.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                       | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        raise StoreError(f"{what} not available") from None
+    try:
+        st = os.fstat(fd)
+    except OSError:
+        os.close(fd)
+        raise StoreError(f"{what} not available") from None
+    if not stat.S_ISREG(st.st_mode) or (st.st_mode & 0o022):
+        os.close(fd)
+        raise StoreError(f"{what} not available")
+    return fd
+
+
 def write_once(path: str, data: bytes, mode: int = 0o400) -> None:
     """Create `path` exactly once. Raises if it already exists."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
@@ -77,6 +114,7 @@ def write_once(path: str, data: bytes, mode: int = 0o400) -> None:
 
 def seal_object(paths: VaultPaths, tmp_path: str, object_id: str) -> str:
     """Move a freshly written ciphertext into the immutable object namespace."""
+    _check_id(object_id)
     final = os.path.join(paths.objects, f"{object_id}.qv")
     if os.path.exists(final):
         raise StoreError(f"object {object_id[:16]}... already sealed")
@@ -84,20 +122,27 @@ def seal_object(paths: VaultPaths, tmp_path: str, object_id: str) -> str:
     # os.link refuses to overwrite; unlink the temp afterwards.
     os.link(tmp_path, final)
     os.unlink(tmp_path)
+    # fsync the directory: without it the link can be lost by a crash while the bytes survive,
+    # which would look like a vanished object rather than an incomplete one.
+    dfd = os.open(paths.objects, os.O_RDONLY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
     return final
 
 
 def put_envelope(paths: VaultPaths, object_id: str, envelope: dict) -> str:
+    _check_id(object_id)
     path = os.path.join(paths.envelopes, f"{object_id}.json")
     write_once(path, canonical_json(envelope), mode=0o400)
     return path
 
 
 def get_envelope(paths: VaultPaths, object_id: str) -> dict:
-    path = os.path.join(paths.envelopes, f"{object_id}.json")
-    if not os.path.exists(path):
-        raise StoreError(f"object {object_id} not available")
-    with open(path) as fh:
+    _check_id(object_id)
+    fd = _open_ro(os.path.join(paths.envelopes, f"{object_id}.json"))
+    with os.fdopen(fd) as fh:
         return json.load(fh)
 
 
@@ -105,16 +150,27 @@ def list_objects(paths: VaultPaths) -> Iterator[dict]:
     for name in sorted(os.listdir(paths.envelopes)):
         if not name.endswith(".json"):
             continue
-        with open(os.path.join(paths.envelopes, name)) as fh:
+        fd = _open_ro(os.path.join(paths.envelopes, name))
+        with os.fdopen(fd) as fh:
             env = json.load(fh)
         yield env
 
 
 def object_path(paths: VaultPaths, object_id: str) -> str:
+    _check_id(object_id)
     p = os.path.join(paths.objects, f"{object_id}.qv")
+    if os.path.lexists(p) and not stat.S_ISREG(os.lstat(p).st_mode):
+        raise StoreError("object not available")
     if not os.path.exists(p):
-        raise StoreError(f"object {object_id} not available")
+        raise StoreError("object not available")
     return p
+
+
+def read_object(paths: VaultPaths, object_id: str) -> bytes:
+    """Read sealed ciphertext the only way the store allows: no links, no special files."""
+    fd = _open_ro(object_path(paths, object_id))
+    with os.fdopen(fd, "rb") as fh:
+        return fh.read()
 
 
 def merkle_root(leaves: list[str]) -> str:

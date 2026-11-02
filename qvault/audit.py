@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import time
 from dataclasses import dataclass
 from hashlib import sha256
@@ -67,6 +68,54 @@ class AuditLog:
 
     # ---------- key handling ----------
 
+    def _open_log(self) -> int:
+        """Open the log without following a symlink and without opening a special file.
+
+        The log is written by this process and by whoever has the vault mounted. A symlink swap
+        would point verification at a file the attacker controls, and a FIFO would hang it.
+        """
+        try:
+            fd = os.open(self.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                         | getattr(os, "O_NONBLOCK", 0))
+        except OSError:
+            raise AuditError("audit log not available") from None
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            os.close(fd)
+            raise AuditError("audit log not available")
+        return fd
+
+    def _mark_path(self) -> str:
+        return self.path + ".hwm"
+
+    def _guard_rollback(self) -> None:
+        """Refuse to append to a log that is shorter than the last count this vault recorded.
+
+        `verify()` cannot see head truncation: a shorter chain is still a valid chain. The signed
+        checkpoint closes that only when the checkpoint is held elsewhere. This mark closes the
+        common attack - truncate, then keep appending so the log looks continuous - by refusing
+        the append. It is advisory against an attacker who can rewrite the mark too; the residual
+        is written in report/TOOLING_RISK.md.
+        """
+        mark = self._mark_path()
+        if not os.path.exists(mark):
+            return
+        try:
+            with open(mark) as fh:
+                recorded = int(fh.read().strip() or 0)
+        except (OSError, ValueError):
+            raise AuditError("audit high-water mark unreadable") from None
+        actual = len(self.entries())
+        if actual < recorded:
+            raise AuditError("audit log shorter than recorded high-water mark (truncation)")
+
+    def _record_mark(self, count: int) -> None:
+        fd = os.open(self._mark_path(), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(str(count))
+            fh.flush()
+            os.fsync(fh.fileno())
+
     def _load_private(self) -> Ed25519PrivateKey:
         if not self.key_path or not os.path.exists(self.key_path):
             raise AuditError("audit signing key not initialised")
@@ -107,6 +156,7 @@ class AuditLog:
         return last
 
     def append(self, event: str, subject: str, payload: dict) -> dict:
+        self._guard_rollback()
         prev = self._last_entry()
         seq = 0 if prev is None else int(prev["seq"]) + 1
         prev_hash = GENESIS if prev is None else prev["hash"]
@@ -126,15 +176,17 @@ class AuditLog:
             fh.write(json.dumps(entry, sort_keys=True) + "\n")
             fh.flush()
             os.fsync(fh.fileno())
+        self._record_mark(seq + 1)
         return entry
 
     # ---------- verification ----------
 
     def entries(self) -> list[dict]:
-        if not os.path.exists(self.path):
+        if not os.path.exists(self.path) and not os.path.lexists(self.path):
             return []
         out = []
-        with open(self.path) as fh:
+        fd = self._open_log()
+        with os.fdopen(fd) as fh:
             for lineno, line in enumerate(fh, 1):
                 line = line.strip()
                 if not line:
