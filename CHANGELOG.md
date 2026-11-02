@@ -60,6 +60,10 @@ Current version. The release where the tool stopped taking its own word for anyt
 
 ### Fixed
 
+- Merged the repository owner's hardening commit `38235ea` (2026-11-01): boundary validation
+  in stream headers and Shamir share parsing, path-traversal rejection in `retrieve`, and
+  single-pass ingest. Their 5 files and 75 new tests are in this release unchanged; my
+  changes sit on top and did not conflict. Total suite is 369 tests after the merge.
 - `audit-signing.key` was written by `init` and then never found: every command constructed
   `AuditLog` without a `key_path`, so `checkpoint` failed with "signing key not
   initialised" on a vault that had one. The path is now derived from the log location.
