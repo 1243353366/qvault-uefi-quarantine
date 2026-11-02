@@ -9,6 +9,7 @@ they deliberately do not mean.
 
 ---
 
+<<<<<<< HEAD
 ## [Unreleased] - feature/cdup
 
 ### Added - CDUP, kept off main
@@ -26,8 +27,87 @@ Not addressed, and stated as such on the page: everything before encryption (key
 capture) and plaintext in memory during use. The boundary is deployment - an authority on the same
 host that answers whatever asks is an envelope, not a boundary.
 
-Held off `main` because the capability model is the same primitive a lawful-access feature would
-need, and that reading should be thought through rather than assumed.
+Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
+=======
+## [0.14.0] - 2026-11-02
+
+### Added - CDUP, kept off main
+
+Cryptographic Data Usability Protection: assume the payload is stolen, minimise what the thief can
+recover. A fresh DEK per object, AES-256-GCM per chunk with the AAD bound to the object id, and the
+DEK wrapped under a KEK held by a separate authority that mints short-lived, single-use, audited
+capabilities. The store holds no key material; `assert_separated` refuses an authority nested inside
+the store it protects.
+
+Thirteen tests are written from the attacker's side. Expired, forged, replayed and wrong-object
+capabilities all return the same bytes, and a test asserts that.
+
+Not addressed, and stated as such on the page: everything before encryption (keylogger, screen
+capture) and plaintext in memory during use. The boundary is deployment - an authority on the same
+host that answers whatever asks is an envelope, not a boundary.
+
+Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
+
+### Added - threat intelligence where the doctrine is code
+
+Three questions kept apart: what software is operating, what infrastructure it depends on, how the
+operation finances itself. `qvault/threatintel.py` collects graded observations, computes what they
+support from provenance rather than row count, and refuses the rest.
+
+Enforced rather than documented: collection sources (probe, forced rotation, credential use,
+purchase, wallet interaction, intrusion) are refused on intake and the module has no network code at
+all; per-claim ceilings cap operator, wallet and proxy attribution at HYPOTHESIS, with no identity
+field in the output; four observations derived from one report count once; `disruption_plan` emits
+report/notify/preserve/submit against named channels and refuses any other verb. A package without a
+competing explanation per hypothesis is refused.
+
+Also: `deleted_domains_are_not_enough` reports ledger-pointer dependency, so a domain takedown is not
+mistaken for a fix, and returns UNKNOWN rather than clean when no pointer is seen.
+
+Two self-inflicted bugs found by the tests: a derived observation hashed to its parent's id, so the
+provenance walk followed itself and the test **hung instead of failing** (identity now covers every
+field, and cycles are refused). Twenty-four tests, written from the analyst's side.
+
+Held off `main` while under review, merged in this release: naming wallets and channels is a
+different publication from quarantining firmware, so it was settled deliberately.
+
+### Added - evidence brief for filing
+
+`qvault/evidence_brief.py` builds a custody-grade brief: per-artefact SHA-256 recomputed from bytes,
+acquisition time with a mandatory timezone, acquiring party, documented method, source provenance,
+immutability checked from the mode bits, a timeline, computed attribution grades, the hypothesis
+carried as a hypothesis beside a required competing explanation, and a manifest hash that
+`verify` recomputes.
+
+Refusal is the design. A hash mismatch, a naive or future timestamp, an undocumented acquisition
+method, an unattributed artefact, a missing original, a writable original, a self-declared
+CORROBORATED grade, a missing alternative, or a hypothesis that names a person all stop the brief.
+No `owner`, `identity` or `suspect` field exists in the structure, so a name cannot be written beside
+an artefact.
+
+Two checks that were quietly broken, both found here: `os.access(W_OK)` is True for a 0400 file as
+root, so the immutability check passed on everything in a container and now reads mode bits; and git
+preserves no mode but the exec bit, so a committed example artefact would arrive writable and be
+correctly refused, hence the demo case stays local.
+
+Nineteen tests, plus a CLI that exits 2 and says "refused" rather than writing a defective document.
+
+### Added - input capture graded by observation point
+
+`qvault/inputcapture.py` classifies collection mechanisms into four tiers - application, OS,
+privileged, external - and keeps **severity on a separate axis**, because a level 1 session thief
+routinely costs more than a level 3 keylogger. Level 4 is listed and marked unobservable from the
+host rather than omitted; confirming it needs external instrumentation.
+
+Corroboration requires two distinct telemetry planes; three signals from one plane are one
+observation. Every innocent explanation recorded for these signals (accessibility tools, keyboard
+utilities, remote support, vendor input drivers) must be excluded on the record before corroboration.
+`CONFIRMED` is unreachable, and an empty case is `UNKNOWN` with a caveat, never clean.
+
+Bug found by a test: the case grade was computed with `min` over grade ranks, which returned the
+**strongest** technique - a case with one corroborated and one inferred finding reported
+CORROBORATED overall. Now the weakest, as it must be.
+>>>>>>> feature/threatintel
 
 ## [0.13.12] - 2026-11-02
 

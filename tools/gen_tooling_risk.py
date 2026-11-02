@@ -95,6 +95,28 @@ REGISTER = {
         gap="The authority trusts its own directory for the KEK and the replay set. An attacker who "
             "can write that directory reads the key and rewrites spent capabilities; the separation "
             "is deployment (another host, an HSM), not this module."),
+    "threatintel.py": dict(
+        consumes="graded observations supplied by an analyst, plus entity strings",
+        guard="collection sources refused on intake and no network code in the module, so it cannot "
+              "become a collector; per-claim ceilings cap attribution at HYPOTHESIS; grades computed "
+              "from provenance roots so derived rows cannot launder independence",
+        gap="It trusts the grades it is handed. An observation typed CONFIRMED by mistake is believed, "
+            "and the ceilings limit what that buys rather than catching the error."),
+    "evidence_brief.py": dict(
+        consumes="a case file (JSON) and the bytes of every artefact it references",
+        guard="hashes recomputed from bytes rather than trusted; timezone-mandatory and non-future "
+              "timestamps; mode-bit immutability; manifest hash that `verify` recomputes; no identity "
+              "field exists in the structure",
+        gap="The case file is read with `json.load` and validated field by field, not against a schema, "
+            "and a hostile case file can still exhaust memory. The lint for person-naming phrasing is "
+            "four regexes and cannot catch implication by layout."),
+    "inputcapture.py": dict(
+        consumes="telemetry signals (technique, plane, source) from endpoint tooling",
+        guard="corroboration requires two distinct planes; all four innocent explanations must be "
+              "excluded on the record; CONFIRMED and \"clean\" unreachable; case grade is the weakest "
+              "technique",
+        gap="Level 4 is unobservable from the host and is reported as such rather than detected. The "
+            "module cannot tell a hook from a hook's absence, so silence stays UNKNOWN."),
     "wild.py": dict(
         consumes="the in-the-wild dataset (pinned snapshot)",
         guard="pinned snapshot; entries are metadata, not samples",

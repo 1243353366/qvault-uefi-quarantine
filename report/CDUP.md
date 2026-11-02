@@ -1,7 +1,7 @@
 # CDUP: Cryptographic Data Usability Protection
 
-Release **0.13.12**, branch `feature/cdup`, not merged. The legal-exposure reason for
-keeping it off `main` is stated at the end of this page.
+Release **0.14.0**. Built on `feature/cdup`, held there until the legal reading was
+settled, and merged in this release; the reasoning is at the end of this page.
 
 **Objective.** Assume an attacker acquires the payload. Minimise what they can recover from
 it.

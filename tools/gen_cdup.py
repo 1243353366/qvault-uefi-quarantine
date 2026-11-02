@@ -68,8 +68,8 @@ OPEN_TESTS = [
 
 def render() -> str:
     o = ["# CDUP: Cryptographic Data Usability Protection\n\n"]
-    o.append(f"Release **{__version__}**, branch `feature/cdup`, not merged. The legal-exposure reason for\n"
-             "keeping it off `main` is stated at the end of this page.\n\n")
+    o.append(f"Release **{__version__}**. Built on `feature/cdup`, held there until the legal reading was\n"
+             "settled, and merged in this release; the reasoning is at the end of this page.\n\n")
     o.append("**Objective.** Assume an attacker acquires the payload. Minimise what they can recover from\n"
              "it.\n\n")
     o.append("The premise is not paranoia. Infostealers are sold as malware-as-a-service, so an attacker\n"
