@@ -29,6 +29,23 @@ host that answers whatever asks is an envelope, not a boundary.
 
 Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
 =======
+## [0.15.0] - 2026-11-02
+
+### Added - records sealed at rest, seven properties
+
+`qvault/atrest.py`: AES-256-GCM with the record id bound in the associated data, wrapped per-record
+DEKs in a separate key root, a hash-linked chain over content identity, append-only writes, rotation
+that re-wraps without touching ciphertext, revocation that destroys availability without touching
+data, and a write path that raises and leaves nothing behind when sealing is impossible.
+
+Honest limits, on the page rather than in a footnote: TPM backing is graded HYPOTHESIS (no attestation
+captured, and no device in this environment); the software protector must be requested explicitly and
+is defeated by a read of its key root; plaintext lives in process memory during seal and after open.
+
+Three bugs the tests found: the key id was bound into the payload's AAD, which made rotation
+impossible; the head file stored a count where a sequence number belonged, so every record claimed
+seq 0; and the chain hashed whole envelopes, so rotation broke every link.
+
 ## [0.14.0] - 2026-11-02
 
 ### Added - CDUP, kept off main

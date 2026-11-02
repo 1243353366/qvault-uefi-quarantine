@@ -95,6 +95,15 @@ REGISTER = {
         gap="The authority trusts its own directory for the KEK and the replay set. An attacker who "
             "can write that directory reads the key and rewrites spent capabilities; the separation "
             "is deployment (another host, an HSM), not this module."),
+    "atrest.py": dict(
+        consumes="sealed envelopes read back from disk, and the key files under the key root",
+        guard="AES-256-GCM with the record id bound in the associated data; wrapped DEKs "
+              "authenticated before use; hash-linked chain over content identity; append-only; a write "
+              "that cannot seal leaves nothing behind",
+        gap="TPM backing is unverified in an environment with no TPM, and is graded HYPOTHESIS even "
+            "when a device is present because no attestation is captured. The software protector is "
+            "defeated by anything that can read its key root, and plaintext exists in memory during "
+            "seal and after open."),
     "threatintel.py": dict(
         consumes="graded observations supplied by an analyst, plus entity strings",
         guard="collection sources refused on intake and no network code in the module, so it cannot "

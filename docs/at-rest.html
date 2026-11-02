@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Records sealed at rest · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.15.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Design</p><ul><li><a href="at-rest.html" class="current">Records sealed at rest</a></li><li><a href="cdup.html">CDUP: data usability protection</a></li></ul><p class="nav-section">Analysis</p><ul><li><a href="input-capture.html">Input capture: four tiers</a></li><li><a href="threatintel.html">Threat intelligence and disruption</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-policy.html">Security policy</a></li><li><a href="provenance.html">Provenance and verification</a></li><li><a href="contributing.html">Contributing</a></li><li><a href="tooling-risk.html">Tooling risk</a></li><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="records-sealed-at-rest">Records sealed at rest</h1>
+<p>Release <strong>0.15.0</strong>. Module <code>qvault/atrest.py</code>, tests <code>qvault/tests/test_atrest.py</code>.</p>
+<p>Seven properties, each written as behaviour a test can attack. The interesting part of this page is not the list; it is where the list is weaker than it sounds, which is stated per row rather than in a footnote at the end.</p>
+<h2 id="the-properties-as-enforced">The properties, as enforced</h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>How it is enforced</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>local_encryption</code></td>
+<td>records are sealed in memory and written sealed; there is no code path that writes plaintext</td>
+<td><code>test_a_record_round_trips_and_leaves_no_plaintext_on_disk</code></td>
+</tr>
+<tr>
+<td><code>authenticated_encryption</code></td>
+<td>AES-256-GCM; associated data binds the record id and schema, so ciphertext cannot be relabelled</td>
+<td><code>test_ciphertext_cannot_be_moved_to_another_record</code></td>
+</tr>
+<tr>
+<td><code>key_separation</code></td>
+<td><code>assert_separated</code> refuses a key root inside the record tree, before anything is created</td>
+<td><code>test_keys_inside_the_record_tree_are_refused</code></td>
+</tr>
+<tr>
+<td><code>hardware_backed</code></td>
+<td><code>TpmProtector</code> requires <code>/dev/tpmrm0</code>; without it, construction fails instead of pretending</td>
+<td><code>test_a_tpm_is_used_when_present_and_refused_when_absent</code></td>
+</tr>
+<tr>
+<td><code>rotation_and_revocation</code></td>
+<td>rotation re-wraps DEKs and leaves ciphertext byte-identical; revocation makes records unreadable while leaving them intact</td>
+<td><code>test_rotation_rewraps_without_touching_ciphertext</code></td>
+</tr>
+<tr>
+<td><code>integrity</code></td>
+<td>hash-linked chain over content identity; edit, delete and reorder all fail verification</td>
+<td><code>test_the_chain_catches_edit_delete_and_reorder</code></td>
+</tr>
+<tr>
+<td><code>fail_closed</code></td>
+<td>a protector that cannot wrap raises and nothing is written or replaced</td>
+<td><code>test_a_failing_protector_writes_nothing_at_all</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="fail-closed-concretely">Fail closed, concretely</h2>
+<p><code>SealedVault.write</code> seals first and persists second. If the protector cannot wrap - device missing, hardware error, revoked key - the call raises and nothing is written, replaced or left behind: no plaintext, no partial file, no degraded "write it unprotected and fix it later". A test drives a protector that always fails and then scans the whole temporary tree for the payload marker; it is not there.</p>
+<p>The same rule governs reads. A record that fails authentication raises. It is never returned partially, and the caller cannot distinguish "tampered" from "wrong key" beyond the error class, which is deliberate.</p>
+<h2 id="hardware-backing-honestly-graded">Hardware backing, honestly graded</h2>
+<p><code>TpmProtector</code> requires <code>/dev/tpmrm0</code> and refuses to construct without it. Its backing grade is <code>HYPOTHESIS</code>, not <code>CONFIRMED</code>, even on a machine that has one: no attestation is captured, so "this key is bound to these PCRs on this platform" is a claim this code cannot support. The software protector is <code>HYPOTHESIS</code> and must be requested explicitly, because a wrapping key on the same host as the ciphertext is an envelope, not a boundary.</p>
+<h2 id="rotation-and-revocation">Rotation and revocation</h2>
+<p>Rotation mints a new key id and re-wraps each record's DEK under it. Ciphertext and nonce are unchanged, byte for byte, and a test asserts that. This is why the key id is bound by the wrapped key rather than by the payload's associated data: binding it to the payload made rotation impossible without re-encrypting every record.</p>
+<p>Revocation is a deliberate destruction of availability. The ciphertext is untouched, so a revoked record stays on disk exactly as it was; it simply cannot be opened. Revoking the last live key is permitted, and sealing afterwards fails closed rather than silently falling back to another key.</p>
+<h2 id="integrity">Integrity</h2>
+<p>Records are hash-linked in sequence order and the head digest is stored separately, so an edit, a deletion, a reordering or a truncation each fail verification. The chain commits to <strong>content identity</strong> - record id, sequence, nonce and ciphertext - not to the whole envelope, because rotation changes the envelope's key metadata and must not invalidate the chain it did not touch.</p>
+<p>Records are append-only. Rewriting an existing id is refused, so a revision is a new record with its own sequence number and the chain never loses what it previously attested to.</p>
+<h2 id="three-bugs-this-layer-produced-before-it-worked">Three bugs this layer produced before it worked</h2>
+<p>The key id was originally bound into the payload's associated data, so every rotation broke decryption: correct-looking, and it made the two properties mutually exclusive.</p>
+<p>The head file stored the record count as the next sequence number, so every record claimed sequence zero and the chain reported a gap on the second write.</p>
+<p>The chain hashed whole envelopes, so a rotation - which rewrites only the wrapped DEK - broke every link. All three were caught by tests that rotate, revoke and reorder rather than round-tripping once.</p>
+<h2 id="what-this-does-not-claim">What this does not claim</h2>
+<ul>
+<li><strong>Memory.</strong> Plaintext exists inside the process during <code>seal</code> and after <code>open</code>. Python cannot zeroise a <code>bytes</code> object, so a reader of this process's memory reads the record. This layer protects data at rest.</li>
+<li><strong>A same-host authority.</strong> A software protector on the host holding the ciphertext is defeated by anything that can read its key root. Real separation is another host, an HSM or a TPM with attestation.</li>
+<li><strong>TPM attestation.</strong> Not captured, therefore not claimed.</li>
+<li><strong>Recovery.</strong> A revoked or lost key means those records are gone. There is no escrow here, and adding one would weaken the property that makes revocation meaningful.</li>
+</ul>
+<h2 id="using-it">Using it</h2>
+<pre><code class="language-python">from qvault.atrest import SealedVault, SoftwareProtector, TpmProtector
+
+protector = TpmProtector('/var/lib/qvault/keys')        # refuses without a TPM
+vault = SealedVault('/var/lib/qvault/records', '/var/lib/qvault/keys', protector)
+vault.write('record-0001', evidence_bytes)
+vault.rotate()
+vault.verify_chain()['ok']
+</code></pre>
+<h2 id="why-this-holds-up">Why this holds up</h2>
+<p>Every property above maps to a named test that attacks it rather than exercising it, the aggregate claims are graded, and the gaps are listed next to the guarantees instead of being discovered by an examiner. The one thing this page will not do is describe a software protector on a shared host as though it were hardware separation.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>
