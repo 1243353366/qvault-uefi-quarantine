@@ -29,6 +29,31 @@ host that answers whatever asks is an envelope, not a boundary.
 
 Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
 =======
+## [0.16.0] - 2026-11-02
+
+### Added - endpoint response tools, reversible by construction
+
+`response/crush-klog.sh` and `response/Crush-Klog.ps1` suspend, isolate, quarantine and de-persist a
+suspected software keylogger. Dry run by default, `--apply` to act, generated restore script for the
+whole run, hashes and manifest over every artefact, and exit codes that distinguish refusal from
+partial success.
+
+Corrections to the draft these were built from, each found by running or reading it: the process tree
+was breadth-first and reversed, which suspended the root first and freed the watchdog; `.exe` was
+appended to targets that already had it; firewall rules bound every target to the first target's
+binary; `fltmc` output was parsed at the wrong column; the report was skipped on every non-success
+path; `-TimeWarp` skewed the system clock, which destroys the timeline the run exists to preserve, and
+is now refused by name; system directories could be renamed; and the Linux half had no restore path at
+all despite reversibility being the premise.
+
+Two defects were only visible when the tool ran: it matched its own command line and tried to suspend
+itself, and it resolved an interpreted implant to its interpreter, producing a live false positive on
+`debug-shell.service` because the matched name was `bash`.
+
+Testing is stated asymmetrically on the page, because it is asymmetric: the Linux tool is executed end
+to end against a planted decoy, the PowerShell tool is parsed by PowerShell 7.4.6 with two of its
+functions executed out of the shipped file, and the Windows-only paths are reviewed rather than run.
+
 ## [0.15.0] - 2026-11-02
 
 ### Added - records sealed at rest, seven properties

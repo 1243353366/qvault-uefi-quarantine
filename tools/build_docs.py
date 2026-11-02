@@ -73,6 +73,8 @@ PAGES = [
     ("report/THREAT_BEHAVIOR_MATRIX.md", "threat-behavior-matrix.html",
      "Behaviour to control", "Research"),
     ("report/TELEMETRY_MAP.md", "telemetry-map.html", "Telemetry map", "Research"),
+    ("report/ENDPOINT_RESPONSE.md", "endpoint-response.html",
+     "Endpoint response: crushing a keylogger", "Response"),
     ("report/AT_REST.md", "at-rest.html",
      "Records sealed at rest", "Design"),
     ("report/INPUT_CAPTURE.md", "input-capture.html",

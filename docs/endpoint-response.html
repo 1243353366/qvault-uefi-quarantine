@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endpoint response: crushing a keylogger · QVault</title>
+<style>
+:root { --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
+        --accent:#7fb2f0; --code:#0f1115; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfbfc; --panel:#f2f3f6; --text:#1a1d22; --muted:#5b6472; --line:#dde0e6;
+          --accent:#1c5fbf; --code:#f4f5f7; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.layout { display:grid; grid-template-columns:250px minmax(0,1fr); min-height:100vh; }
+nav { background:var(--panel); border-right:1px solid var(--line); padding:20px 16px;
+  position:sticky; top:0; height:100vh; overflow-y:auto; }
+nav .brand { font-weight:600; font-size:15px; letter-spacing:.02em; display:block;
+  color:var(--text); text-decoration:none; margin-bottom:4px; }
+nav .ver { color:var(--muted); font-size:12px; margin:0 0 18px; }
+nav a { color:var(--muted); text-decoration:none; }
+nav a:hover { color:var(--accent); }
+nav a.current { color:var(--accent); font-weight:600; }
+.nav-section { color:var(--text); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }
+nav ul { list-style:none; margin:0; padding:0; }
+nav li { margin:2px 0; font-size:14px; }
+main { padding:36px 44px 80px; max-width:980px; }
+h1 { font-size:30px; line-height:1.25; margin:0 0 8px; }
+h2 { font-size:21px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:24px 0 8px; }
+a { color:var(--accent); }
+p, li { max-width:78ch; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;
+  display:block; overflow-x:auto; }
+th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:var(--panel); font-weight:600; }
+code { background:var(--code); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto;
+  border:1px solid var(--line); }
+pre code { background:none; padding:0; }
+blockquote { margin:16px 0; padding:2px 16px; border-left:3px solid var(--accent);
+  color:var(--muted); }
+footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+@media (max-width:820px) {
+  .layout { grid-template-columns:1fr; }
+  nav { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  main { padding:24px 20px 60px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <a class="brand" href="index">QVault</a>
+  <p class="ver">v0.16.0 · prototype</p>
+  <p class="nav-section">Overview</p><ul><li><a href="index.html">Overview</a></li></ul><p class="nav-section">Research</p><ul><li><a href="deep-dive.html">UEFI malware deep dive</a></li><li><a href="in-the-wild.html">Zero-days in the wild</a></li><li><a href="threat-behavior-matrix.html">Behaviour to control</a></li><li><a href="telemetry-map.html">Telemetry map</a></li><li><a href="fingerprints.html">Family fingerprints</a></li><li><a href="defect-log.html">Defect log</a></li></ul><p class="nav-section">Response</p><ul><li><a href="endpoint-response.html" class="current">Endpoint response: crushing a keylogger</a></li></ul><p class="nav-section">Design</p><ul><li><a href="at-rest.html">Records sealed at rest</a></li><li><a href="cdup.html">CDUP: data usability protection</a></li></ul><p class="nav-section">Analysis</p><ul><li><a href="input-capture.html">Input capture: four tiers</a></li><li><a href="threatintel.html">Threat intelligence and disruption</a></li></ul><p class="nav-section">Controls</p><ul><li><a href="persistence.html">Persistence detection</a></li><li><a href="lan-layer.html">LAN containment</a></li><li><a href="netobs.html">Network observation</a></li><li><a href="denial-model.html">Denial model</a></li></ul><p class="nav-section">Assurance</p><ul><li><a href="security-policy.html">Security policy</a></li><li><a href="provenance.html">Provenance and verification</a></li><li><a href="contributing.html">Contributing</a></li><li><a href="tooling-risk.html">Tooling risk</a></li><li><a href="security-report.html">Security report</a></li><li><a href="acquisition.html">Acquisition and analysis</a></li><li><a href="trust-model.html">Trust model</a></li><li><a href="threat-model-review.html">Threat model review</a></li><li><a href="limitations.html">Architectural limitations</a></li><li><a href="capability-map.html">Capability map</a></li><li><a href="evidence-policy.html">Evidence policy</a></li><li><a href="operating-model.html">Operating model</a></li><li><a href="reproduce.html">Reproduce the results</a></li><li><a href="hardware-questions.html">Hardware test backlog</a></li></ul><p class="nav-section">Sources</p><ul><li><a href="citations.html">Citations</a></li><li><a href="contributors.html">Contributors</a></li><li><a href="changelog.html">Changelog</a></li></ul>
+</nav>
+<main>
+<h1 id="endpoint-response-crushing-a-suspected-keylogger">Endpoint response: crushing a suspected keylogger</h1>
+<p>Release <strong>0.16.0</strong>. Tools <code>response/crush-klog.sh</code> and <code>response/Crush-Klog.ps1</code>, tests
+<code>qvault/tests/test_response_scripts.py</code>.</p>
+<p>Suspend, isolate, quarantine and de-persist a suspected software keylogger, reversibly. Dry run is the
+default; <code>--apply</code> / <code>-Apply</code> is required to change anything; every applied action is recorded and a
+<code>RESTORE</code> script is generated that puts the machine back.</p>
+<p>The point is containment without destruction. Nothing is deleted, the system clock is never touched,
+and a failed step is reported as failed rather than assumed to have worked.</p>
+<h2 id="order-and-why-the-order-is-the-design">Order, and why the order is the design</h2>
+<ol>
+<li><strong>Evidence first.</strong> Hashes, a read-only copy of the binary, live sockets, the persistence inventory
+   and per-process metadata are all captured before any mutation. After suspension the socket map is
+   gone and the process metadata starts decaying.</li>
+<li><strong>Suspend, children first.</strong> Depth-first post-order. A watchdog is usually the child of the thing it
+   protects, so suspending the parent first frees the watchdog to put the Run key back within seconds.</li>
+<li><strong>De-persist after suspension.</strong> Same reason: a dead process cannot re-create its own autostart
+   entry, while a live one recreates it faster than the operator can delete it.</li>
+<li><strong>Quarantine by rename</strong>, not deletion: <code>app</code> becomes <code>app.quarantined</code>, and system directories are
+   refused outright so containment cannot turn into destruction.</li>
+<li><strong>Network block</strong>, by recorded destination where sockets were captured, and by executable path for
+   the quarantined copy.</li>
+<li><strong>Read-only containment</strong> on the quarantined tree, so a resumed process cannot rewrite its own logs.</li>
+</ol>
+<h2 id="the-reversibility-contract">The reversibility contract</h2>
+<p><code>RESTORE.sh</code> / <code>RESTORE.ps1</code> is generated on every applied run and is idempotent: resume the suspended
+processes, remove the firewall rules, rename the directories back, re-enable the units and services,
+restore the crontab from its verbatim copy, reload the filter drivers. Restore uses the <strong>recorded</strong>
+absolute paths rather than <code>$HOME</code> or <code>$env:USERPROFILE</code>, because a restore run by a different operator
+would otherwise put a profile entry back in the wrong profile.</p>
+<h2 id="chain-of-custody">Chain of custody</h2>
+<p><code>report.txt</code>, <code>events.jsonl</code> (UTC, one line per phase), <code>evidence/hashes.txt</code>, the read-only binary
+copy, <code>persistence/entries.*</code> and <code>MANIFEST.sha256</code> covering every artefact except itself. The clock is
+recorded and not modified, which is what makes the timestamps worth anything later.</p>
+<h2 id="what-was-wrong-with-the-draft-and-what-changed">What was wrong with the draft, and what changed</h2>
+<table>
+<thead>
+<tr>
+<th>Draft behaviour</th>
+<th>Why it fails</th>
+<th>Shipped behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tree built breadth-first, then the outer array reversed</td>
+<td>Suspends the root first, freeing the watchdog to respawn</td>
+<td>Depth-first post-order, children before parents</td>
+</tr>
+<tr>
+<td><code>"$t.exe"</code> appended to a target that already ended in <code>.exe</code></td>
+<td>Looks for <code>klog.exe.exe</code>, silently matches nothing</td>
+<td>Suffix appended only when absent</td>
+</tr>
+<tr>
+<td>Firewall step used <code>roots[0]</code>'s filename for every rule</td>
+<td>Rules bind to the wrong executable for all but the first target</td>
+<td>Each renamed directory supplies its own executable</td>
+</tr>
+<tr>
+<td><code>fltmc filters</code> parsed at split index <code>[2]</code></td>
+<td>Column padding moves the name; silently finds no filter or the wrong one</td>
+<td>Split on whitespace runs, name at index 0, header skipped</td>
+</tr>
+<tr>
+<td><code>-TimeWarp</code> skewed the system clock</td>
+<td>Rewrites file timestamps and breaks event correlation: destroys the timeline the run exists to preserve</td>
+<td>Parameter kept and <strong>refused by name</strong>, with the reason</td>
+</tr>
+<tr>
+<td>Report written only on the success path</td>
+<td>A dry run, a refusal or a crash left no record at all</td>
+<td>Written from a <code>finally</code> block on every exit path</td>
+</tr>
+<tr>
+<td>Rename attempted without checking the directory</td>
+<td><code>C:\Program Files</code> or <code>/usr/bin</code> renamed would be destruction, not containment</td>
+<td>System and shared program directories refused before any rename</td>
+</tr>
+<tr>
+<td><code>/proc/pid/exe</code> trusted as the target</td>
+<td>For an interpreted implant that is <code>python</code> or <code>bash</code>: the tool would look for "bash" in persistence and copy the interpreter as evidence</td>
+<td>Interpreter detected, real script resolved from the command line, interpreter recorded and never modified</td>
+</tr>
+<tr>
+<td>Restore rebuilt autostart under <code>$HOME</code></td>
+<td>A restore under another account restores into the wrong profile</td>
+<td>Recorded absolute path used</td>
+</tr>
+<tr>
+<td>Linux: no restore path at all</td>
+<td>Reversibility was the stated premise and the Linux half had none</td>
+<td><code>RESTORE.sh</code> generated, tested end to end</td>
+</tr>
+</tbody>
+</table>
+<p>Two of these were found by running the tool, not by reading it: the self-match (the tool's own command
+line contains the target string, so <code>pgrep -f</code> matched the tool and it tried to suspend itself) and the
+interpreter resolution, which produced a live false positive on <code>debug-shell.service</code> because the
+matched "name" was <code>bash</code>.</p>
+<h2 id="testing-status-stated-plainly">Testing status, stated plainly</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>crush-klog.sh</code></td>
+<td><strong>Executed end to end</strong>: decoy planted, dry run verified side-effect-free, apply verified to suspend (state <code>T</code>), quarantine, and move persistence; <code>RESTORE.sh</code> verified to resume, rename back and restore the autostart entry under a different <code>HOME</code>.</td>
+</tr>
+<tr>
+<td><code>Crush-Klog.ps1</code></td>
+<td><strong>Parsed by PowerShell 7.4.6</strong>; <code>Get-OrderedTree</code> and <code>Test-PathHit</code> are executed out of the shipped file by the test suite. Everything Windows-specific (CIM, registry, <code>fltmc</code>, <code>New-NetFirewallRule</code>, <code>NtSuspendProcess</code>) is <strong>reviewed, not run</strong>: there is no Windows host here. Treat first use as a supervised dry run.</td>
+</tr>
+</tbody>
+</table>
+<p>That asymmetry is not hidden in a footnote because it is the one thing an examiner will ask about.</p>
+<h2 id="limits">Limits</h2>
+<ul>
+<li><strong>A kernel-mode keylogger is not touched.</strong> No user-mode action removes a driver; the filter-driver
+  step is best-effort and a failure is reported, not hidden.</li>
+<li><strong>Protected processes (PPL) do not suspend.</strong> The script reports the failure and the process keeps
+  running.</li>
+<li><strong>Renaming can fail while the image is mapped.</strong> On Windows the directory may be locked even with the
+  process suspended; the step reports <code>FAILED</code> and the run exits <code>3</code> (partial).</li>
+<li><strong>A suspended process keeps its open sockets.</strong> Suspension stops execution, not the existing
+  connection state; the firewall rules bind to paths, so they bite on restart.</li>
+<li><strong>Level 4 capture is out of scope.</strong> Physical interception and firmware-level capture produce no
+  endpoint telemetry at all, which is the same boundary the input-capture tiers describe.</li>
+<li><strong>This tool does not prove the process was a keylogger.</strong> It contains a suspect. Judging whether the
+  observation adds up is the grading problem: two telemetry planes, innocent explanations excluded on
+  the record, and no "clean" verdict from an absence of signals.</li>
+</ul>
+<h2 id="use">Use</h2>
+<pre><code class="language-bash">./response/crush-klog.sh klog              # report only
+sudo ./response/crush-klog.sh klog --apply # contain
+sudo &lt;run dir&gt;/RESTORE.sh                  # put it back
+</code></pre>
+<pre><code class="language-powershell">.\Crush-Klog.ps1 -Target klog            # report only
+.\Crush-Klog.ps1 -Target klog -Apply     # contain, elevated
+&lt;run dir&gt;\RESTORE.ps1                    # put it back, elevated
+</code></pre>
+<p>Exit codes: <code>0</code> complete, <code>1</code> nothing matched, <code>2</code> refused (no elevation, or <code>-TimeWarp</code>), <code>3</code> partial,
+<code>4</code> unexpected failure. A partial run is the normal outcome on a hardened host, and it is reported as
+partial rather than rounded up to success.</p>
+<p>Input-capture techniques are classified per MITRE ATT&amp;CK
+<a href="https://attack.mitre.org/techniques/T1056/">T1056</a>; the tier model and its coverage limits are the
+subject of the input-capture page.</p>
+<footer>Generated from the repository by <code>tools/build_docs.py</code>. Every page is a
+render of a Markdown file in the repo, so the site cannot claim more than the code does.
+Sources: <a href="citations">citations</a> · Code:
+<a href="https://github.com/1243353366/qvault-uefi-quarantine">github.com/1243353366/qvault-uefi-quarantine</a></footer>
+</main>
+</div>
+</body>
+</html>

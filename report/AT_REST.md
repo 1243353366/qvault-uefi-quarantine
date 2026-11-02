@@ -1,6 +1,6 @@
 # Records sealed at rest
 
-Release **0.15.0**. Module `qvault/atrest.py`, tests `qvault/tests/test_atrest.py`.
+Release **0.16.0**. Module `qvault/atrest.py`, tests `qvault/tests/test_atrest.py`.
 
 Seven properties, each written as behaviour a test can attack. The interesting part of this page is not the list; it is where the list is weaker than it sounds, which is stated per row rather than in a footnote at the end.
 
