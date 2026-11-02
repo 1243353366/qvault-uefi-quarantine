@@ -37,7 +37,7 @@ jobs:
           cache: pip
       - name: install pinned dependencies and the project
         run: |
-          pip install -r requirements-lock.txt
+          pip install -r requirements-dev.txt
           pip install -e . --no-deps
       - name: unit tests
         run: python -m pytest qvault/tests -q
@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -r requirements-lock.txt
+      - run: pip install -r requirements-dev.txt
       - run: pip install -e . --no-deps
       - name: gates G1-G14
         run: python tools/gates.py
@@ -68,7 +68,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install markdown
+      - name: install the pinned renderer
+        run: pip install -r requirements-dev.txt
       - name: rebuild and compare
         run: |
           python tools/build_docs.py
@@ -95,7 +96,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install build
+      - run: pip install -r requirements-dev.txt
       - run: python -m build
       - name: install the wheel, not the tree
         run: pip install dist/*.whl
@@ -117,6 +118,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m compileall -q qvault tools vendor
-      - run: pip install ruff==0.6.9
+      - run: pip install -r requirements-dev.txt
       - name: errors only, not style
         run: ruff check --select E9,F63,F7,F82 qvault tools

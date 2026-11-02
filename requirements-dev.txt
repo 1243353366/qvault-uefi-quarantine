@@ -1,0 +1,8 @@
+# Test and documentation dependencies, pinned to the versions the gates were verified with.
+# Runtime dependencies live in requirements-lock.txt; this file adds only what the test suite,
+# the document generators and the static check need.
+-r requirements-lock.txt
+
+markdown==3.11.2
+build==1.4.1
+ruff==0.6.9
