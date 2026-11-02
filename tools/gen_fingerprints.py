@@ -82,6 +82,9 @@ does nothing and only a reflash removes them.
 def main() -> None:
     import sys
     import qvault.residency as R
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import tables
     check = "--check" in sys.argv
     P.assert_catalogue_integrity()
     lines = [HEADER]
@@ -122,7 +125,7 @@ def main() -> None:
     lines.append(RESIDENCY_CLOSE)
 
     lines.append(FOOTER)
-    rendered = "".join(lines)
+    rendered = tables.align("".join(lines))
     count = sum(len(P.by_family(f)) for f in P.FAMILIES)
 
     if check:

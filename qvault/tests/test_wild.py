@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / "tools"))
+import tables  # noqa: E402
 from qvault import wild as W
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,7 +109,7 @@ def test_the_report_matches_the_pinned_index():
     import gen_in_the_wild  # noqa: PLC0415
 
     on_disk = (ROOT / "report" / "IN_THE_WILD.md").read_text()
-    assert on_disk == gen_in_the_wild.render(), (
+    assert on_disk == tables.align(gen_in_the_wild.render()), (
         "report/IN_THE_WILD.md is stale; run tools/gen_in_the_wild.py")
 
 

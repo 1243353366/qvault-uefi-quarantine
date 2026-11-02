@@ -7,7 +7,7 @@
 > `tools/linkcheck.py` was right to fail it. Locally, `.githooks/pre-push` runs all fourteen
 > gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.13.2** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.13.3** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
 
 > **Status: prototype, not hardened.** The code was written before the threat model
 > had been independently reviewed, which is the wrong order. Nine weaknesses found
@@ -38,16 +38,16 @@ The full documentation is published at
 **<https://1243353366.github.io/qvault-uefi-quarantine/>**, generated from this repository by
 `tools/build_docs.py`, so the site cannot claim more than the code does.
 
-| Page | What it answers |
-|------|-----------------|
-| [Deep dive](https://1243353366.github.io/qvault-uefi-quarantine/deep-dive) | LoJax, MoonBounce and BlackLotus, with the architecture and the bibliography |
-| [Zero-days in the wild](https://1243353366.github.io/qvault-uefi-quarantine/in-the-wild) | The pinned Project Zero reference set, and why the overlap with this boundary is 2 of 70 |
-| [Behaviour to control](https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix) | 17 attacker behaviours, the control that answers each, and the gaps named |
-| [Telemetry map](https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map) | What feeds each detection: Sysmon, Windows events, script blocks, TPM log |
-| [Persistence](https://1243353366.github.io/qvault-uefi-quarantine/persistence) | Fourteen autostart mechanisms and four result classes |
-| [Acquisition and analysis](https://1243353366.github.io/qvault-uefi-quarantine/acquisition) | Dump-based workflow, tooling, air-gap, and what an emulator cannot tell you |
-| [Trust model](https://1243353366.github.io/qvault-uefi-quarantine/trust-model) · [Limitations](https://1243353366.github.io/qvault-uefi-quarantine/limitations) | What is programmatically enforced, and what is deployment-dependent |
-| [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations) | All 68 sources, each with where it is used |
+| Page                                                                                                                                                            | What it answers                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [Deep dive](https://1243353366.github.io/qvault-uefi-quarantine/deep-dive)                                                                                      | LoJax, MoonBounce and BlackLotus, with the architecture and the bibliography             |
+| [Zero-days in the wild](https://1243353366.github.io/qvault-uefi-quarantine/in-the-wild)                                                                        | The pinned Project Zero reference set, and why the overlap with this boundary is 2 of 70 |
+| [Behaviour to control](https://1243353366.github.io/qvault-uefi-quarantine/threat-behavior-matrix)                                                              | 17 attacker behaviours, the control that answers each, and the gaps named                |
+| [Telemetry map](https://1243353366.github.io/qvault-uefi-quarantine/telemetry-map)                                                                              | What feeds each detection: Sysmon, Windows events, script blocks, TPM log                |
+| [Persistence](https://1243353366.github.io/qvault-uefi-quarantine/persistence)                                                                                  | Fourteen autostart mechanisms and four result classes                                    |
+| [Acquisition and analysis](https://1243353366.github.io/qvault-uefi-quarantine/acquisition)                                                                     | Dump-based workflow, tooling, air-gap, and what an emulator cannot tell you              |
+| [Trust model](https://1243353366.github.io/qvault-uefi-quarantine/trust-model) · [Limitations](https://1243353366.github.io/qvault-uefi-quarantine/limitations) | What is programmatically enforced, and what is deployment-dependent                      |
+| [Citations](https://1243353366.github.io/qvault-uefi-quarantine/citations)                                                                                      | All 68 sources, each with where it is used                                               |
 
 Every claim in the reports carries a source, a tag, a status and a falsifier in
 `report/CLAIMS_LEDGER.csv`; gate G3 fails if a claim has no source and gate G12 fails if the
@@ -76,17 +76,17 @@ python tools/check_claims.py     # fails on any claim missing evidence or falsif
 
 ## Why each piece exists
 
-| Mechanism | Threat it addresses | Why not something simpler |
-|---|---|---|
-| Encrypt at ingestion, streaming | Accidental execution, casual inspection, backup/AV crawlers touching the sample | A password-protected zip still writes a plaintext temp file during `zip` |
-| Fresh DEK per object | One leaked key burns one sample, not the vault | A single vault key means any single compromise is total |
-| KEK split K-of-N (Shamir, GF(256)) | Compromise of the vault host or any one custodian | A KEK in one file is one credential away from full disclosure |
-| Dual-control approvals, requester ≠ approver | Insider misuse, rushed "just decrypt it" | Logging alone does not prevent, only records |
-| Enclave sentinel directory | Decrypting straight into a workstation or production share | Path checks alone are bypassable by symlink or mount games |
-| Chunked AEAD with metadata binding | Silent corruption, sample swapping, truncation | A plain SHA-256 manifest cannot tell you *which* bytes changed or stop a swap |
-| Content-address by ciphertext hash | Plaintext hash as a confirmation oracle | Content-addressing by plaintext hash leaks "do you have sample X?" |
-| Hash-chained audit + signed checkpoints | Log editing, entry deletion, history rewrite | A normal log file is editable by anyone with write access |
-| Inert triage (bounded reads only) | Parser exploitation at the boundary | Deep FFS/PE parsing at ingestion turns the vault into an attack surface |
+| Mechanism                                    | Threat it addresses                                                             | Why not something simpler                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Encrypt at ingestion, streaming              | Accidental execution, casual inspection, backup/AV crawlers touching the sample | A password-protected zip still writes a plaintext temp file during `zip`      |
+| Fresh DEK per object                         | One leaked key burns one sample, not the vault                                  | A single vault key means any single compromise is total                       |
+| KEK split K-of-N (Shamir, GF(256))           | Compromise of the vault host or any one custodian                               | A KEK in one file is one credential away from full disclosure                 |
+| Dual-control approvals, requester ≠ approver | Insider misuse, rushed "just decrypt it"                                        | Logging alone does not prevent, only records                                  |
+| Enclave sentinel directory                   | Decrypting straight into a workstation or production share                      | Path checks alone are bypassable by symlink or mount games                    |
+| Chunked AEAD with metadata binding           | Silent corruption, sample swapping, truncation                                  | A plain SHA-256 manifest cannot tell you *which* bytes changed or stop a swap |
+| Content-address by ciphertext hash           | Plaintext hash as a confirmation oracle                                         | Content-addressing by plaintext hash leaks "do you have sample X?"            |
+| Hash-chained audit + signed checkpoints      | Log editing, entry deletion, history rewrite                                    | A normal log file is editable by anyone with write access                     |
+| Inert triage (bounded reads only)            | Parser exploitation at the boundary                                             | Deep FFS/PE parsing at ingestion turns the vault into an attack surface       |
 
 ## Install
 
@@ -183,15 +183,15 @@ the result is `unverified` with an `unverified_root` gap.
 and test for every requirement and refuses to label a pillar implemented while a
 required piece is missing:
 
-| Pillar | Status |
-|---|---|
-| P1 Forensic acquisition | partial (3/4) |
-| P2 IOC detection | partial (2/3) |
-| P3 Behavioral correlation | partial (2/4) |
+| Pillar                          | Status        |
+| ------------------------------- | ------------- |
+| P1 Forensic acquisition         | partial (3/4) |
+| P2 IOC detection                | partial (2/3) |
+| P3 Behavioral correlation       | partial (2/4) |
 | P4 Cryptographic evidence vault | partial (3/4) |
-| P5 Firmware integrity | partial (2/3) |
-| P6 Containment | partial (3/4) |
-| P7 Evidence assessment | partial (3/4) |
+| P5 Firmware integrity           | partial (2/3) |
+| P6 Containment                  | partial (3/4) |
+| P7 Evidence assessment          | partial (3/4) |
 
 Two requirements are load-bearing and partial: P3 process identity normalisation
 (subjects are strings, so two spellings of one binary do not merge) and P6 substrate
@@ -221,13 +221,13 @@ An OS scan runs on the machine it judges, so it cannot certify the hardware host
 it. `qvault/firmware_integrity.py` ranks anchors by independence and enforces that a
 verdict may not be stronger than its anchor:
 
-| Anchor | Establishes |
-|---|---|
-| OS-mediated read | **nothing** |
-| Firmware measures itself | boot chain (hypothesis) |
-| TPM quote | boot chain, DXE, option ROM (**not** flash or CRTM) |
-| Hardware boot ROM | CRTM |
-| Out-of-band flash read | flash image, CRTM, DXE, ME/EC |
+| Anchor                   | Establishes                                         |
+| ------------------------ | --------------------------------------------------- |
+| OS-mediated read         | **nothing**                                         |
+| Firmware measures itself | boot chain (hypothesis)                             |
+| TPM quote                | boot chain, DXE, option ROM (**not** flash or CRTM) |
+| Hardware boot ROM        | CRTM                                                |
+| Out-of-band flash read   | flash image, CRTM, DXE, ME/EC                       |
 
 Host trust needs `flash_image` and `crtm` at rank 3 or above, and the only route to
 `flash_image` is out-of-band. `certify_host()` refuses on weaker evidence naming the
@@ -240,13 +240,13 @@ matched.
 database parsers, indicator processing, report generation, AI-assisted analysis) and
 refuses placements that cannot meet them:
 
-| Component | Zone | Must not have |
-|---|---|---|
-| Evidence reader | enclave | network, keys, model, vault write, report emit |
-| Database parser | enclave | the same |
-| Indicator processing | intel | artifact read, **finding write**, whitelist write |
-| Report generation | presentation | artifact read, plaintext, keys, model |
-| AI analysis | ai | artifact read, plaintext, keys, finding write |
+| Component            | Zone         | Must not have                                     |
+| -------------------- | ------------ | ------------------------------------------------- |
+| Evidence reader      | enclave      | network, keys, model, vault write, report emit    |
+| Database parser      | enclave      | the same                                          |
+| Indicator processing | intel        | artifact read, **finding write**, whitelist write |
+| Report generation    | presentation | artifact read, plaintext, keys, model             |
+| AI analysis          | ai           | artifact read, plaintext, keys, finding write     |
 
 Placement is validated rather than labelled, data flow is deny-by-default (plaintext
 never leaves the enclave toward AI or reporting; keys flow only into the enclave), and
@@ -256,16 +256,16 @@ model output enters as an `Observation` graded `HYPOTHESIS`, never as a `Finding
 
 `qvault/provenance.py` refuses to build an envelope without all of them:
 
-| Element | Enforced how |
-|---|---|
-| Original-source identification | kind, locator and identity all non-empty |
-| Acquisition timestamp | positive integer milliseconds, UTC |
-| SHA-256 digest | **computed from the bytes**, never accepted from the caller; `verify()` re-hashes in constant time |
-| Acquisition method | fixed vocabulary, and each method maps to an evidence plane |
-| Tool and reader versions | both mandatory and separate: a capture bug and a parser bug need different remedies |
-| Coverage and collection errors | every error must state its effect; unobserved regions become telemetry gaps that lower finding confidence |
-| Chain of custody | append-only, hash-chained, first event must be the acquisition; verification detects edits and reordering |
-| Cryptographic protection at rest | authenticated ciphers only; `AES-256-CBC` and `none` are refused |
+| Element                          | Enforced how                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Original-source identification   | kind, locator and identity all non-empty                                                                  |
+| Acquisition timestamp            | positive integer milliseconds, UTC                                                                        |
+| SHA-256 digest                   | **computed from the bytes**, never accepted from the caller; `verify()` re-hashes in constant time        |
+| Acquisition method               | fixed vocabulary, and each method maps to an evidence plane                                               |
+| Tool and reader versions         | both mandatory and separate: a capture bug and a parser bug need different remedies                       |
+| Coverage and collection errors   | every error must state its effect; unobserved regions become telemetry gaps that lower finding confidence |
+| Chain of custody                 | append-only, hash-chained, first event must be the acquisition; verification detects edits and reordering |
+| Cryptographic protection at rest | authenticated ciphers only; `AES-256-CBC` and `none` are refused                                          |
 
 ## Five rules the tool cannot break
 
@@ -290,14 +290,14 @@ visibility, firmware blind spots, baselines, indicator trust) as evidence planes
 with a `forgeable_by_subject` property, so a claim's strength is computed from the
 plane it rests on:
 
-| Claim | Plane | Defensible against an adversary |
-|---|---|---|
-| Firmware integrity | read via the subject's OS | **no** |
-| Firmware integrity | read out-of-band (physical) | yes |
-| Process existed | live response | **no** |
-| Network contact | wire observation | yes |
-| Behaviour is normal | baseline | **no** |
-| Object is malicious | threat intel | **no** |
+| Claim               | Plane                       | Defensible against an adversary |
+| ------------------- | --------------------------- | ------------------------------- |
+| Firmware integrity  | read via the subject's OS   | **no**                          |
+| Firmware integrity  | read out-of-band (physical) | yes                             |
+| Process existed     | live response               | **no**                          |
+| Network contact     | wire observation            | yes                             |
+| Behaviour is normal | baseline                    | **no**                          |
+| Object is malicious | threat intel                | **no**                          |
 
 Also included: `baseline_validity()` returns `unverified` when the compromise window
 is unknown, never `valid`; `intel_trust()` reports three feeds sharing one upstream
@@ -310,13 +310,13 @@ integrity. See `report/ARCHITECTURAL_LIMITATIONS.md`.
 storage, compute, inter-network, decryption) as a function of the **plane** that
 enforces them and the **posture** of the subject:
 
-| Plane | Clean | OS compromised | Firmware compromised |
-|---|---|---|---|
-| Subject OS | full | **none** | **none** |
-| Hypervisor | full | full | partial |
-| Fabric (switch/VLAN ACL) | full | full | full, if every egress path is enumerated |
-| Physical | full | full | full |
-| Cryptographic | full | full | full |
+| Plane                    | Clean | OS compromised | Firmware compromised                     |
+| ------------------------ | ----- | -------------- | ---------------------------------------- |
+| Subject OS               | full  | **none**       | **none**                                 |
+| Hypervisor               | full  | full           | partial                                  |
+| Fabric (switch/VLAN ACL) | full  | full           | full, if every egress path is enumerated |
+| Physical                 | full  | full           | full                                     |
+| Cryptographic            | full  | full           | full                                     |
 
 A plan built from host firewalls, ACLs and service shutdown reads as complete and
 provides zero denial once the subject is compromised, because the subject decides

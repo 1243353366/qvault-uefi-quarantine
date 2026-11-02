@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from qvault import behaviors as B  # noqa: E402
+import tables  # noqa: E402
 
 OUT = ROOT / "report" / "THREAT_BEHAVIOR_MATRIX.md"
 
@@ -53,7 +54,7 @@ def render() -> str:
 
 
 def main() -> int:
-    rendered = render()
+    rendered = tables.align(render())
     OUT.write_text(rendered)
     print(f"wrote {OUT.relative_to(ROOT)} ({len(rendered)} bytes)")
     return 0

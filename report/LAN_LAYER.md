@@ -25,14 +25,14 @@ certificate fingerprint or keyed device identity. `Device.identity_key` never re
 wireless label, and a device with no authenticated identity raises rather than falling
 back to an address.
 
-| Layer | What it protects |
-|---|---|
-| WPA3 / 802.1X | association and authentication |
-| BSSID | which AP interface was used (context only) |
-| VLAN | logical segmentation |
-| ACL / firewall | permitted traffic between devices |
-| Mutual TLS + device certificates | endpoint identity |
-| Firmware integrity | trust in the infrastructure itself |
+| Layer                            | What it protects                           |
+| -------------------------------- | ------------------------------------------ |
+| WPA3 / 802.1X                    | association and authentication             |
+| BSSID                            | which AP interface was used (context only) |
+| VLAN                             | logical segmentation                       |
+| ACL / firewall                   | permitted traffic between devices          |
+| Mutual TLS + device certificates | endpoint identity                          |
+| Firmware integrity               | trust in the infrastructure itself         |
 
 **2. Metadata over content.** Source, destination, timing, volume, service, DNS name and
 endpoint process events are enough to reason about relationships. TLS interception is not
@@ -44,14 +44,14 @@ affects more than one device, or that pushes material to other hosts, is refused
 
 ## The six functions
 
-| Function | What it does |
-|---|---|
-| `Device` / roles | inventory with authenticated identity and least-privilege service policy |
-| `build_baseline` / `deviations` | normal peer and service relationships; new peer, new service, first contact |
-| `discovery_anomalies` | mdns, llmnr, netbios, ssdp, upnp: an unsanctioned *response* is a claim of authority over a name |
-| `lateral_movement` | east-west service use correlated with authentication failures, graded by independent layers |
-| `infrastructure_integrity` | router, AP, switch, DNS, DHCP attestation and identity strength |
-| `containment_plan` | graded ladder, with refusals naming the plane that cannot be trusted |
+| Function                        | What it does                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Device` / roles                | inventory with authenticated identity and least-privilege service policy                         |
+| `build_baseline` / `deviations` | normal peer and service relationships; new peer, new service, first contact                      |
+| `discovery_anomalies`           | mdns, llmnr, netbios, ssdp, upnp: an unsanctioned *response* is a claim of authority over a name |
+| `lateral_movement`              | east-west service use correlated with authentication failures, graded by independent layers      |
+| `infrastructure_integrity`      | router, AP, switch, DNS, DHCP attestation and identity strength                                  |
+| `containment_plan`              | graded ladder, with refusals naming the plane that cannot be trusted                             |
 
 ## Grading: independence, not volume
 
@@ -66,10 +66,10 @@ agreement.
 `identity_inconsistency()` fuses layers and refuses to answer without an anchor that does
 not ask the device:
 
-| Evidence | Verdict |
-|---|---|
-| Endpoint indicators only | insufficient |
-| LAN deviation + endpoint, no firmware anchor | unverified (`no_firmware_anchor` gap) |
+| Evidence                                        | Verdict                                     |
+| ----------------------------------------------- | ------------------------------------------- |
+| Endpoint indicators only                        | insufficient                                |
+| LAN deviation + endpoint, no firmware anchor    | unverified (`no_firmware_anchor` gap)       |
 | LAN deviation + endpoint + firmware attestation | inconsistent with identity (`CORROBORATED`) |
 
 That last row is the only shape that survives a compromised OS, because every other layer
@@ -77,14 +77,14 @@ is authored by the suspect.
 
 ## Graded containment ladder
 
-| Step | Effect | Reversible | Blast radius |
-|---|---|---|---|
-| observe | more logging for the device and peers | yes | 1 |
-| restrict_egress | block internet egress, keep LAN | yes | 1 |
-| microsegment | per-device ACL denying lateral services | yes | 1 |
-| revoke_credential | revoke at the issuer | no | 1 |
-| isolate_port | disable switch port or quarantine VLAN | yes | 1 |
-| physical | power off, escalate to out-of-band acquisition | no | 1 |
+| Step              | Effect                                         | Reversible | Blast radius |
+| ----------------- | ---------------------------------------------- | ---------- | ------------ |
+| observe           | more logging for the device and peers          | yes        | 1            |
+| restrict_egress   | block internet egress, keep LAN                | yes        | 1            |
+| microsegment      | per-device ACL denying lateral services        | yes        | 1            |
+| revoke_credential | revoke at the issuer                           | no         | 1            |
+| isolate_port      | disable switch port or quarantine VLAN         | yes        | 1            |
+| physical          | power off, escalate to out-of-band acquisition | no         | 1            |
 
 `containment_plan()` removes any switch-dependent step when the switch plane is untrusted,
 and names the alternatives instead. Asking a compromised switch to quarantine an attacker

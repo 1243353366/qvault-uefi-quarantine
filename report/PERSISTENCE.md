@@ -10,19 +10,19 @@ that is what the module does.
 
 ## The eleven mechanisms
 
-| Mechanism | Where it lives | Signal we look for |
-|-----------|----------------|--------------------|
-| Run / RunOnce keys | `...\CurrentVersion\Run(Once)` | payload in a user-writable path, unsigned |
-| Policies\Explorer\Run | `...\Policies\Explorer\Run` | entry with no matching GPO |
-| Startup folders | Start Menu Startup; Shell Folders | Shell Folders pointing at a writable directory |
-| Scheduled tasks | `System32\Tasks`, `TaskCache\Tree` | hidden flag, SYSTEM principal, writable payload |
-| Services / ServiceDll | `CurrentControlSet\Services` | binary or ServiceDll outside System32 |
-| BootExecute | `Session Manager\BootExecute` | any value other than `autocheck autochk *` |
-| Hive loading | `Control\hivelist` | hive outside `System32\config` |
-| Browser Helper Objects | `Explorer\Browser Helper Objects` | unsigned BHO DLL |
-| AppInit_DLLs | `...\Windows\AppInit_DLLs` | populated with loading enabled |
-| DLL search order hijack | app dir, PATH, %TEMP% | same-named DLL ahead of the signed original |
-| Rootkit / bootkit / fileless | kernel, boot chain, memory | **not observable here** |
+| Mechanism                    | Where it lives                     | Signal we look for                              |
+| ---------------------------- | ---------------------------------- | ----------------------------------------------- |
+| Run / RunOnce keys           | `...\CurrentVersion\Run(Once)`     | payload in a user-writable path, unsigned       |
+| Policies\Explorer\Run        | `...\Policies\Explorer\Run`        | entry with no matching GPO                      |
+| Startup folders              | Start Menu Startup; Shell Folders  | Shell Folders pointing at a writable directory  |
+| Scheduled tasks              | `System32\Tasks`, `TaskCache\Tree` | hidden flag, SYSTEM principal, writable payload |
+| Services / ServiceDll        | `CurrentControlSet\Services`       | binary or ServiceDll outside System32           |
+| BootExecute                  | `Session Manager\BootExecute`      | any value other than `autocheck autochk *`      |
+| Hive loading                 | `Control\hivelist`                 | hive outside `System32\config`                  |
+| Browser Helper Objects       | `Explorer\Browser Helper Objects`  | unsigned BHO DLL                                |
+| AppInit_DLLs                 | `...\Windows\AppInit_DLLs`         | populated with loading enabled                  |
+| DLL search order hijack      | app dir, PATH, %TEMP%              | same-named DLL ahead of the signed original     |
+| Rootkit / bootkit / fileless | kernel, boot chain, memory         | **not observable here**                         |
 
 ## Three of them are marked, not detected
 
@@ -42,12 +42,12 @@ fact on a dead image.
 `assess()` always returns one row per mechanism descriptor, whatever the snapshot contained.
 The row's `result` is exactly one of:
 
-| Result | Meaning |
-|--------|---------|
-| `detected` | signals were found for this mechanism; graded by the collection basis |
-| `benign` | present, no anomaly signals: consistent with its benign twin, not proven safe |
-| `unknown_not_observable` | no snapshot can see it; the article lists it anyway |
-| `not_observed` | observable, but this snapshot held no entry for it |
+| Result                   | Meaning                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `detected`               | signals were found for this mechanism; graded by the collection basis         |
+| `benign`                 | present, no anomaly signals: consistent with its benign twin, not proven safe |
+| `unknown_not_observable` | no snapshot can see it; the article lists it anyway                           |
+| `not_observed`           | observable, but this snapshot held no entry for it                            |
 
 There is no `CLEAN`. `CLEAN_STATES` is an empty frozenset and `assert_not_clean()` raises if
 any code path tries to invent one. `not_observed` and `unknown_not_observable` are separate
@@ -65,13 +65,13 @@ the collection method supports. The ceiling is derived from the evidence-class t
 `separation.py`, so it moves automatically if a class is ever strengthened, rather than being
 asserted here.
 
-| Basis | Evidence class | Ceiling |
-|-------|----------------|---------|
-| `synthetic` | self_report | none: no graded finding |
-| `live_host` | self_report | none: the subject reported its own state |
-| `offline_image` | independent_measurement | CORROBORATED |
-| `attested_image`, attestation verified | independent + hardware anchor | CONFIRMED |
-| `attested_image`, attestation absent or unknown | independent only | CORROBORATED |
+| Basis                                           | Evidence class                | Ceiling                                  |
+| ----------------------------------------------- | ----------------------------- | ---------------------------------------- |
+| `synthetic`                                     | self_report                   | none: no graded finding                  |
+| `live_host`                                     | self_report                   | none: the subject reported its own state |
+| `offline_image`                                 | independent_measurement       | CORROBORATED                             |
+| `attested_image`, attestation verified          | independent + hardware anchor | CONFIRMED                                |
+| `attested_image`, attestation absent or unknown | independent only              | CORROBORATED                             |
 
 Signal count proposes the grade: none is `UNKNOWN`, one is `HYPOTHESIS`, two or more are
 `INFERRED`. The ceiling caps it and never lifts it, so two signals from an attested image are

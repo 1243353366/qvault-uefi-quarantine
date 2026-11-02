@@ -13,14 +13,14 @@ tools/reproduce.sh
 
 ## What a correct run prints
 
-| Gate | Expected |
-|------|----------|
-| `python3 -m qvault --version` | `qvault 0.9.0` |
-| `pytest qvault/tests -q` | 465 passed |
-| `tools/smoke.py` | SMOKE OK: 62 checks passed |
-| `tools/check_claims.py` | OK: every claim has a source, a tag, a status and a falsifier |
-| `tools/gen_fingerprints.py` | no diff against `report/FINGERPRINTS.md` |
-| `pillars.audit()` | 8 capabilities, 0 with a required gap |
+| Gate                          | Expected                                                      |
+| ----------------------------- | ------------------------------------------------------------- |
+| `python3 -m qvault --version` | `qvault 0.9.0`                                                |
+| `pytest qvault/tests -q`      | 465 passed                                                    |
+| `tools/smoke.py`              | SMOKE OK: 62 checks passed                                    |
+| `tools/check_claims.py`       | OK: every claim has a source, a tag, a status and a falsifier |
+| `tools/gen_fingerprints.py`   | no diff against `report/FINGERPRINTS.md`                      |
+| `pillars.audit()`             | 8 capabilities, 0 with a required gap                         |
 
 ## Using the numbers honestly
 

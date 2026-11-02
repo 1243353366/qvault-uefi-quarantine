@@ -9,6 +9,35 @@ they deliberately do not mean.
 
 ---
 
+## [0.13.3] - 2026-11-02
+
+### Added - CI actually runs
+
+The `workflow` scope was the missing piece: GitHub refuses workflow files from a token without
+it, and the file had also been sitting in `.git/info/exclude`, so "we have CI" was never true.
+With the scope granted, `.github/workflows/ci.yml` is pushed and live: tests on 3.11 and 3.12,
+all sixteen gates, docs-drift, both link checks, the wheel install and static analysis, every step
+under `set -o pipefail`.
+
+The package job was rehearsed locally before the push, because a red first run is worse than no
+badge: the wheel builds, the vendored detector travels in it, `qvault --version` and
+`qvault enclave` work from an installed wheel outside the checkout, and `ruff --select E9,F63,F7,F82`
+is clean.
+
+### Fixed - tables line up in the source
+
+`tools/tables.py` pads every markdown table to its column widths, and gate G16 fails a document
+whose tables are ragged. The point is the diff, not the rendering: a rendered table hides ragged
+pipes, so a hand-edited row used to look fine in review and misalign in the source.
+
+This needed the generators fixed, not just the files: padding the outputs while the emitters kept
+producing ragged rows made four generators report themselves stale, and the gates comparing
+`render()` rather than aligned output failed the same way. `gen_behavior_matrix`,
+`gen_telemetry_map`, `gen_in_the_wild` and `gen_fingerprints` now emit aligned tables, the gates
+compare aligned output, and `tools/fix_tables.py --write` repairs any file by hand.
+
+791 tests, sixteen gates.
+
 ## [0.13.2] - 2026-11-02
 
 ### Fixed - BlackLotus was being described as a firmware implant

@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT))
 
 from qvault import persistence as P  # noqa: E402
 from qvault import telemetry as T  # noqa: E402
+import tables  # noqa: E402
 
 OUT = ROOT / "report" / "TELEMETRY_MAP.md"
 
@@ -74,7 +75,7 @@ def render() -> str:
 
 
 def main() -> int:
-    OUT.write_text(render())
+    OUT.write_text(tables.align(render()))
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0
 

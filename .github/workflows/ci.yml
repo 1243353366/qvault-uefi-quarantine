@@ -1,0 +1,122 @@
+name: ci
+
+# Needs to be added through the GitHub web editor, or by a credential with `workflow` scope:
+# an OAuth app without that scope is refused when it tries to create this file.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every step runs with pipefail. A gate piped into `tail` must still fail the step: that is
+# exactly how a broken commit reached main once.
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  test:
+    name: tests (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: install pinned dependencies and the project
+        run: |
+          pip install -r requirements-lock.txt
+          pip install -e . --no-deps
+      - name: unit tests
+        run: python -m pytest qvault/tests -q
+      - name: smoke tests (operator surfaces)
+        run: python tools/smoke.py
+
+  gates:
+    name: every gate, one command
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-lock.txt
+      - run: pip install -e . --no-deps
+      - name: gates G1-G14
+        run: python tools/gates.py
+      - name: the version has one source
+        run: python tools/sync_version.py --check
+
+  docs:
+    name: published site matches its sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install markdown
+      - name: rebuild and compare
+        run: |
+          python tools/build_docs.py
+          git diff --exit-code -- docs CITATIONS.md
+
+  links:
+    name: link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: internal links must resolve (no network)
+        run: python tools/linkcheck.py --internal
+      - name: external citations must answer
+        run: python tools/linkcheck.py --external
+
+  package:
+    name: wheel installs and runs outside the repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install build
+      - run: python -m build
+      - name: install the wheel, not the tree
+        run: pip install dist/*.whl
+      - name: the vendored detector must travel with the package
+        run: python -c "from vendor.zbtriage import result; assert result.HIT_LIST_LIMIT == 100"
+      - name: the console script works outside the checkout
+        working-directory: /tmp
+        run: |
+          qvault --version
+          qvault enclave --path /tmp/enclave
+          test -f /tmp/enclave/.enclave
+
+  static:
+    name: syntax and undefined names
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m compileall -q qvault tools vendor
+      - run: pip install ruff==0.6.9
+      - name: errors only, not style
+        run: ruff check --select E9,F63,F7,F82 qvault tools

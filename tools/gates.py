@@ -19,6 +19,7 @@ override them: a gate that fails is a refusal, not a delay to be argued down.
   G13 version source     the version has one source and every copy agrees with it
   G14 internal links     every link in the published site resolves
   G15 residency taxonomy substrate per family, and no document merges them
+  G16 table alignment     columns line up in the source, not only when rendered
 
 Usage: python3 tools/gates.py [--list] [G4 G7]
 """
@@ -146,10 +147,11 @@ def g9_behaviour_matrix() -> tuple[bool, str]:
 
     B.assert_resolves()
     sys.path.insert(0, str(ROOT / "tools"))
+    import tables  # noqa: PLC0415
     import gen_behavior_matrix  # noqa: PLC0415
 
     on_disk = (ROOT / "report" / "THREAT_BEHAVIOR_MATRIX.md").read_text()
-    if on_disk != gen_behavior_matrix.render():
+    if on_disk != tables.align(gen_behavior_matrix.render()):
         return False, "report/THREAT_BEHAVIOR_MATRIX.md is stale; run tools/gen_behavior_matrix.py"
     gaps = len(B.gaps())
     return True, f"{len(B.BEHAVIOURS)} behaviours resolve, {gaps} declared gaps, document current"
@@ -172,10 +174,11 @@ def g10_telemetry() -> tuple[bool, str]:
 
     T.assert_complete()
     sys.path.insert(0, str(ROOT / "tools"))
+    import tables  # noqa: PLC0415
     import gen_telemetry_map  # noqa: PLC0415
 
     on_disk = (ROOT / "report" / "TELEMETRY_MAP.md").read_text()
-    if on_disk != gen_telemetry_map.render():
+    if on_disk != tables.align(gen_telemetry_map.render()):
         return False, "report/TELEMETRY_MAP.md is stale; run tools/gen_telemetry_map.py"
     blind = T.mechanisms_without_host_evidence()
     return True, (f"{len(T.MECHANISM_SOURCES)} mechanisms mapped to {len(T.SOURCES)} sources, "
@@ -188,10 +191,11 @@ def g11_in_the_wild() -> tuple[bool, str]:
 
     W.assert_dataset_integrity()
     sys.path.insert(0, str(ROOT / "tools"))
+    import tables  # noqa: PLC0415
     import gen_in_the_wild  # noqa: PLC0415
 
     on_disk = (ROOT / "report" / "IN_THE_WILD.md").read_text()
-    if on_disk != gen_in_the_wild.render():
+    if on_disk != tables.align(gen_in_the_wild.render()):
         return False, "report/IN_THE_WILD.md is stale; run tools/gen_in_the_wild.py"
     summary = W.summary()
     return True, (f"{summary['entries']} entries pinned at {W.load()['source']['commit'][:8]}, "
@@ -265,9 +269,13 @@ def g15_residency() -> tuple[bool, str]:
     if not page.exists():
         problems.append("acquisition page is missing")
     else:
-        text = page.read_text()
+        rows_in_page = []
+        for line in page.read_text().splitlines():
+            if line.strip().startswith("|"):
+                rows_in_page.append(tuple(c.strip() for c in line.strip().strip("|").split("|")))
         for row in R.summary_rows():
-            if f"| {row['family']} | {row['substrate']} |" not in text:
+            want = (row["family"], row["substrate"], row["hardware"])
+            if not any(got[:3] == want for got in rows_in_page):
                 problems.append(f"acquisition page has a stale row for {row['family']}")
 
     if problems:
@@ -275,6 +283,23 @@ def g15_residency() -> tuple[bool, str]:
     esp = sum(1 for r in R.RESIDENCY.values() if not r.hardware_resident)
     return True, (f"{len(R.RESIDENCY)} families, {esp} not hardware-resident, "
                   f"no document merges them")
+
+
+def g16_table_alignment() -> tuple[bool, str]:
+    """Tables line up in the source, which is what a diff reader sees."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import tables  # noqa: PLC0415
+
+    problems, total = [], 0
+    for path in [ROOT / "README.md"] + sorted((ROOT / "report").glob("*.md")):
+        text = path.read_text()
+        total += text.count("\n|")
+        bad = tables.misaligned(text)
+        if bad:
+            problems.append(f"{path.name}:{bad[0]}")
+    if problems:
+        return False, "; ".join(problems[:3]) + " (run tools/fix_tables.py --write)"
+    return True, f"{total} table rows aligned across {len(list((ROOT / 'report').glob('*.md'))) + 1} documents"
 
 
 GATES = (
@@ -293,6 +318,7 @@ GATES = (
     ("G13", "version source", g13_version_single_sourced),
     ("G14", "internal links", g14_internal_links),
     ("G15", "residency taxonomy", g15_residency),
+    ("G16", "table alignment", g16_table_alignment),
 )
 
 

@@ -12,15 +12,15 @@ Every claim a detection system makes rests on some source of evidence. Those
 sources differ in one property that matters more than the rest: whether the thing
 under suspicion can influence them.
 
-| Plane | Establishes | Subject can forge it | Needs physical access |
-|---|---|---|---|
-| Live state | process existed, file content | **yes** | no |
-| Historical record | past activity, file content, network contact | **yes** | no |
-| Wire observation | network contact | no | no |
-| Firmware read via OS | firmware integrity | **yes** | no |
-| Firmware read out-of-band | firmware integrity | no | **yes** |
-| Threat intelligence | object is malicious | **yes** (via source) | no |
-| Behavioural baseline | behaviour is normal | **yes** (see below) | no |
+| Plane                     | Establishes                                  | Subject can forge it | Needs physical access |
+| ------------------------- | -------------------------------------------- | -------------------- | --------------------- |
+| Live state                | process existed, file content                | **yes**              | no                    |
+| Historical record         | past activity, file content, network contact | **yes**              | no                    |
+| Wire observation          | network contact                              | no                   | no                    |
+| Firmware read via OS      | firmware integrity                           | **yes**              | no                    |
+| Firmware read out-of-band | firmware integrity                           | no                   | **yes**               |
+| Threat intelligence       | object is malicious                          | **yes** (via source) | no                    |
+| Behavioural baseline      | behaviour is normal                          | **yes** (see below)  | no                    |
 
 A proposition is supported only by planes that actually establish it, and against a
 capable adversary only by planes the subject cannot forge. `establish()` computes

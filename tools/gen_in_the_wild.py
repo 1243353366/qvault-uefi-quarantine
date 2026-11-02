@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from qvault import wild as W  # noqa: E402
+import tables  # noqa: E402
 
 OUT = ROOT / "report" / "IN_THE_WILD.md"
 
@@ -78,7 +79,7 @@ def render() -> str:
 
 
 def main() -> int:
-    OUT.write_text(render())
+    OUT.write_text(tables.align(render()))
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0
 

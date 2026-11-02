@@ -4,6 +4,10 @@ from pathlib import Path
 
 import pytest
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / "tools"))
+import tables  # noqa: E402
 from qvault import persistence as P
 from qvault import telemetry as T
 
@@ -94,7 +98,7 @@ def test_the_rendered_map_matches_the_mapping():
     import gen_telemetry_map  # noqa: PLC0415
 
     on_disk = (ROOT / "report" / "TELEMETRY_MAP.md").read_text()
-    assert on_disk == gen_telemetry_map.render(), (
+    assert on_disk == tables.align(gen_telemetry_map.render()), (
         "report/TELEMETRY_MAP.md is stale; run tools/gen_telemetry_map.py")
 
 

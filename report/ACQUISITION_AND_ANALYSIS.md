@@ -22,11 +22,11 @@ reproducing it adds nothing to defence and everything to the supply of attack to
 weaker, because it merges three situations with different evidence and different remediation.
 The taxonomy in `qvault/residency.py` is the single source; the table below is generated from it.
 
-| family | substrate | hardware-resident | survives | removed by | revocation |
-|---|---|---|---|---|---|
-| lojax | SPI flash | yes | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; read-back comparison against the vendor image before returning to service | not sufficient on its own |
-| moonbounce | SPI flash | yes | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; NVRAM considered separately, since the implant used it for storage | not sufficient on its own |
-| blacklotus | EFI System Partition | no | os reinstall preserving esp | reformat and recreate the ESP; apply dbx/SVN revocation for the vulnerable bootloader | sufficient with ESP rebuild |
+| family     | substrate            | hardware-resident | survives                                                 | removed by                                                                                                                        | revocation                  |
+| ---------- | -------------------- | ----------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| lojax      | SPI flash            | yes               | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; read-back comparison against the vendor image before returning to service | not sufficient on its own   |
+| moonbounce | SPI flash            | yes               | os reinstall, disk wipe, esp reformat, bootloader update | external reflash with a vendor image from a programmer; NVRAM considered separately, since the implant used it for storage        | not sufficient on its own   |
+| blacklotus | EFI System Partition | no                | os reinstall preserving esp                              | reformat and recreate the ESP; apply dbx/SVN revocation for the vulnerable bootloader                                             | sufficient with ESP rebuild |
 
 Three consequences follow, and they are the reason the table is code rather than prose:
 

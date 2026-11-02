@@ -22,12 +22,12 @@ recorder with an explicit honesty model about what it can and cannot attribute.
 
 ### What it records
 
-| Record | Fields |
-|---|---|
-| DNS event | timestamp, host, qname, qtype, rcode, answers, resolver, claimed pid/image |
-| Flow event | 5-tuple, protocol, start/end, bytes out/in, claimed pid/image/parent chain, optional URI and command line, source (`host` or `wire`) |
-| Process node | pid, ppid, image path, image hash, user, session |
-| Destination classification | address, network kind, organisation, category, first-seen, confidence |
+| Record                     | Fields                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| DNS event                  | timestamp, host, qname, qtype, rcode, answers, resolver, claimed pid/image                                                           |
+| Flow event                 | 5-tuple, protocol, start/end, bytes out/in, claimed pid/image/parent chain, optional URI and command line, source (`host` or `wire`) |
+| Process node               | pid, ppid, image path, image hash, user, session                                                                                     |
+| Destination classification | address, network kind, organisation, category, first-seen, confidence                                                                |
 
 ### What it deliberately does not record
 
@@ -56,12 +56,12 @@ because that is precisely what the malware arranged.
 
 Therefore every flow carries an attribution tier:
 
-| Tier | Meaning | How it is obtained |
-|---|---|---|
-| `wire_only` | The flow was observed on the network, with no host-side claim | SPAN/TAP, firewall or resolver logs |
-| `claimed_only` | The host asserts an owner; nothing external confirms it | Endpoint API, ETW, eBPF |
-| `corroborated` | Wire and host agree on the 5-tuple within a time window | Join of the two |
-| `conflict` | Wire and host disagree about *who* or *whether* | Join, then compare |
+| Tier           | Meaning                                                       | How it is obtained                  |
+| -------------- | ------------------------------------------------------------- | ----------------------------------- |
+| `wire_only`    | The flow was observed on the network, with no host-side claim | SPAN/TAP, firewall or resolver logs |
+| `claimed_only` | The host asserts an owner; nothing external confirms it       | Endpoint API, ETW, eBPF             |
+| `corroborated` | Wire and host agree on the 5-tuple within a time window       | Join of the two                     |
+| `conflict`     | Wire and host disagree about *who* or *whether*               | Join, then compare                  |
 
 **The signal is the delta, not the record.** A flow that exists on the wire but
 not in host accounting means the host is blind, misconfigured, or hiding
@@ -111,14 +111,14 @@ and a silent one at that.
 Network metadata is surveillance data. It reveals who someone contacted, when, for
 how long, and how much. It is treated as sensitive by default.
 
-| Constraint | Requirement |
-|---|---|
-| Authorisation | Written scope naming the subject hosts and the time window, before collection starts |
-| Minimisation | Metadata only, per §1; no payloads, no query strings, no credentials |
-| Third parties | Traffic not belonging to the subject is excluded at capture, not filtered later |
-| Retention | Records expire on a stated schedule; expiry is logged like any other state change |
-| Access | Same access control as the evidence vault: named analysts, per-case, audit on read |
-| Transparency | If the organisation has staff-monitoring obligations, recording is disclosed in the manner its policy requires |
+| Constraint      | Requirement                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Authorisation   | Written scope naming the subject hosts and the time window, before collection starts                                        |
+| Minimisation    | Metadata only, per §1; no payloads, no query strings, no credentials                                                        |
+| Third parties   | Traffic not belonging to the subject is excluded at capture, not filtered later                                             |
+| Retention       | Records expire on a stated schedule; expiry is logged like any other state change                                           |
+| Access          | Same access control as the evidence vault: named analysts, per-case, audit on read                                          |
+| Transparency    | If the organisation has staff-monitoring obligations, recording is disclosed in the manner its policy requires              |
 | Derivative risk | Destination classifications and beacon scores are inferences; they must not be presented as findings of fact about a person |
 
 These are engineering requirements in the same sense as the crypto is: a recorder
@@ -178,15 +178,15 @@ operator applies, so a low score means nothing at all.
 Each rule cites the same evidence used in the main report, with the same caveat:
 these are shapes taken from published analysis, not validated against samples.
 
-| Rule | Condition | Basis |
-|---|---|---|
-| `blacklotus_winlogon_egress` | claimed image is `winlogon.exe` and destination is external | BlackLotus injects a downloader into `winlogon.exe`; it has no legitimate reason to originate traffic [CONFIRMED in report §4.6] |
-| `blacklotus_gate_path` | URI path is `/API/hpb_gate.php` | Documented C2 path [CONFIRMED, ESET] |
-| `blacklotus_ip_probe` | DNS query `api.ipify.org` from `winlogon.exe` | Documented public-IP check [CONFIRMED, ESET] |
-| `moonbounce_netsvcs_fetch` | claimed image is `svchost.exe` with `NETSVCS` in its command line, and it fetches a binary over HTTP | Documented injection target and stage fetch [CONFIRMED, Kaspersky technical details p.8] |
-| `lojax_agent_egress` | claimed image is `rpcnetp.exe` and destination is external | Trojanised Computrace agent [CONFIRMED, ESET] |
-| `attribution_conflict` | wire and host disagree on image or existence | This module's own model, §2 |
-| `beaconing` | score ≥ threshold on ≥ 4 intervals | §6 |
+| Rule                         | Condition                                                                                            | Basis                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `blacklotus_winlogon_egress` | claimed image is `winlogon.exe` and destination is external                                          | BlackLotus injects a downloader into `winlogon.exe`; it has no legitimate reason to originate traffic [CONFIRMED in report §4.6] |
+| `blacklotus_gate_path`       | URI path is `/API/hpb_gate.php`                                                                      | Documented C2 path [CONFIRMED, ESET]                                                                                             |
+| `blacklotus_ip_probe`        | DNS query `api.ipify.org` from `winlogon.exe`                                                        | Documented public-IP check [CONFIRMED, ESET]                                                                                     |
+| `moonbounce_netsvcs_fetch`   | claimed image is `svchost.exe` with `NETSVCS` in its command line, and it fetches a binary over HTTP | Documented injection target and stage fetch [CONFIRMED, Kaspersky technical details p.8]                                         |
+| `lojax_agent_egress`         | claimed image is `rpcnetp.exe` and destination is external                                           | Trojanised Computrace agent [CONFIRMED, ESET]                                                                                    |
+| `attribution_conflict`       | wire and host disagree on image or existence                                                         | This module's own model, §2                                                                                                      |
+| `beaconing`                  | score ≥ threshold on ≥ 4 intervals                                                                   | §6                                                                                                                               |
 
 Note the double edge on the first three: they depend on **claimed** identity, which
 §2 says is untrustworthy exactly when these families are present. That is why the
@@ -198,18 +198,18 @@ only the divergence rule notices.
 
 ## 8. Failure modes
 
-| # | Failure | Mechanism | Mitigation | Residual |
-|---|---|---|---|---|
-| N1 | Recorder runs on the compromised host | Endpoint agent is downstream of the implant; its records are attacker-influenced | Prefer out-of-band capture; treat host records as claims, never facts | An implant that hooks both socket and accounting lies consistently |
-| N2 | DNS invisible | Client uses DoH/DoT, or ECH hides SNI; resolver logs never see the query | Capture at the resolver *and* the endpoint; record which resolver was used; flag unknown resolves | Encrypted resolution to an external resolver is simply not observable |
-| N3 | NAT / CGNAT destroys host attribution | Many hosts share one egress address | Record NAT translations if available; otherwise mark destination attribution as shared | Without NAT logs, external IP attribution is host-ambiguous |
-| N4 | Clock skew breaks the join | Sources drift; VM pause; timezone confusion | Per-source clock reference, record observed offset, timestamp everything in UTC epoch | Skew beyond tolerance silently converts matches into two one-sided findings |
-| N5 | Volume swamps the analyst | Metadata at scale is enormous | Aggregation by destination, first-seen suppression, retention limits | Aggregation hides the single anomalous flow |
-| N6 | Privacy overreach | Easy to capture more than authorised | Minimisation at capture (§4) | A determined operator can widen scope; audit of scope changes is the control |
-| N7 | False positive from periodic legitimate traffic | NTP, updaters, telemetry | Beacon score never presented as a verdict | Analyst time wasted; no way to fully suppress |
-| N8 | Classification treated as fact | Feed labels presented as ground truth | Three confidence tiers kept separate in the schema | Downstream consumers may still flatten them |
-| N9 | IPv6 rotation and privacy addresses | One host appears as many addresses | Join on interface/MAC where available, not just address | Privacy extensions genuinely defeat long-term address attribution |
-| N10 | Records tampering | Evidence altered after the fact | Records sealed through the vault: hash-chained audit, content-addressed store | Same limits as the vault (see review W2/W3) |
+| #   | Failure                                         | Mechanism                                                                        | Mitigation                                                                                        | Residual                                                                     |
+| --- | ----------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| N1  | Recorder runs on the compromised host           | Endpoint agent is downstream of the implant; its records are attacker-influenced | Prefer out-of-band capture; treat host records as claims, never facts                             | An implant that hooks both socket and accounting lies consistently           |
+| N2  | DNS invisible                                   | Client uses DoH/DoT, or ECH hides SNI; resolver logs never see the query         | Capture at the resolver *and* the endpoint; record which resolver was used; flag unknown resolves | Encrypted resolution to an external resolver is simply not observable        |
+| N3  | NAT / CGNAT destroys host attribution           | Many hosts share one egress address                                              | Record NAT translations if available; otherwise mark destination attribution as shared            | Without NAT logs, external IP attribution is host-ambiguous                  |
+| N4  | Clock skew breaks the join                      | Sources drift; VM pause; timezone confusion                                      | Per-source clock reference, record observed offset, timestamp everything in UTC epoch             | Skew beyond tolerance silently converts matches into two one-sided findings  |
+| N5  | Volume swamps the analyst                       | Metadata at scale is enormous                                                    | Aggregation by destination, first-seen suppression, retention limits                              | Aggregation hides the single anomalous flow                                  |
+| N6  | Privacy overreach                               | Easy to capture more than authorised                                             | Minimisation at capture (§4)                                                                      | A determined operator can widen scope; audit of scope changes is the control |
+| N7  | False positive from periodic legitimate traffic | NTP, updaters, telemetry                                                         | Beacon score never presented as a verdict                                                         | Analyst time wasted; no way to fully suppress                                |
+| N8  | Classification treated as fact                  | Feed labels presented as ground truth                                            | Three confidence tiers kept separate in the schema                                                | Downstream consumers may still flatten them                                  |
+| N9  | IPv6 rotation and privacy addresses             | One host appears as many addresses                                               | Join on interface/MAC where available, not just address                                           | Privacy extensions genuinely defeat long-term address attribution            |
+| N10 | Records tampering                               | Evidence altered after the fact                                                  | Records sealed through the vault: hash-chained audit, content-addressed store                     | Same limits as the vault (see review W2/W3)                                  |
 
 ---
 
@@ -257,17 +257,17 @@ is a claim by whoever is radiating. Therefore evaluation is ordered so every
 disqualifier is checked before any credit is given, and a BSSID can only ever lose
 trust, never earn it alone:
 
-| Condition | Result |
-|---|---|
-| No valid BSSID, or multicast bit set | `untrusted`, fail-safe |
-| Registry records the network as hostile | `hostile` |
-| BSSID locally administered (randomised) | `untrusted` — hotspots and spoofed APs |
-| Security mode without server authentication (open, WEP, WPA2-PSK) | `untrusted` — a shared secret proves nothing about the network |
-| EAP offered but server certificate not validated | `untrusted` — evil twin indistinguishable |
-| Authenticated, but registry does not know the BSSID | `ambiguous` |
-| Authenticated, known, but no independent corroboration | `ambiguous` |
-| Authenticated, known, corroborated, and DHCP domain contradicts registry | `ambiguous` |
-| Authenticated, known, corroborated | `managed` |
+| Condition                                                                | Result                                                         |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| No valid BSSID, or multicast bit set                                     | `untrusted`, fail-safe                                         |
+| Registry records the network as hostile                                  | `hostile`                                                      |
+| BSSID locally administered (randomised)                                  | `untrusted` — hotspots and spoofed APs                         |
+| Security mode without server authentication (open, WEP, WPA2-PSK)        | `untrusted` — a shared secret proves nothing about the network |
+| EAP offered but server certificate not validated                         | `untrusted` — evil twin indistinguishable                      |
+| Authenticated, but registry does not know the BSSID                      | `ambiguous`                                                    |
+| Authenticated, known, but no independent corroboration                   | `ambiguous`                                                    |
+| Authenticated, known, corroborated, and DHCP domain contradicts registry | `ambiguous`                                                    |
+| Authenticated, known, corroborated                                       | `managed`                                                      |
 
 Corroborating factors are things the AP does not get to assert alone: gateway MAC
 consistency with the registry, DHCP domain matching expectation, prior observation
@@ -275,12 +275,12 @@ of that BSSID in the estate.
 
 ### 11.3 What the policy may and may not gate
 
-| May gate | Must never gate |
-|---|---|
-| Collection depth | Key release or decryption authorisation |
-| Retention period | Whether a sample may be preserved at all |
-| Custody threshold (2-of-3 vs 3-of-5) | Whether the audit chain is verified |
-| Whether evidence may transit the network | The operator's ability to record |
+| May gate                                 | Must never gate                          |
+| ---------------------------------------- | ---------------------------------------- |
+| Collection depth                         | Key release or decryption authorisation  |
+| Retention period                         | Whether a sample may be preserved at all |
+| Custody threshold (2-of-3 vs 3-of-5)     | Whether the audit chain is verified      |
+| Whether evidence may transit the network | The operator's ability to record         |
 
 Note the direction of the `hostile` policy: it preserves *more* evidence under
 *tighter* custody, rather than discarding. A containment system that responds to

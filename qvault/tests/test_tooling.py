@@ -160,3 +160,31 @@ def test_reproduce_runs_every_gate():
     text = (ROOT / "tools" / "reproduce.sh").read_text()
     assert "set -euo pipefail" in text
     assert "tools/gates.py" in text
+
+
+# --- table alignment ----------------------------------------------------------------------
+
+import tables  # noqa: E402
+
+
+def test_alignment_pads_every_cell_to_its_column():
+    ragged = "| a | bbb |\n|---|---|\n| longer | c |"
+    fixed = tables.align(ragged)
+    widths = {len(line.split("|")[1]) for line in fixed.splitlines()}
+    assert len(widths) == 1
+    assert tables.align(fixed) == fixed, "alignment must be idempotent"
+
+
+def test_alignment_leaves_prose_and_code_untouched():
+    text = "a | b is not a table\n\n```bash\ngrep x | tail -3\n```\n"
+    assert tables.align(text) == text
+
+
+def test_misalignment_is_reported_with_a_line_number():
+    text = "| a | b |\n|---|---|\n| xxxx | y |"
+    assert tables.misaligned(text)
+
+
+def test_every_report_table_is_aligned_today():
+    for path in [ROOT / "README.md"] + sorted((ROOT / "report").glob("*.md")):
+        assert tables.align(path.read_text()) == path.read_text(), path.name

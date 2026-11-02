@@ -17,26 +17,26 @@ Upstream is never read at run time. Updating this set means fetching a new commi
 70 root-cause analyses across 6 years and 28 distinct products.
 
 | Year | Entries |
-|------|---------|
-| 2019 | 7 |
-| 2020 | 17 |
-| 2021 | 20 |
-| 2022 | 15 |
-| 2023 | 10 |
-| 2024 | 1 |
+| ---- | ------- |
+| 2019 | 7       |
+| 2020 | 17      |
+| 2021 | 20      |
+| 2022 | 15      |
+| 2023 | 10      |
+| 2024 | 1       |
 
-| Product | Entries |
-|---------|---------|
-| Google Chrome | 16 |
-| Microsoft Windows | 11 |
-| Microsoft Internet Explorer | 5 |
-| Apple iOS | 4 |
-| Samsung Android | 4 |
-| Mozilla Firefox | 3 |
-| Qualcomm Adreno GPU | 3 |
-| Windows | 3 |
-| Google Android | 2 |
-| ARM Mali GPU Driver | 1 |
+| Product                     | Entries |
+| --------------------------- | ------- |
+| Google Chrome               | 16      |
+| Microsoft Windows           | 11      |
+| Microsoft Internet Explorer | 5       |
+| Apple iOS                   | 4       |
+| Samsung Android             | 4       |
+| Mozilla Firefox             | 3       |
+| Qualcomm Adreno GPU         | 3       |
+| Windows                     | 3       |
+| Google Android              | 2       |
+| ARM Mali GPU Driver         | 1       |
 
 ## What it does not say
 
@@ -63,11 +63,11 @@ This corpus is exploitation research, not detection ground truth. It is not used
 
 Classes below come from keyword matches over the RCA header, recorded with the terms that matched so a reviewer can check them. A keyword match is an observation to adjudicate, not a finding.
 
-| Class | Keyword families |
-|-------|------------------|
-| `firmware_boot` | firmware, uefi, secure boot, bootloader, boot rom, tpm, baseband |
-| `kernel` | kernel, driver, ioctl, use-after-free in the kernel, ebpf |
-| `browser_renderer` | v8, webkit, renderer, javascript engine, blink |
-| `sandbox_escape` | sandbox, escape, ipc, broker |
-| `privilege_escalation` | privilege, escalation, lpe, elevation, token |
-| `persistence` | persistence, autorun, startup, scheduled task, service |
+| Class                  | Keyword families                                                 |
+| ---------------------- | ---------------------------------------------------------------- |
+| `firmware_boot`        | firmware, uefi, secure boot, bootloader, boot rom, tpm, baseband |
+| `kernel`               | kernel, driver, ioctl, use-after-free in the kernel, ebpf        |
+| `browser_renderer`     | v8, webkit, renderer, javascript engine, blink                   |
+| `sandbox_escape`       | sandbox, escape, ipc, broker                                     |
+| `privilege_escalation` | privilege, escalation, lpe, elevation, token                     |
+| `persistence`          | persistence, autorun, startup, scheduled task, service           |

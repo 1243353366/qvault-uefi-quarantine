@@ -28,21 +28,21 @@ and reasoning another person can reproduce.**
 The original §0.2 table defined the tags but did not say *whose* verification
 they describe. Corrected semantics:
 
-| Tag | Means, precisely |
-|---|---|
-| **CONFIRMED** | A primary source *directly demonstrates* the claim with technical evidence (decompilation, byte structure, named artifact, vendor specification). **It does not mean the author verified it.** |
-| **CORROBORATED** | Two or more *independent* sources agree, at least one of them technical. |
-| **INFERRED** | A conclusion drawn by the author from confirmed material, via reasoning stated in the text. Not observed. |
-| **HYPOTHESIS** | Plausible and consistent, unproven. Stated so it can be attacked. |
-| **UNKNOWN** | Insufficient public evidence. Not guessed. |
+| Tag              | Means, precisely                                                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CONFIRMED**    | A primary source *directly demonstrates* the claim with technical evidence (decompilation, byte structure, named artifact, vendor specification). **It does not mean the author verified it.** |
+| **CORROBORATED** | Two or more *independent* sources agree, at least one of them technical.                                                                                                                       |
+| **INFERRED**     | A conclusion drawn by the author from confirmed material, via reasoning stated in the text. Not observed.                                                                                      |
+| **HYPOTHESIS**   | Plausible and consistent, unproven. Stated so it can be attacked.                                                                                                                              |
+| **UNKNOWN**      | Insufficient public evidence. Not guessed.                                                                                                                                                     |
 
 And a second, orthogonal dimension that the first release lacked:
 
-| Verification status | Means |
-|---|---|
-| **none** | Taken from a published source. Nobody in this project re-derived it. This covers every claim about LoJax, MoonBounce and BlackLotus. |
-| **partial** | Derived here from published artifacts (e.g. signature sets, diff logic) but not validated against a real sample. |
-| **independent** | Produced and checked inside this repository, with an executable test. Only used for `qvault`'s own behaviour. |
+| Verification status | Means                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **none**            | Taken from a published source. Nobody in this project re-derived it. This covers every claim about LoJax, MoonBounce and BlackLotus. |
+| **partial**         | Derived here from published artifacts (e.g. signature sets, diff logic) but not validated against a real sample.                     |
+| **independent**     | Produced and checked inside this repository, with an executable test. Only used for `qvault`'s own behaviour.                        |
 
 **Standing statement:** this project performed no independent reverse
 engineering. No sample was obtained, unpacked, disassembled, emulated or
@@ -97,22 +97,22 @@ not evidence.
 
 ### 3.1 Rule 1 violations
 
-| Where | Problem | Correction applied |
-|---|---|---|
-| Title and §0.1 | "A Reverse-Engineering Study" reads as first-hand analysis | Title retained (the study *of* reverse-engineering literature) but §0.5 now states the limitation explicitly and every family section header carries the source |
-| §0.2 (original) | Tags appeared to record the author's verification | Redefined in §2 above with an explicit second dimension |
-| §3.8 heading | "Function-level reconstruction" could imply independent RE | Corrected to attribute the reconstruction to Kaspersky's document in the first line |
-| Chat / commit messages | "the mechanism is now fully reconstructable" | True of the *documented* mechanism only; overstated as a general claim |
-| §3.9 | Signature table presented without a verification-status column | §3.9 now states that no signature has been validated against a live sample |
+| Where                  | Problem                                                        | Correction applied                                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title and §0.1         | "A Reverse-Engineering Study" reads as first-hand analysis     | Title retained (the study *of* reverse-engineering literature) but §0.5 now states the limitation explicitly and every family section header carries the source |
+| §0.2 (original)        | Tags appeared to record the author's verification              | Redefined in §2 above with an explicit second dimension                                                                                                         |
+| §3.8 heading           | "Function-level reconstruction" could imply independent RE     | Corrected to attribute the reconstruction to Kaspersky's document in the first line                                                                             |
+| Chat / commit messages | "the mechanism is now fully reconstructable"                   | True of the *documented* mechanism only; overstated as a general claim                                                                                          |
+| §3.9                   | Signature table presented without a verification-status column | §3.9 now states that no signature has been validated against a live sample                                                                                      |
 
 ### 3.2 Rule 2 violations
 
-| Where | Problem |
-|---|---|
+| Where                   | Problem                                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Whole `qvault/` package | Written *before* §11 (failure analysis) existed. The mitigations were retrofitted to existing code rather than driving its design. |
-| §11 | Self-authored criticism only. No independent reviewer. |
-| §12 roadmap | Presented phases as if the design were settled, with no review gate |
-| README | Presented the architecture as "reference implementation" without noting unreviewed status |
+| §11                     | Self-authored criticism only. No independent reviewer.                                                                             |
+| §12 roadmap             | Presented phases as if the design were settled, with no review gate                                                                |
+| README                  | Presented the architecture as "reference implementation" without noting unreviewed status                                          |
 
 **Correction:** `qvault` is now labelled **prototype, not hardened** in the README
 and in §13, `report/THREAT_MODEL_REVIEW.md` exists as the artifact an independent
@@ -138,16 +138,16 @@ critic needs, and §12 contains an explicit gate before Phase 1 hardening.
 
 Stated so a critic has targets rather than impressions.
 
-| Claim | Falsified by |
-|---|---|
-| LoJax survives a full-region firmware update | A hardware test showing survival after a complete BIOS-region rewrite |
-| A partial firmware update cannot remove an implanted FFS file | A vendor capsule that preserves free space yet removes a foreign file |
-| Secure Boot does not attest firmware volume contents | A platform whose Secure Boot verification demonstrably covers its own DXE volumes |
-| MoonBounce leaves no structural firmware fingerprint | A structural (non-byte-diff) detector that reliably finds an in-place DXE patch |
-| `0x6F4EB841` is unique to this implant | Any legitimate firmware component containing that immediate |
-| Encryption at ingestion prevents execution of the stored object | Any path that executes a sealed object without a retrieval authorisation |
-| The audit chain detects truncation | A log rewrite that passes `verify` including checkpoint comparison |
-| BlackLotus is fully removed by OS + ESP reformat | Survival of the bootkit after a reformat with ESP wipe and MOK revocation |
+| Claim                                                           | Falsified by                                                                      |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| LoJax survives a full-region firmware update                    | A hardware test showing survival after a complete BIOS-region rewrite             |
+| A partial firmware update cannot remove an implanted FFS file   | A vendor capsule that preserves free space yet removes a foreign file             |
+| Secure Boot does not attest firmware volume contents            | A platform whose Secure Boot verification demonstrably covers its own DXE volumes |
+| MoonBounce leaves no structural firmware fingerprint            | A structural (non-byte-diff) detector that reliably finds an in-place DXE patch   |
+| `0x6F4EB841` is unique to this implant                          | Any legitimate firmware component containing that immediate                       |
+| Encryption at ingestion prevents execution of the stored object | Any path that executes a sealed object without a retrieval authorisation          |
+| The audit chain detects truncation                              | A log rewrite that passes `verify` including checkpoint comparison                |
+| BlackLotus is fully removed by OS + ESP reformat                | Survival of the bootkit after a reformat with ESP wipe and MOK revocation         |
 
 ---
 

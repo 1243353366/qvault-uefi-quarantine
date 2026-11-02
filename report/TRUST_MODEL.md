@@ -14,14 +14,14 @@ Status terms used below:
 
 ## Summary
 
-| # | Gap | Status | What the code does now | What it still cannot do |
-|---|-----|--------|------------------------|-------------------------|
-| 1 | Host trust gap | Architectural | Caps every conclusion at the ceiling of its best evidence class and refuses the rest | Prove the integrity of the host it is running on |
-| 2 | Self-scan | Architectural | `self_report` supports no conclusion at all, so a self-scan cannot produce a grade | Certify the evidence source from inside that source |
-| 3 | Oracle in denials | Enforced | Coarse, byte-identical refusal for unprivileged callers; detail only behind a granted principal | Authenticate that principal (see assumption A1) |
-| 4 | Separation of duties | Enforced | Refuses an identity holding observer and verifier roles in the same pipeline | Stop an operator wiring it anyway outside the API |
-| 5 | Local storage | Deployment | Refuses an append-only custody claim on non-WORM storage | Make a local filesystem append-only |
-| 6 | Live samples | Enforced | Refuses live capture unless the acquisition path is isolated and attested | Verify that isolation from the inside |
+| #   | Gap                  | Status        | What the code does now                                                                          | What it still cannot do                             |
+| --- | -------------------- | ------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | Host trust gap       | Architectural | Caps every conclusion at the ceiling of its best evidence class and refuses the rest            | Prove the integrity of the host it is running on    |
+| 2   | Self-scan            | Architectural | `self_report` supports no conclusion at all, so a self-scan cannot produce a grade              | Certify the evidence source from inside that source |
+| 3   | Oracle in denials    | Enforced      | Coarse, byte-identical refusal for unprivileged callers; detail only behind a granted principal | Authenticate that principal (see assumption A1)     |
+| 4   | Separation of duties | Enforced      | Refuses an identity holding observer and verifier roles in the same pipeline                    | Stop an operator wiring it anyway outside the API   |
+| 5   | Local storage        | Deployment    | Refuses an append-only custody claim on non-WORM storage                                        | Make a local filesystem append-only                 |
+| 6   | Live samples         | Enforced      | Refuses live capture unless the acquisition path is isolated and attested                       | Verify that isolation from the inside               |
 
 ## 1. Host trust gap
 
@@ -33,13 +33,13 @@ Enforcement lives in `separation.grade_ceiling` and `assert_claim_supported`. Ea
 evidence class has a ceiling, and a claim above it raises `EvidenceCeilingError` naming the
 class that would be needed:
 
-| Evidence class | Strongest grade supported |
-|----------------|---------------------------|
-| `self_report` | none: supports no conclusion |
-| `peer_claim` | `HYPOTHESIS` |
-| `independent_measurement` (physical flash read, bus capture) | `CORROBORATED` |
-| `signed_manifest` | `CORROBORATED` |
-| `hardware_anchor` (TPM quote, DICE) | `CONFIRMED` |
+| Evidence class                                               | Strongest grade supported    |
+| ------------------------------------------------------------ | ---------------------------- |
+| `self_report`                                                | none: supports no conclusion |
+| `peer_claim`                                                 | `HYPOTHESIS`                 |
+| `independent_measurement` (physical flash read, bus capture) | `CORROBORATED`               |
+| `signed_manifest`                                            | `CORROBORATED`               |
+| `hardware_anchor` (TPM quote, DICE)                          | `CONFIRMED`                  |
 
 So a host-mediated scan of an image can support `INFERRED` at best, a physical SPI read
 can support `CORROBORATED`, and only a hardware-rooted measurement corroborating that read
@@ -85,11 +85,11 @@ Roles were separated per component but a pipeline could still assign one identit
 of them, which is how a single compromised host both observes and decides.
 `pipeline_conflicts` refuses these pairs:
 
-| Pair | Why |
-|------|-----|
-| acquisition + verification | the observer would be judging what it observed |
-| analysis + verification | the analyst would be verifying its own parsing |
-| storage + verification | the holder would be certifying the evidence it holds |
+| Pair                       | Why                                                  |
+| -------------------------- | ---------------------------------------------------- |
+| acquisition + verification | the observer would be judging what it observed       |
+| analysis + verification    | the analyst would be verifying its own parsing       |
+| storage + verification     | the holder would be certifying the evidence it holds |
 
 The refusal names the shared identity. A fully separated pipeline is
 `acquisition -> analysis -> storage`, with `verification` held by a fourth identity on a
@@ -137,15 +137,15 @@ they are fixed because a test passes would be worse.
 `qvault/probe.py` is the instrument side of the boundary, and it is deliberately unable to
 answer anything but "what did I observe":
 
-| Requirement | How it is met | How it is tested |
-|-------------|---------------|------------------|
-| No new way to learn hidden facts | One token per request; identical for forbidden and absent | `test_a_forbidden_resource_and_a_missing_one_are_indistinguishable` |
-| No behaviour on the target | No connections, no execution, no files | source scan for socket/urllib/subprocess/eval/exec/open; empty tmpdir |
-| No remote resource use | Pure local evaluation of an existing decision | no imports that can reach out |
-| No unauthorised distinctions | Closed token vocabulary; gate labels only for the caller's own context | `test_the_vocabulary_is_closed` |
-| Bounded | `Budget`, one attempt, no retries or recursion | `test_a_second_call_gives_unknown_not_another_attempt` |
-| Refuses on ambiguity | Missing attestation outranks a denial; incomplete context is `PARTIAL`, never "absent" | `test_incomplete_context_is_partial_not_absent` |
-| No timing signal | Every gate computed for every request | evaluation trace plus a 3x timing bound |
+| Requirement                      | How it is met                                                                          | How it is tested                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| No new way to learn hidden facts | One token per request; identical for forbidden and absent                              | `test_a_forbidden_resource_and_a_missing_one_are_indistinguishable`   |
+| No behaviour on the target       | No connections, no execution, no files                                                 | source scan for socket/urllib/subprocess/eval/exec/open; empty tmpdir |
+| No remote resource use           | Pure local evaluation of an existing decision                                          | no imports that can reach out                                         |
+| No unauthorised distinctions     | Closed token vocabulary; gate labels only for the caller's own context                 | `test_the_vocabulary_is_closed`                                       |
+| Bounded                          | `Budget`, one attempt, no retries or recursion                                         | `test_a_second_call_gives_unknown_not_another_attempt`                |
+| Refuses on ambiguity             | Missing attestation outranks a denial; incomplete context is `PARTIAL`, never "absent" | `test_incomplete_context_is_partial_not_absent`                       |
+| No timing signal                 | Every gate computed for every request                                                  | evaluation trace plus a 3x timing bound                               |
 
 What it cannot do: prove the host, establish an evidence class it was not given, or make a
 local filesystem append-only. Those remain in the architectural column.
