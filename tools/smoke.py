@@ -305,6 +305,45 @@ except CAL.CalibrationError:
     check("a zero-claim sentence is refused", True)
 
 
+
+print("7. lan layer")
+_lan_tmp = tempfile.mkdtemp()
+_case = os.path.join(_lan_tmp, "lan-case.json")
+with open(_case, "w", encoding="utf-8") as fh:
+    json.dump({
+        "devices": [
+            {"id": "ws1", "role": "workstation", "addr": "10.0.0.5", "cert_fp": "AA"},
+            {"id": "nas1", "role": "nas", "addr": "10.0.0.9", "cert_fp": "BB"},
+            {"id": "sw1", "role": "switch", "addr": "10.0.0.2", "mac": "CC"},
+        ],
+        "flows": [
+            {"ts": 100, "src": "ws1", "dst": "nas1", "port": 3389, "fingerprint": "f1"},
+            {"ts": 100, "src": "ws1", "dst": "nas1", "port": 3389, "fingerprint": "f1"},
+        ],
+        "auths": [
+            {"ts": 90, "device": "ws1", "principal": "admin", "credential": "c1", "result": "failure"},
+            {"ts": 95, "device": "ws1", "principal": "admin", "credential": "c1", "result": "success"},
+        ],
+        "firmware": {"host_trustworthy": False, "statement": "no out-of-band read"},
+        "enforcement": {"switch": {"trusted": False, "reason": "image unattested"}},
+    }, fh)
+
+proc = cli("lan", "--case", _case)
+check("lan verb exits clean", proc.returncode == 0, proc.stderr[-160:])
+assess = json.loads(proc.stdout)
+check("an out-of-role connection is suspicious", assess["verdict"] == "suspicious", assess["verdict"])
+check("duplicate flows are dropped", assess["independent_layers"] >= 1)
+check("no anchor blocks the identity claim",
+      assess["identity"]["verdict"] != "inconsistent_with_identity", assess["identity"]["verdict"])
+check("a missing anchor is an explicit gap",
+      any(g.startswith("firmware_unattested") for g in assess["gaps"]), str(assess["gaps"])[:120])
+refused = {r["step"] for r in assess["containment"]["refused"]}
+check("switch-dependent containment is refused", {"microsegment", "isolate_port"} <= refused, str(refused))
+check("offered containment never relies on the switch",
+      not ({"microsegment", "isolate_port"} & set(assess["containment"]["steps"])),
+      str(assess["containment"]["steps"]))
+check("the lan verdict is never clean", "clean" not in str(assess["verdict"]).lower())
+
 print()
 if failures:
     print(f"SMOKE FAILED: {len(failures)} problem(s) in {steps} checks")

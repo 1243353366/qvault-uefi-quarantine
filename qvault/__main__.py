@@ -46,6 +46,32 @@ def _kek_from_shares(root: str, share_paths: list[str]) -> bytes:
     return rebuild_kek(shares, int(cfg["threshold"]), cfg["kek_id"])
 
 
+def cmd_lan(args) -> None:
+    from . import lan as lan_mod
+
+    with open(args.case, "r", encoding="utf-8") as fh:
+        doc = json.load(fh)
+    case = lan_mod.load_case(doc)
+    assessment = lan_mod.cross_layer(
+        devices=case["devices"], flows=case["flows"], auths=case["auths"],
+        discovery=case["discovery"], firmware=case["firmware"],
+        endpoint_findings=case["endpoint_findings"],
+        provenance_gaps=case["provenance_gaps"],
+    )
+    plan = lan_mod.containment_plan(assessment, case["enforcement"])
+    _json_out({
+        "verdict": assessment["verdict"],
+        "grade": assessment["grade"],
+        "identity": assessment["identity"],
+        "independent_layers": assessment["independent_layers"],
+        "gaps": assessment["gaps"],
+        "containment": {
+            "steps": [s["step"] for s in plan["steps"]],
+            "refused": plan["refused"],
+        },
+    })
+
+
 def cmd_init(args) -> None:
     paths = store.VaultPaths.open(args.root)
     cfg_path = os.path.join(args.root, "vault.json")
@@ -314,6 +340,10 @@ def build_parser() -> argparse.ArgumentParser:
     en = sub.add_parser("enclave", help="create an analysis enclave for plaintext")
     en.add_argument("--path", required=True)
     en.set_defaults(func=cmd_enclave)
+
+    ln = sub.add_parser("lan", help="assess a LAN case file and plan containment")
+    ln.add_argument("--case", required=True)
+    ln.set_defaults(func=cmd_lan)
 
     cp = sub.add_parser("checkpoint", help="sign the current audit head")
     cp.add_argument("--root", required=True)

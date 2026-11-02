@@ -9,6 +9,31 @@ they deliberately do not mean.
 
 ---
 
+## [0.8.0] - 2026-11-02
+
+The LAN layer existed but was unreachable: no fusion function, no CLI verb, no smoke
+coverage. This release connects it to the other layers and makes it runnable.
+
+### Added
+
+- `lan.cross_layer()` fuses firmware attestation, endpoint findings, network deviation,
+  authentication events and provenance into one graded assessment.
+- `lan.load_case()` parses a case file strictly: an unknown role or malformed flow is
+  refused by field name, because silently dropping hostile records under-reports.
+- `qvault lan --case FILE` prints verdict, grade, identity verdict, gaps and the
+  containment plan (offered steps and refused steps with alternatives).
+- Smoke section 7: 8 end-to-end checks over the verb, the dedupe, the anchor gating and
+  the enforcement refusals. 62 checks total.
+
+### Fixed
+
+- Role violation and identity assertion were graded as one claim, so a missing firmware
+  anchor dragged real network evidence down to UNKNOWN and the tool under-reported.
+  They are now separate: "this host violated its role" needs no anchor, "this device is
+  inconsistent with its authenticated identity" does. Gaps cost one step, never erasure.
+- `load_case` passed the wrong field names into `Flow` and `DiscoveryEvent`, and called
+  `infrastructure_integrity` with a list where it expects the index.
+
 ## [0.7.0] - 2026-11-02
 
 LAN layer (P8): a network is a communication environment, not a machine. Adds

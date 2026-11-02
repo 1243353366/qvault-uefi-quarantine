@@ -54,6 +54,10 @@ SERVICE_NAMES = {
 
 #: Service each role may legitimately initiate. Anything else is out-of-role and is a
 #: lead, not a verdict: installers, backups and monitoring break role purity all the time.
+class LanError(ValueError):
+    """Malformed LAN input: refused by name, never silently dropped."""
+
+
 ROLE_POLICY = {
     WORKSTATION: {53, 80, 443, 445, 123, 1900, 5353, 9100},
     SERVER: {53, 80, 443, 445, 123, 3389, 22, 2049},
@@ -514,3 +518,168 @@ def assert_narrow(step: dict) -> None:
         raise ValueError(
             f"step {step.get('step')!r} would push {step['action_kind']} to other hosts"
         )
+
+
+# --- cross-layer fusion ---------------------------------------------------
+
+
+def _firmware_anchor(firmware: dict) -> tuple[bool, str]:
+    """Whether firmware integrity is independently established.
+
+    Accepts a firmware_integrity assessment or a plain subject->verdict map. Anything
+    short of `match` on the flash image and the CRTM is not an anchor.
+    """
+    if not firmware:
+        return False, "no firmware evidence supplied"
+    if "host_trustworthy" in firmware:
+        return bool(firmware["host_trustworthy"]), str(firmware.get("statement", ""))
+    rows = firmware.get("rows") or []
+    verdicts = {r.get("subject"): r.get("verdict") for r in rows}
+    for subject, verdict in firmware.items():
+        if isinstance(verdict, str):
+            verdicts.setdefault(subject, verdict)
+    needed = ("flash_image", "crtm")
+    missing = [n for n in needed if verdicts.get(n) != "match"]
+    if missing:
+        return False, f"not established by an independent anchor: {', '.join(missing)}"
+    return True, "flash image and CRTM match an independent reference"
+
+
+def cross_layer(*, devices, flows, auths=(), discovery=(), firmware=None,
+                endpoint_findings=(), provenance_gaps=()) -> dict:
+    """Fuse firmware, endpoint, network, authentication and provenance evidence.
+
+    Independence is the whole point: layers that all originate inside the suspect device
+    are one layer wearing several names. The verdict is capped accordingly, and the
+    strongest verdict additionally requires a firmware anchor, because everything else
+    here was authored by the thing under suspicion.
+    """
+    devices = list(devices)
+    by_id = {d.id: d for d in devices}
+    flows, dup_flows = deduplicate_flows(list(flows))
+
+    base = build_baseline(flows)
+    devs = deviations(flows, base)
+    role = out_of_role(flows, by_id)
+    disc = discovery_anomalies(list(discovery))
+    lat = lateral_movement(flows, list(auths), by_id)
+    infra = infrastructure_integrity(by_id)
+    anchored, anchor_note = _firmware_anchor(firmware or {})
+
+    endpoint_positive = bool(endpoint_findings)
+    net_delta = bool(devs or role or disc or lat.get("suspicion"))
+
+    ident = identity_inconsistency({
+        "lan_deviation": net_delta,
+        "endpoint_indicators": endpoint_positive,
+        "firmware_attested": anchored,
+    })
+
+    layers = {
+        "network": net_delta,
+        "authentication": bool(auths),
+        "endpoint": endpoint_positive,
+        "firmware": anchored,
+        "provenance": not provenance_gaps,
+    }
+    independent = [n for n, v in layers.items() if v]
+
+    gaps = list(provenance_gaps)
+    if not anchored:
+        gaps.append(f"firmware_unattested: {anchor_note}")
+    if not devices:
+        gaps.append("no network inventory: role violations cannot be assessed")
+    if not flows:
+        gaps.append("no traffic: baseline and deviation are unmeasured, not clean")
+    gaps.extend(infra.get("gaps", []))
+
+    # Two separate claims, graded separately. "This host violated its role" rests on
+    # network evidence and needs no firmware anchor. "This device is inconsistent with
+    # its authenticated identity" is a claim about identity and does need one. Coupling
+    # them let an unrelated gap erase a real role violation, which is under-reporting.
+    if ident["verdict"] == "inconsistent_with_identity":
+        grade = F.CORROBORATED
+    elif role or lat.get("suspicion"):
+        grade = F.CORROBORATED if len(independent) >= 2 else F.INFERRED
+    elif devs or disc:
+        grade = F.INFERRED if independent else F.HYPOTHESIS
+    else:
+        grade = F.UNKNOWN
+    # Gaps cost one step at most: a missing anchor weakens, it does not erase.
+    if provenance_gaps and grade != F.UNKNOWN:
+        grade = F.confidence_grade(grade, tuple(gaps))
+
+    if grade in (F.CONFIRMED, F.CORROBORATED, F.INFERRED):
+        verdict = "suspicious"
+    elif grade == F.UNKNOWN and independent:
+        verdict = "inconclusive"
+    elif not independent:
+        verdict = F.INCONCLUSIVE
+    else:
+        verdict = F.NO_EVIDENCE_FOUND
+
+    return {
+        "verdict": verdict,
+        "grade": grade,
+        "identity": ident,
+        "layers_present": independent,
+        "independent_layers": len(independent),
+        "flows": len(flows),
+        "duplicate_flows_dropped": dup_flows,
+        "deviations": devs,
+        "role_violations": role,
+        "discovery": disc,
+        "lateral": lat,
+        "infrastructure": infra,
+        "gaps": gaps,
+        "statement": (
+            f"{len(independent)} independent layer(s) of evidence; verdict {verdict} "
+            f"at grade {grade}. This is not a statement that the network is clean."
+        ),
+    }
+
+
+def load_case(doc: dict) -> dict:
+    """Parse a LAN case file into the inputs cross_layer takes.
+
+    Deliberately strict: an unknown role or a malformed flow is refused with the field
+    named, because silently dropping hostile records is how a case file under-reports.
+    """
+    if not isinstance(doc, dict):
+        raise LanError("a case file must be a JSON object")
+    try:
+        devices = [
+            Device(id=d["id"], role=d["role"], addr=d.get("addr", ""),
+                   mac=d.get("mac", ""), bssid=d.get("bssid", ""),
+                   cert_fp=d.get("cert_fp", ""),
+                   firmware_attested=bool(d.get("firmware_attested", False)),
+                   os_attested=bool(d.get("os_attested", False)))
+            for d in doc.get("devices", [])
+        ]
+        flows = [
+            Flow(ts=int(f["ts"]), src=f["src"], dst=f["dst"], port=int(f["port"]),
+                 byte_count=int(f.get("byte_count", f.get("bytes", 0))),
+                 encrypted=bool(f.get("encrypted", True)),
+                 dns=f.get("dns", ""), fingerprint=f.get("fingerprint", ""))
+            for f in doc.get("flows", [])
+        ]
+        auths = [
+            AuthEvent(ts=int(a["ts"]), device=a["device"], principal=a["principal"],
+                      credential=a.get("credential", ""), result=a["result"])
+            for a in doc.get("auths", [])
+        ]
+        discovery = [
+            DiscoveryEvent(ts=int(e["ts"]), device=e["device"], protocol=e["proto"],
+                           kind=e["kind"], target=e.get("target", ""),
+                           designated=bool(e.get("designated", False)))
+            for e in doc.get("discovery", [])
+        ]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise LanError(f"malformed case file: {exc}") from exc
+    return {
+        "devices": devices, "flows": flows, "auths": auths, "discovery": discovery,
+        "firmware": doc.get("firmware") or {},
+        "endpoint_findings": doc.get("endpoint_findings") or [],
+        "provenance_gaps": doc.get("provenance_gaps") or [],
+        "enforcement": doc.get("enforcement") or {},
+    }
