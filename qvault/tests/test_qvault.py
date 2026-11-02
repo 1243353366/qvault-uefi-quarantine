@@ -366,3 +366,78 @@ def test_merkle_root_changes_when_inventory_changes(vault, tmp_path):
     ingest(a, vault["kek"], _write(tmp_path, "two.bin", b"two"), operator="o", method="m")
     root_two = store.merkle_root(sorted(e["object_id"] for e in store.list_objects(a)))
     assert len({root_empty, root_one, root_two}) == 3
+
+
+def test_stream_header_rejects_hostile_counts_before_decrypt(tmp_path):
+    from qvault.crypto import CHUNK_SIZE, SUITE
+
+    malformed = [
+        {"suite": SUITE, "chunk_size": CHUNK_SIZE, "n_chunks": 10**30,
+         "plaintext_size": 1},
+        {"suite": SUITE, "chunk_size": CHUNK_SIZE, "n_chunks": 0,
+         "plaintext_size": 0},
+        {"suite": SUITE, "chunk_size": CHUNK_SIZE, "n_chunks": 1,
+         "plaintext_size": -1},
+        {"suite": SUITE, "chunk_size": CHUNK_SIZE, "n_chunks": True,
+         "plaintext_size": 1},
+    ]
+    for item in malformed:
+        with pytest.raises(CryptoError):
+            StreamHeader.from_dict(item)
+
+
+def test_share_combine_rejects_out_of_range_manual_index():
+    from qvault.keys import Share
+
+    with pytest.raises(ValueError, match="index"):
+        combine([Share(0, b"x")])
+
+
+def test_approval_identity_cannot_escape_approval_directory(vault):
+    from qvault.retrieve import AuthorizationError
+
+    with pytest.raises(AuthorizationError, match="safe identifier"):
+        record_approval(vault["paths"], "a" * 64, "../../outside", justification="no")
+
+
+def test_retrieve_rejects_path_filename_and_preserves_existing_file(vault, tmp_path):
+    src = _write(tmp_path, "dump.bin", b"fixture")
+    env = ingest(vault["paths"], vault["kek"], src, operator="a", method="m")
+    enclave = tmp_path / "enclave"
+    enclave.mkdir()
+    (enclave / ".enclave").write_text("ok")
+    record_approval(vault["paths"], env["object_id"], "r1", justification="j")
+    record_approval(vault["paths"], env["object_id"], "r2", justification="j")
+
+    with pytest.raises(AuthorizationError, match="safe filename"):
+        retrieve(vault["paths"], env["object_id"], shares=vault["shares"][:2],
+                 threshold=2, requester="analyst", out_dir=str(enclave), filename="../escape")
+
+    existing = enclave / "kept.sample"
+    existing.write_bytes(b"do not overwrite")
+    with pytest.raises(AuthorizationError, match="overwrite"):
+        retrieve(vault["paths"], env["object_id"], shares=vault["shares"][:2],
+                 threshold=2, requester="analyst", out_dir=str(enclave), filename="kept.sample")
+    assert existing.read_bytes() == b"do not overwrite"
+
+
+def test_ingest_encrypts_and_triages_same_source_bytes(vault, tmp_path, monkeypatch):
+    import qvault.ingest as ingest_module
+
+    initial = b"A" * 65536 + b"B" * 1024
+    changed = b"C" * len(initial)
+    source = _write(tmp_path, "dump.bin", initial)
+    real_encrypt = ingest_module.encrypt_stream
+
+    def mutate_before_encryption(*args, **kwargs):
+        # Change the already-open inode at the exact point encryption begins.
+        # Hash and ciphertext must describe the same bytes, never two passes.
+        with open(source, "r+b") as fh:
+            fh.write(changed)
+            fh.flush()
+        return real_encrypt(*args, **kwargs)
+
+    monkeypatch.setattr(ingest_module, "encrypt_stream", mutate_before_encryption)
+    env = ingest(vault["paths"], vault["kek"], source, operator="a", method="m")
+    assert env["plaintext_size"] == len(changed)
+    assert env["plaintext_sha256"] == __import__("hashlib").sha256(changed).hexdigest()

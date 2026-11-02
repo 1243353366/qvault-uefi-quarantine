@@ -118,7 +118,13 @@ def combine(shares: Sequence[Share]) -> bytes:
     """Rebuild the secret from `shares` via Lagrange interpolation at x=0."""
     if not shares:
         raise ValueError("no shares supplied")
+    if any(not isinstance(s, Share) for s in shares):
+        raise ValueError("every share must be a Share instance")
     xs = [s.index for s in shares]
+    if any(isinstance(x, bool) or not isinstance(x, int) or not 1 <= x <= 255 for x in xs):
+        raise ValueError("share index out of range")
+    if not shares[0].y or any(not isinstance(s.y, bytes) for s in shares):
+        raise ValueError("shares must contain non-empty byte strings")
     if len(set(xs)) != len(xs):
         raise ValueError("duplicate share indices")
     length = len(shares[0].y)
