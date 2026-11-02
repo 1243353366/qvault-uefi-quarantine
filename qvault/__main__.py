@@ -269,6 +269,9 @@ def cmd_checkpoint(args) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="qvault", description=__doc__)
+    from . import __version__
+    p.add_argument("--version", action="version", version=f"qvault {__version__}")
+
     sub = p.add_subparsers(dest="cmd", required=True)
 
     i = sub.add_parser("init", help="create a vault and split the KEK")

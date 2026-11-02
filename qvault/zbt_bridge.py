@@ -31,7 +31,14 @@ forking: upstream stays authoritative, and the seam stays testable.
 
 from __future__ import annotations
 
-from vendor.zbtriage import result as zbt
+try:
+    from vendor.zbtriage import result as zbt
+except ImportError as exc:  # pragma: no cover - install-time failure
+    raise ImportError(
+        "the vendored detection engine is missing. It ships in vendor/zbtriage and is "
+        "pinned by vendor/UPSTREAM.md; install the package with its vendor tree, or run "
+        "from a full checkout."
+    ) from exc
 
 from . import findings as F
 from . import limitations as L

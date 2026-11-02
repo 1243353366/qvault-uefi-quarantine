@@ -8,6 +8,7 @@ Run: python3 tools/gen_fingerprints.py
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -62,6 +63,8 @@ FOOTER = """
 
 
 def main() -> None:
+    import sys
+    check = "--check" in sys.argv
     P.assert_catalogue_integrity()
     lines = [HEADER]
 
@@ -93,10 +96,21 @@ def main() -> None:
         lines.append("\n")
 
     lines.append(FOOTER)
+    rendered = "".join(lines)
+    count = sum(len(P.by_family(f)) for f in P.FAMILIES)
+
+    if check:
+        current = pathlib.Path(OUT).read_text(encoding="utf-8") if pathlib.Path(OUT).exists() else ""
+        if current != rendered:
+            print(f"{OUT} differs from what the code generates")
+            raise SystemExit(1)
+        print(f"{OUT} matches the code ({count} fingerprints)")
+        return
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:
-        fh.write("".join(lines))
-    print(f"wrote {OUT} ({sum(len(P.by_family(f)) for f in P.FAMILIES)} fingerprints)")
+        fh.write(rendered)
+    print(f"wrote {OUT} ({count} fingerprints)")
 
 
 if __name__ == "__main__":

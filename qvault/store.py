@@ -95,7 +95,7 @@ def put_envelope(paths: VaultPaths, object_id: str, envelope: dict) -> str:
 def get_envelope(paths: VaultPaths, object_id: str) -> dict:
     path = os.path.join(paths.envelopes, f"{object_id}.json")
     if not os.path.exists(path):
-        raise StoreError(f"no envelope for object {object_id}")
+        raise StoreError(f"object {object_id} not available")
     with open(path) as fh:
         return json.load(fh)
 
@@ -112,7 +112,7 @@ def list_objects(paths: VaultPaths) -> Iterator[dict]:
 def object_path(paths: VaultPaths, object_id: str) -> str:
     p = os.path.join(paths.objects, f"{object_id}.qv")
     if not os.path.exists(p):
-        raise StoreError(f"object {object_id} not found")
+        raise StoreError(f"object {object_id} not available")
     return p
 
 

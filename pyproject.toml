@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qvault"
+dynamic = ["version"]
+description = "Cryptographic quarantine vault, firmware evidence analysis and LAN containment"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+dependencies = ["cryptography>=42"]
+
+[project.scripts]
+qvault = "qvault.__main__:main"
+
+[tool.setuptools]
+packages = ["qvault", "vendor", "vendor.zbtriage"]
+
+[tool.setuptools.dynamic]
+version = {attr = "qvault.__version__"}

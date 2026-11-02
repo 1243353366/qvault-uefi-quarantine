@@ -26,6 +26,7 @@ import os
 from dataclasses import dataclass, field
 
 from . import store
+from .crypto import sha256_file
 from .audit import AuditLog, verify_checkpoint
 
 
@@ -65,11 +66,7 @@ def verify_vault(paths: store.VaultPaths) -> VerifyReport:
             rep.errors.append(str(exc))
             continue
 
-        actual = store.sha256_file(path) if hasattr(store, "sha256_file") else None
-        if actual is None:  # pragma: no cover - fallback
-            from .crypto import sha256_file as _sh
-
-            actual = _sh(path)
+        actual = sha256_file(path)
 
         if actual != env.get("ciphertext_sha256"):
             rep.errors.append(f"object {oid[:16]}... ciphertext hash mismatch")

@@ -1,0 +1,5 @@
+# Exact versions the release assessment was produced with.
+# A pilot should install these, not requirements.txt, or the numbers below do not apply.
+# Interpreter: CPython 3.11.18
+cryptography==50.0.2
+pytest==9.2.0

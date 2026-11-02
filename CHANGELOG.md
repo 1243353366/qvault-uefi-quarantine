@@ -9,6 +9,48 @@ they deliberately do not mean.
 
 ---
 
+## [0.9.0] - 2026-11-02
+
+Two problem classes, worked line by line.
+
+### Oracle problems (interfaces that answer questions they should not)
+
+- `crypto` reported `authentication failed at chunk {idx}`. The index let an attacker bisect
+  where their edit was detected; wrong-key and tampered-ciphertext failures also read
+  differently. All authentication paths now raise one constant, `AUTH_FAILED`, carrying no
+  position, no key property and no failure class.
+- `store` distinguished "no envelope" from "object not found", which reveals an aborted
+  ingest: ciphertext written, envelope missing. Both now answer `object <id> not available`.
+- `verify` contained a `hasattr(store, "sha256_file")` fallback that silently masked a
+  missing import. The import is explicit and the branch is gone.
+
+### Pilot problems (whether a fresh checkout can be deployed and reproduced)
+
+- No packaging existed: `pip install` was impossible and `vendor.zbtriage` would not travel.
+  Added `pyproject.toml` packaging `qvault`, `vendor` and `vendor.zbtriage`, with the
+  `qvault` console script.
+- `requirements.txt` used `>=`, so a pilot environment could drift from the tree the numbers
+  describe. Added `requirements-lock.txt` (CPython 3.11.18, cryptography 50.0.2,
+  pytest 9.2.0).
+- The CLI had no way to say what it was: added `qvault --version`.
+- Reproduction was undocumented and unverifiable. Added `tools/reproduce.sh` and
+  `report/REPRODUCE.md` with the exact expected output of every gate, verified by running
+  from a clean copy of the tree rather than from git.
+- `tools/gen_fingerprints.py --check` replaces the `git diff` drift check, which failed
+  falsely in a checkout without `.git`.
+- A missing vendor tree raised a bare ImportError; it now names the cause and the fix.
+
+### Added
+
+- `qvault/tests/test_oracle_resistance.py`: 8 tests asserting indistinguishability, not just
+  that an error occurred. 465 tests, 62 smoke checks.
+
+### Known limitation, not fixed
+
+- Dual control counts approver *names*; nothing binds a name to a person, so one operator
+  holding two names satisfies it. Fixing this needs an identity source the tool does not
+  have, and pretending otherwise would be the failure this project documents against.
+
 ## [0.8.0] - 2026-11-02
 
 The LAN layer existed but was unreachable: no fusion function, no CLI verb, no smoke

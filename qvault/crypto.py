@@ -44,6 +44,8 @@ CHUNK_SIZE = 64 * 1024
 TAG_LEN = 16
 NONCE_LEN = 12
 KEY_LEN = 32
+AUTH_FAILED = "authentication failed: ciphertext, key or metadata altered"
+
 SUITE = "QV1-AES256GCM-STREAM-CHUNKED"
 
 
@@ -199,7 +201,7 @@ def decrypt_stream(
             pt = aead.decrypt(_nonce(idx, final), blob, aad)
         except InvalidTag as exc:  # noqa: PERF203 - explicit failure path
             raise CryptoError(
-                f"authentication failed at chunk {idx}: ciphertext or metadata altered"
+                AUTH_FAILED
             ) from exc
         dst.write(pt)
         total += len(pt)
@@ -228,9 +230,9 @@ def unwrap_key(kek: bytes, wrapped: dict, *, aad_obj: dict) -> bytes:
             bytes.fromhex(wrapped["nonce"]), bytes.fromhex(wrapped["wrapped_dek"]), aad
         )
     except InvalidTag as exc:
-        raise CryptoError("DEK unwrap failed: wrong KEK quorum or altered envelope") from exc
+        raise CryptoError(AUTH_FAILED) from exc
     if len(dek) != KEY_LEN:
-        raise CryptoError("unwrapped DEK has wrong length")
+        raise CryptoError(AUTH_FAILED)
     return dek
 
 
