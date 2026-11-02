@@ -33,6 +33,30 @@ asks for something else, so an operator received a settings dict and no way to t
 - 19 tests, including monotonicity against a more permissive policy and a check that a
   denial's text carries no material.
 
+### Fixed - the denial was an oracle
+
+The first version of this denial logic leaked. `DENY_UNKNOWN_RESOURCE` versus
+`DENY_INSUFFICIENT_CUSTODY`, plus the echoed resource name, told an unauthenticated caller
+that a resource existed and which condition was nearly satisfied. Refusals are now coarse
+and byte-identical for a real, a forbidden, and a nonexistent resource; detail requires a
+principal with a granted flag, and bulk results do not report counts to unprivileged
+callers. Rule-engine tests moved to `_evaluate`, and the public surface is tested for what
+it refuses to say.
+
+### Added - trust model enforcement
+
+- `separation.grade_ceiling` and `assert_claim_supported`: a claim above what its evidence
+  class can support is refused, naming the class that would be enough. A self-report
+  supports no conclusion at all; volume of one class is not a stronger class.
+- `pipeline_conflicts` / `assert_pipeline_separated`: one identity may not hold acquisition
+  and verification, analysis and verification, or storage and verification.
+- `assert_custody_claim`: append-only history cannot be claimed on non-WORM storage.
+- `assert_scope`: live capture is refused unless the acquisition path is isolated and
+  attested.
+- `report/TRUST_MODEL.md` maps all six gaps, marking which are enforced in code, which are
+  architectural, and which are deployment properties. Assumption A1 (the principal's detail
+  grant is not authenticated here) is stated rather than papered over.
+
 ### Note
 
 Deliberately not merged: main remains at v0.11.0 until this is reviewed.

@@ -370,7 +370,7 @@ def _deny(decision: "Decision", resource: str, code: str, required: str,
                   remedy=remedy, detail=detail)
 
 
-def authorize(decision: "Decision", resource: str, *, requested=None,
+def _evaluate(decision: "Decision", resource: str, *, requested=None,
               attested: bool | None = None, shares: int | None = None) -> Verdict:
     """Decide one request under the selected policy.
 
@@ -445,15 +445,76 @@ def authorize(decision: "Decision", resource: str, *, requested=None,
     return Verdict(resource=resource, allowed=not denials, denials=denials)
 
 
-def authorize_all(decision: "Decision", requests: dict[str, dict]) -> dict:
+# --------------------------------------------------------------------------------------
+# Who is allowed to see why
+#
+# A denial that distinguishes "no such resource" from "that resource is forbidden", or that
+# names the rule that refused, is an oracle: it tells an unauthenticated caller which
+# resources exist and which conditions are close to passing. So the default answer is
+# coarse and identical for every refusal, and detail is only returned to a principal the
+# deployment has already authenticated.
+# --------------------------------------------------------------------------------------
+
+#: Returned to callers that have not been granted detail. Byte-identical for an unknown
+#: resource, a forbidden one, and a policy that simply says no.
+COARSE_REFUSAL: dict = {
+    "allowed": False,
+    "denial": "refused",
+    "remedy": "the request was refused by policy; the specific reason is available to the "
+              "policy owner",
+}
+
+
+@dataclass(frozen=True)
+class Principal:
+    """An authenticated caller. `sees_detail` is granted by the deployment, not asserted here.
+
+    Until a deployment wires this to its own authentication, treat every Principal as
+    unverified: the coarse path is the only one that is safe without an authn layer.
+    """
+
+    name: str = ""
+    role: str = ""
+    sees_detail: bool = False
+
+    @property
+    def may_see_detail(self) -> bool:
+        return bool(self.sees_detail and self.role and self.name)
+
+
+def authorize(decision: "Decision", resource: str, *, principal: Principal | None = None,
+              requested=None, attested: bool | None = None,
+              shares: int | None = None) -> dict:
+    """Answer one request, saying as little as the caller has earned.
+
+    The evaluation always runs, so a refusal costs the same work whichever rule produced
+    it; only the report differs.
+    """
+    verdict = _evaluate(decision, resource, requested=requested, attested=attested,
+                        shares=shares)
+    if principal is None or not principal.may_see_detail:
+        if verdict.allowed:
+            return {"allowed": True}
+        return dict(COARSE_REFUSAL)
+    return {"allowed": verdict.allowed, "resource": resource,
+            "denials": [d.to_dict() for d in verdict.denials]}
+
+
+def authorize_all(decision: "Decision", requests: dict[str, dict], *,
+                  principal: Principal | None = None) -> dict:
     """Evaluate several requests at once. Deterministic order, so reports diff cleanly."""
     verdicts = {}
     for resource in sorted(requests):
         kwargs = dict(requests[resource] or {})
-        verdicts[resource] = authorize(decision, resource, **kwargs)
-    return {
-        "policy": decision.policy,
-        "trust": decision.trust,
-        "allowed": all(v.allowed for v in verdicts.values()),
-        "verdicts": {name: v.to_dict() for name, v in verdicts.items()},
-    }
+        verdicts[resource] = authorize(decision, resource, principal=principal, **kwargs)
+    detailed = principal is not None and principal.may_see_detail
+    out = {"allowed": all(v["allowed"] for v in verdicts.values())}
+    if detailed:
+        out["policy"] = decision.policy
+        out["trust"] = decision.trust
+        out["verdicts"] = verdicts
+    else:
+        # No resource names, no count of which failed, no policy identity.
+        out["denial" if not out["allowed"] else "verdicts"] = (
+            "refused" if not out["allowed"] else len(verdicts))
+    return out

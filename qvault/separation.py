@@ -303,3 +303,144 @@ def may(component: str, action: str) -> bool:
     if action in duties["must_not"]:
         return False
     return action in duties["may"]
+
+
+# --------------------------------------------------------------------------------------
+# Claim ceilings
+#
+# GRADE_BY_CLASS said what each evidence class can support. Nothing refused a claim that
+# exceeded it, so a host-mediated read could be reported as CONFIRMED firmware integrity
+# by simply not consulting the table. These functions make the table binding.
+# --------------------------------------------------------------------------------------
+
+_RANK = {grade: i for i, grade in enumerate(reversed(F.GRADES))}   # CONFIRMED highest
+
+
+class EvidenceCeilingError(SeparationError):
+    """Raised when a claim is stronger than the evidence offered for it."""
+
+
+def grade_ceiling(classes) -> str | None:
+    """The strongest grade the best available evidence class can support."""
+    best = None
+    for cls in classes:
+        if cls not in GRADE_BY_CLASS:
+            raise SeparationError(f"unknown evidence class {cls!r}; known: {EVIDENCE_CLASSES}")
+        grade = GRADE_BY_CLASS[cls]
+        if grade is None:
+            continue
+        if best is None or _RANK[grade] > _RANK[best]:
+            best = grade
+    return best
+
+
+def assert_claim_supported(claim_grade: str, classes, what: str = "claim") -> dict:
+    """Refuse a conclusion stronger than the evidence, and say what would be enough.
+
+    An empty class list supports nothing: absence of evidence has never been evidence.
+    """
+    if claim_grade not in _RANK:
+        raise SeparationError(f"unknown grade {claim_grade!r}; known: {F.GRADES}")
+    classes = tuple(classes)
+    ceiling = grade_ceiling(classes)
+    if ceiling is None:
+        raise EvidenceCeilingError(
+            f"{what} cannot be graded {claim_grade}: no evidence class was offered, and "
+            f"no class here supports any conclusion. Obtain an independent measurement.")
+    if _RANK[claim_grade] > _RANK[ceiling]:
+        raise EvidenceCeilingError(
+            f"{what} graded {claim_grade} exceeds what {', '.join(classes)} can support "
+            f"({ceiling}). A stronger conclusion needs a stronger evidence class, not more "
+            f"volume of the same one.")
+    return {"claim": claim_grade, "ceiling": ceiling, "classes": list(classes),
+            "supported": True}
+
+
+# --------------------------------------------------------------------------------------
+# Pipeline separation
+#
+# Roles are separated component by component. A pipeline can still hand the same identity
+# several roles, which is how one compromised host ends up both observing and deciding.
+# --------------------------------------------------------------------------------------
+
+#: Pairs that must never share an identity. Observer-decides and holder-certifies are the
+#: two that let a compromised subject produce a clean verdict about itself.
+PIPELINE_CONFLICTS: tuple[tuple[str, str, str], ...] = (
+    (ACQUISITION, VERIFICATION, "the observer would be judging what it observed"),
+    (ANALYSIS, VERIFICATION, "the analyst would be verifying its own parsing"),
+    (STORAGE, VERIFICATION, "the holder would be certifying the evidence it holds"),
+)
+
+
+def pipeline_conflicts(assignment: dict[str, str]) -> list[dict]:
+    """Conflicts in a role-to-identity map. Empty means the pipeline is separated."""
+    unknown = set(assignment) - set(ROLES)
+    if unknown:
+        raise SeparationError(f"unknown role(s) {sorted(unknown)}; known: {ROLES}")
+    out = []
+    for left, right, why in PIPELINE_CONFLICTS:
+        a, b = assignment.get(left), assignment.get(right)
+        if a is not None and a == b:
+            out.append({"roles": [left, right], "identity": a, "reason": why})
+    return out
+
+
+def assert_pipeline_separated(assignment: dict[str, str]) -> dict:
+    conflicts = pipeline_conflicts(assignment)
+    if conflicts:
+        raise SeparationError("roles must not share an identity: " +
+                              "; ".join(f"{c['roles'][0]} and {c['roles'][1]} both "
+                                        f"{c['identity']} ({c['reason']})"
+                                        for c in conflicts))
+    return {"roles": dict(assignment), "separated": True}
+
+
+# --------------------------------------------------------------------------------------
+# Storage durability and sample scope
+# --------------------------------------------------------------------------------------
+
+NOT_WORM = "not_worm"
+WORM_EMULATED = "worm_emulated"     # object-lock/compliance mode, or an external WORM appliance
+WORM = "worm"
+
+STORAGE_CLASSES = (NOT_WORM, WORM_EMULATED, WORM)
+
+
+class CustodyClaimError(SeparationError):
+    """Raised when custody is claimed on storage that cannot keep the promise."""
+
+
+def assert_custody_claim(storage_class: str, claim: str = "append_only_history") -> dict:
+    """A local filesystem cannot promise append-only history, whoever is asking."""
+    if storage_class not in STORAGE_CLASSES:
+        raise SeparationError(f"unknown storage class {storage_class!r}; known: {STORAGE_CLASSES}")
+    if storage_class == NOT_WORM:
+        raise CustodyClaimError(
+            f"cannot claim {claim} on {NOT_WORM} storage: a writer who can reach the "
+            f"filesystem can rewrite history. Move objects/ and the audit log to "
+            f"object-lock or compliance-mode media before making this claim.")
+    return {"storage_class": storage_class, "claim": claim, "supported": True}
+
+
+SYNTHETIC = "synthetic"
+LIVE_CAPTURE = "live_capture"
+
+
+class ScopeError(SeparationError):
+    """Raised when work is attempted outside the scope the tool claims to support."""
+
+
+def assert_scope(scope: str, *, isolated: bool = False, attested: bool = False) -> dict:
+    """Live samples are refused unless the acquisition path is isolated and attested."""
+    if scope not in (SYNTHETIC, LIVE_CAPTURE):
+        raise SeparationError(f"unknown scope {scope!r}")
+    if scope == SYNTHETIC:
+        return {"scope": scope, "isolation_required": False}
+    if not (isolated and attested):
+        missing = [n for n, ok in (("isolated acquisition environment", isolated),
+                                   ("independent attestation", attested)) if not ok]
+        raise ScopeError(
+            "live capture is outside the supported scope without " + " and ".join(missing) +
+            ". Analyse a synthetic fixture, or acquire out of band and attest the "
+            "acquisition path first.")
+    return {"scope": scope, "isolation_required": True, "isolated": True, "attested": True}
