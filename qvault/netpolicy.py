@@ -289,3 +289,171 @@ def envelope_context(ctx: NetworkContext, decision: Decision) -> dict:
             "network context selected the policy; it did not contribute to any key"
         ),
     }
+
+
+# --------------------------------------------------------------------------------------
+# Policy denial
+#
+# The policy matrix says what the settings are. It does not say what happens when a caller
+# asks for something those settings do not permit, and an operator who receives a bare
+# settings dict has no way to tell "not allowed" from "allowed but empty".
+#
+# A denial here is a record, not a boolean: which rule refused, what it required, what was
+# observed, and what would lift it. The observed value is always a count or a label, never
+# key material, a credential, or a share - a refusal must not become the leak that the
+# oracle tests exist to prevent.
+# --------------------------------------------------------------------------------------
+
+DENY_EGRESS = "DENY_EGRESS"
+DENY_SEALING = "DENY_UNSEALED_WRITE"
+DENY_OVERCOLLECTION = "DENY_OVERCOLLECTION"
+DENY_RETENTION = "DENY_OVER_RETENTION"
+DENY_CUSTODY = "DENY_INSUFFICIENT_CUSTODY"
+DENY_ATTESTATION = "DENY_NO_ATTESTATION"
+DENY_UNKNOWN_RESOURCE = "DENY_UNKNOWN_RESOURCE"
+
+#: Resources a caller may request, in the order they are evaluated. Anything absent from
+#: this table is refused rather than permitted: an unknown request is not a safe request.
+RESOURCES: tuple[str, ...] = (
+    "egress", "write", "collection", "retention", "custody", "attestation",
+)
+
+_COLLECTION_RANK = {"minimal": 0, "standard": 1, "forensic": 2}
+
+
+@dataclass
+class Denial:
+    """One refusal, with enough context for an operator to act on it."""
+
+    resource: str
+    code: str
+    policy: str
+    trust: str
+    required: str
+    observed: str
+    remedy: str
+    detail: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "resource": self.resource,
+            "code": self.code,
+            "policy": self.policy,
+            "trust": self.trust,
+            "required": self.required,
+            "observed": self.observed,
+            "remedy": self.remedy,
+            **({"detail": self.detail} if self.detail else {}),
+        }
+
+
+@dataclass
+class Verdict:
+    """The answer to one request. `allowed` is False whenever any denial exists."""
+
+    resource: str
+    allowed: bool
+    denials: list[Denial] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "resource": self.resource,
+            "allowed": self.allowed,
+            "denials": [d.to_dict() for d in self.denials],
+        }
+
+
+def _deny(decision: "Decision", resource: str, code: str, required: str,
+          observed: str, remedy: str, detail: str = "") -> Denial:
+    return Denial(resource=resource, code=code, policy=decision.policy,
+                  trust=decision.trust, required=required, observed=observed,
+                  remedy=remedy, detail=detail)
+
+
+def authorize(decision: "Decision", resource: str, *, requested=None,
+              attested: bool | None = None, shares: int | None = None) -> Verdict:
+    """Decide one request under the selected policy.
+
+    `requested` is a collection level or a retention period in days, depending on the
+    resource. `shares` is a count of custodians, never the shares themselves.
+    """
+    settings = decision.settings
+    denials: list[Denial] = []
+
+    if resource not in RESOURCES:
+        denials.append(_deny(decision, resource, DENY_UNKNOWN_RESOURCE, "a known resource",
+                             repr(str(resource))[:32],
+                             f"request one of: {', '.join(RESOURCES)}"))
+        return Verdict(resource=resource, allowed=False, denials=denials)
+
+    if resource == "egress":
+        if not settings["allow_egress"]:
+            denials.append(_deny(
+                decision, resource, DENY_EGRESS, "allow_egress = true",
+                f"allow_egress = false under policy {decision.policy}",
+                "move to an authenticated network whose identity is corroborated, or egress "
+                "from a host that is not carrying this evidence"))
+
+    elif resource == "write":
+        if not settings["seal_before_write"]:
+            denials.append(_deny(
+                decision, resource, DENY_SEALING, "seal_before_write = true",
+                "unsealed writes permitted", "seal the object before it is written"))
+
+    elif resource == "collection":
+        want = str(requested if requested is not None else settings["collection"])
+        if _COLLECTION_RANK.get(want, 99) > _COLLECTION_RANK.get(settings["collection"], 0):
+            denials.append(_deny(
+                decision, resource, DENY_OVERCOLLECTION,
+                f"collection = {settings['collection']}",
+                f"requested {want}",
+                "collect only what the policy prescribes here, or re-collect from a "
+                "corroborated network where the wider scope is allowed",
+                detail="over-collection raises retention and disclosure exposure for evidence "
+                       "whose integrity is not yet established"))
+
+    elif resource == "retention":
+        want = int(requested if requested is not None else 0)
+        if want > int(settings["retention_days"]):
+            denials.append(_deny(
+                decision, resource, DENY_RETENTION,
+                f"retention_days <= {settings['retention_days']}",
+                f"requested {want} days",
+                "reduce retention, or move the object under a policy that permits it",
+                detail="keeping data longer than the policy allows is the failure mode this "
+                       "control exists to stop, not a convenience"))
+
+    elif resource == "custody":
+        need = int(settings["custody"][0])
+        have = need if shares is None else int(shares)
+        if have < need:
+            denials.append(_deny(
+                decision, resource, DENY_CUSTODY, f"{need} of {settings['custody'][1]} custodians",
+                f"{have} custodians",
+                "enrol more custodians, or retrieve under a policy with a lower threshold",
+                detail="a share count is reported; share material is never included"))
+
+    elif resource == "attestation":
+        if settings["require_attestation"] and not attested:
+            denials.append(_deny(
+                decision, resource, DENY_ATTESTATION, "attestation = verified",
+                "attested" if attested else "not attested",
+                "establish a trust anchor out of band, then re-request",
+                detail="a self-report is not an attestation"))
+
+    denials.sort(key=lambda d: (d.code, d.resource))
+    return Verdict(resource=resource, allowed=not denials, denials=denials)
+
+
+def authorize_all(decision: "Decision", requests: dict[str, dict]) -> dict:
+    """Evaluate several requests at once. Deterministic order, so reports diff cleanly."""
+    verdicts = {}
+    for resource in sorted(requests):
+        kwargs = dict(requests[resource] or {})
+        verdicts[resource] = authorize(decision, resource, **kwargs)
+    return {
+        "policy": decision.policy,
+        "trust": decision.trust,
+        "allowed": all(v.allowed for v in verdicts.values()),
+        "verdicts": {name: v.to_dict() for name, v in verdicts.items()},
+    }

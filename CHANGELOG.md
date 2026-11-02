@@ -9,6 +9,34 @@ they deliberately do not mean.
 
 ---
 
+## [Unreleased] - policy denial (branch: feature/policy-denial)
+
+The policy matrix said what the settings are. Nothing said what happens to a caller that
+asks for something else, so an operator received a settings dict and no way to tell
+"refused" from "allowed but empty".
+
+### Added
+
+- `netpolicy.authorize()` returns a verdict carrying structured denials rather than a
+  boolean: `DENY_EGRESS`, `DENY_UNSEALED_WRITE`, `DENY_OVERCOLLECTION`,
+  `DENY_OVER_RETENTION`, `DENY_INSUFFICIENT_CUSTODY`, `DENY_NO_ATTESTATION`,
+  `DENY_UNKNOWN_RESOURCE`.
+- Each denial names the requirement, the observation, and the remedy, so a refusal is
+  actionable instead of final.
+- Unknown resources are refused rather than permitted: a request nobody wrote a rule for
+  is not thereby allowed.
+- Observations are counts and labels only. No share material, key identifier or
+  credential reaches a denial, so the refusal cannot become the leak the oracle tests
+  exist to prevent.
+- `authorize_all()` aggregates several requests deterministically, so two runs over the
+  same inputs diff cleanly.
+- 19 tests, including monotonicity against a more permissive policy and a check that a
+  denial's text carries no material.
+
+### Note
+
+Deliberately not merged: main remains at v0.11.0 until this is reviewed.
+
 ## [0.11.0] - 2026-11-02
 
 Plane errors, the third class, and the one that makes the other two compound: an
