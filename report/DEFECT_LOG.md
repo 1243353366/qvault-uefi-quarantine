@@ -1,6 +1,6 @@
 # Defect log: what the red runs bought
 
-Release **0.18.0**. This page is the engineering record of this project's own
+Release **0.18.1**. This page is the engineering record of this project's own
 failures, graded with the same vocabulary it uses on malware claims. A project whose
 thesis is *do not promote absence and do not overstate* has no honest way to show a
 green badge without showing what red taught it.

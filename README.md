@@ -1,10 +1,12 @@
 # qvault
 
+> Compromise spans firmware, the endpoint and the network, so this project treats all three as one problem and answers each with containment and evidence graded by what can be shown, not by what a tool asserts.
+
 [![ci](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml/badge.svg)](https://github.com/1243353366/qvault-uefi-quarantine/actions/workflows/ci.yml)
 
 CI runs the suite this README describes: tests on 3.11 and 3.12, all seventeen gates, docs drift, both link checks, a wheel install outside the checkout, and static analysis, every step under `set -o pipefail`. Locally, `.githooks/pre-push` runs the same gates and blocks a push that fails one: `bash tools/install_hooks.sh`.
 
-**Version 0.18.0** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md) — a cryptographic quarantine vault for firmware evidence
+**Version 0.18.1** · [documentation site](https://1243353366.github.io/qvault-uefi-quarantine/) · [security report](report/SECURITY_REPORT.md) · [CHANGELOG](CHANGELOG.md) · [citations](CITATIONS.md) · [capability map](report/CAPABILITY_MAP.md)
 
 [`SECURITY.md`](SECURITY.md) (report a vulnerability privately) · [`PROVENANCE.md`](PROVENANCE.md) (licence, verifying a release, what signing does not cover) · [`CONTRIBUTING.md`](CONTRIBUTING.md) (how a claim earns a grade)
 

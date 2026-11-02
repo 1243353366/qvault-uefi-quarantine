@@ -17,6 +17,7 @@ DEST = ROOT / "docs"
 
 #: Where the site is published. Absolute URLs here: a sitemap entry must be absolute to be useful.
 SITE = "https://1243353366.github.io/qvault-uefi-quarantine"
+TAGLINE = "firmware, endpoint and network containment"
 
 #: Pages crawlers should know about, in site order. Derived from PAGES so a new page cannot be
 #: published and forgotten; index.html becomes the bare site root.
@@ -67,47 +68,37 @@ EXTENSIONS = ["tables", "fenced_code", "toc", "sane_lists", "attr_list"]
 PAGES = [
     ("README.md", "index.html", "Overview", "Overview"),
     ("report/EVERYTHING.md", "everything.html", "Everything, linked", "Overview"),
-    ("report/UEFI_Malware_Deep_Dive_Report.md", "deep-dive.html",
-     "UEFI malware deep dive", "Research"),
-    ("report/IN_THE_WILD.md", "in-the-wild.html",
-     "Zero-days in the wild", "Research"),
-    ("report/THREAT_BEHAVIOR_MATRIX.md", "threat-behavior-matrix.html",
-     "Behaviour to control", "Research"),
-    ("report/TELEMETRY_MAP.md", "telemetry-map.html", "Telemetry map", "Research"),
+    ("report/UEFI_Malware_Deep_Dive_Report.md", "deep-dive.html", "UEFI malware deep dive", "The problem"),
+    ("report/IN_THE_WILD.md", "in-the-wild.html", "Zero-days in the wild", "The problem"),
+    ("report/THREAT_BEHAVIOR_MATRIX.md", "threat-behavior-matrix.html", "Behaviour to control", "The problem"),
+    ("report/TELEMETRY_MAP.md", "telemetry-map.html", "Telemetry map", "The problem"),
     ("report/ENDPOINT_RESPONSE.md", "endpoint-response.html",
-     "Endpoint response: crushing a keylogger", "Response"),
-    ("report/AT_REST.md", "at-rest.html",
-     "Records sealed at rest", "Design"),
-    ("report/INPUT_CAPTURE.md", "input-capture.html",
-     "Input capture: four tiers", "Analysis"),
-    ("report/THREAT_INTEL.md", "threatintel.html",
-     "Threat intelligence and disruption", "Analysis"),
-    ("report/PERSISTENCE.md", "persistence.html", "Persistence detection", "Controls"),
-    ("report/FINGERPRINTS.md", "fingerprints.html", "Family fingerprints", "Research"),
+     "Endpoint response: crushing a keylogger", "Endpoint"),
+    ("report/AT_REST.md", "at-rest.html", "Records sealed at rest", "Endpoint"),
+    ("report/INPUT_CAPTURE.md", "input-capture.html", "Input capture: four tiers", "Endpoint"),
+    ("report/THREAT_INTEL.md", "threatintel.html", "Threat intelligence and disruption", "The problem"),
+    ("report/PERSISTENCE.md", "persistence.html", "Persistence detection", "Endpoint"),
+    ("report/FINGERPRINTS.md", "fingerprints.html", "Family fingerprints", "The problem"),
     ("SECURITY.md", "security-policy.html", "Security policy", "Assurance"),
     ("PROVENANCE.md", "provenance.html", "Provenance and verification", "Assurance"),
     ("CONTRIBUTING.md", "contributing.html", "Contributing", "Assurance"),
-    ("report/CDUP.md", "cdup.html", "CDUP: data usability protection", "Design"),
+    ("report/CDUP.md", "cdup.html", "CDUP: data usability protection", "Endpoint"),
     ("report/TOOLING_RISK.md", "tooling-risk.html", "Tooling risk", "Assurance"),
-    ("report/SECURITY_REPORT.md", "security-report.html",
-     "Security report", "Assurance"),
-    ("report/ACQUISITION_AND_ANALYSIS.md", "acquisition.html",
-     "Acquisition and analysis", "Assurance"),
-    ("report/LAN_LAYER.md", "lan-layer.html", "LAN containment", "Controls"),
-    ("report/NETOBS_MODULE.md", "netobs.html", "Network observation", "Controls"),
-    ("report/DEFECT_LOG.md", "defect-log.html", "Defect log", "Research"),
-    ("report/DENIAL_MODEL.md", "denial-model.html", "Denial model", "Controls"),
-    ("report/TRUST_MODEL.md", "trust-model.html", "Trust model", "Assurance"),
-    ("report/THREAT_MODEL_REVIEW.md", "threat-model-review.html",
-     "Threat model review", "Assurance"),
+    ("report/SECURITY_REPORT.md", "security-report.html", "Security report", "Assurance"),
+    ("report/ACQUISITION_AND_ANALYSIS.md", "acquisition.html", "Acquisition and analysis", "Firmware"),
+    ("report/LAN_LAYER.md", "lan-layer.html", "LAN containment", "Network"),
+    ("report/NETOBS_MODULE.md", "netobs.html", "Network observation", "Network"),
+    ("report/DEFECT_LOG.md", "defect-log.html", "Defect log", "The problem"),
+    ("report/DENIAL_MODEL.md", "denial-model.html", "Denial model", "Cross-layer design"),
+    ("report/TRUST_MODEL.md", "trust-model.html", "Trust model", "Cross-layer design"),
+    ("report/THREAT_MODEL_REVIEW.md", "threat-model-review.html", "Threat model review", "Assurance"),
     ("report/ARCHITECTURAL_LIMITATIONS.md", "limitations.html",
-     "Architectural limitations", "Assurance"),
-    ("report/CAPABILITY_MAP.md", "capability-map.html", "Capability map", "Assurance"),
-    ("report/EVIDENCE_POLICY.md", "evidence-policy.html", "Evidence policy", "Assurance"),
-    ("report/OPERATING_MODEL.md", "operating-model.html", "Operating model", "Assurance"),
+     "Architectural limitations", "Cross-layer design"),
+    ("report/CAPABILITY_MAP.md", "capability-map.html", "Capability map", "Cross-layer design"),
+    ("report/EVIDENCE_POLICY.md", "evidence-policy.html", "Evidence policy", "Cross-layer design"),
+    ("report/OPERATING_MODEL.md", "operating-model.html", "Operating model", "Cross-layer design"),
     ("report/REPRODUCE.md", "reproduce.html", "Reproduce the results", "Assurance"),
-    ("report/HARDWARE_TEST_QUESTIONS.md", "hardware-questions.html",
-     "Hardware test backlog", "Assurance"),
+    ("report/HARDWARE_TEST_QUESTIONS.md", "hardware-questions.html", "Hardware test backlog", "Firmware"),
     ("CITATIONS.md", "citations.html", "Citations", "Sources"),
     ("CONTRIBUTORS.md", "contributors.html", "Contributors", "Sources"),
     ("CHANGELOG.md", "changelog.html", "Changelog", "Sources"),
@@ -264,7 +255,7 @@ TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} · QVault</title>
+<title>{title} · QVault: {TAGLINE}</title>
 <style>
 :root {{ --bg:#14161a; --panel:#1b1e24; --text:#e7e9ee; --muted:#9aa3b2; --line:#2a2f38;
         --accent:#7fb2f0; --code:#0f1115; }}
@@ -284,6 +275,7 @@ nav .ver {{ color:var(--muted); font-size:12px; margin:0 0 18px; }}
 nav a {{ color:var(--muted); text-decoration:none; }}
 nav a:hover {{ color:var(--accent); }}
 nav a.current {{ color:var(--accent); font-weight:600; }}
+.tagline {{ font-size: .72rem; line-height: 1.3; color: var(--muted, #667); margin: .2rem 0 .9rem; }}
 .nav-section {{ color:var(--text); font-size:11px; text-transform:uppercase;
   letter-spacing:.08em; margin:16px 0 6px; opacity:.6; }}
 nav ul {{ list-style:none; margin:0; padding:0; }}
@@ -319,6 +311,7 @@ footer {{ margin-top:48px; padding-top:16px; border-top:1px solid var(--line);
 <nav>
   <a class="brand" href="index">QVault</a>
   <p class="ver">v{version} · prototype</p>
+  <p class="tagline">{TAGLINE}</p>
   {nav}
 </nav>
 <main>
@@ -338,7 +331,8 @@ def render_page(src: str, slug: str, title: str) -> str:
     text = (ROOT / src).read_text()
     html = markdown.markdown(text, extensions=EXTENSIONS)
     html = rewrite_links(html)
-    return TEMPLATE.format(title=title, version=version(), nav=nav(slug), content=html)
+    return TEMPLATE.format(title=title, version=version(), nav=nav(slug), content=html,
+                           TAGLINE=TAGLINE)
 
 
 def build() -> dict[str, str]:

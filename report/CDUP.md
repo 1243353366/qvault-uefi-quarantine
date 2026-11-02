@@ -1,6 +1,6 @@
 # CDUP: Cryptographic Data Usability Protection
 
-Release **0.18.0**. Built on `feature/cdup`, held there until the legal reading was
+Release **0.18.1**. Built on `feature/cdup`, held there until the legal reading was
 settled, and merged in this release; the reasoning is at the end of this page.
 
 **Objective.** Assume an attacker acquires the payload. Minimise what they can recover from

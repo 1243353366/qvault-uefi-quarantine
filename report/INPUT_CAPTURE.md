@@ -1,6 +1,6 @@
 # Input capture: four tiers, and why the tier is not the danger
 
-Release **0.18.0**. Module `qvault/inputcapture.py`, tests `qvault/tests/test_inputcapture.py`.
+Release **0.18.1**. Module `qvault/inputcapture.py`, tests `qvault/tests/test_inputcapture.py`.
 
 A collection mechanism can only capture what its observation point can see. That makes the observation point the useful axis for classifying input capture, and it makes **severity a separate axis**: a browser-side session thief at level 1 routinely inflicts more damage than a crude kernel keylogger at level 3, because an authenticated cookie is worth more than a paragraph of typing. This page keeps the two apart everywhere.
 

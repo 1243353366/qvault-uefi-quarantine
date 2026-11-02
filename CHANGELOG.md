@@ -29,6 +29,22 @@ host that answers whatever asks is an envelope, not a boundary.
 
 Held off `main` until the legal reading was settled, then merged; the branch history stays in git.
 =======
+## [0.18.1] - 2026-11-02
+
+### Changed - the front door says what the project is, and the nav is grouped around it
+
+The README opens with the thesis and the site title carries it: compromise spans firmware, the endpoint
+and the network, so all three are treated as one problem and answered with containment plus evidence
+graded by what can be shown. Nav sections now follow those layers (Overview, The problem, Firmware,
+Endpoint, Network, Cross-layer design, Assurance, Sources) instead of the old file-tree groupings.
+
+Firmware is two pages, because that work is research and acquisition rather than a layer with its own
+tooling. The grouping shows the asymmetry instead of hiding it behind a broader label.
+
+Defect: the tagline style was inserted into the page template without escaping its braces, so
+`str.format` raised `KeyError: ' font-size'` and the site build failed. Caught by the docs-drift gate
+before the push, which is what that gate is for.
+
 ## [0.18.0] - 2026-11-02
 
 ### Changed - execution demands attestation evidence, not a fingerprint list

@@ -6,7 +6,7 @@ architecture and its limits.
 
 from . import audit, crypto, ingest, keys, retrieve, store, triage, verify
 
-__version__ = "0.18.0"
+__version__ = "0.18.1"
 
 __all__ = [
     "audit",

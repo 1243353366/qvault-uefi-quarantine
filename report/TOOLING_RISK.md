@@ -1,6 +1,6 @@
 # Tooling risk: the tool as an attack surface
 
-Release **0.18.0**. This project parses hostile firmware for a living, which
+Release **0.18.1**. This project parses hostile firmware for a living, which
 makes it part of the reader's problem rather than only part of the answer. This
 register lists every component that consumes input it does not control, the guard
 found by reading that component, and the gap that remains.
