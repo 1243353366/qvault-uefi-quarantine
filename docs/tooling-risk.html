@@ -149,6 +149,12 @@ certification, and nothing on it grades above <code>CORROBORATED</code>.</p>
 <td>Third-party code is trusted at its pin. Its upstream changes are audited by hand, and that audit is not automated.</td>
 </tr>
 <tr>
+<td><code>qvault/cdup.py</code></td>
+<td>sealed ciphertext, wrapped keys and capability tokens, from a caller or an attacker</td>
+<td>AEAD per chunk with AAD bound to the object id, so ciphertext cannot be relabelled; capability MAC checked with <code>hmac.compare_digest</code> before any key is unwrapped; a single-use replay set; refusals byte-identical across expiry, forgery, replay and wrong-object</td>
+<td>The authority trusts its own directory for the KEK and the replay set. An attacker who can write that directory reads the key and rewrites spent capabilities; the separation is deployment (another host, an HSM), not this module.</td>
+</tr>
+<tr>
 <td><code>qvault/wild.py</code></td>
 <td>the in-the-wild dataset (pinned snapshot)</td>
 <td>pinned snapshot; entries are metadata, not samples</td>
@@ -162,7 +168,7 @@ certification, and nothing on it grades above <code>CORROBORATED</code>.</p>
 </tr>
 </tbody>
 </table>
-<p>12 registered components. A test fails if a module takes <code>bytes</code> or parses JSON and is missing from this table, so the register stays complete as the code grows.</p>
+<p>13 registered components. A test fails if a module takes <code>bytes</code> or parses JSON and is missing from this table, so the register stays complete as the code grows.</p>
 <h2 id="what-a-reader-should-do-with-it">What a reader should do with it</h2>
 <p>Run this on a machine you can rebuild. Treat the evidence store as data written by an adversary, because a bootkit that knows it is being collected will try to write it. Neither of those is a paranoid reading of the code; both follow from the rows above.</p>
 <h2 id="what-this-page-does-not-claim">What this page does not claim</h2>

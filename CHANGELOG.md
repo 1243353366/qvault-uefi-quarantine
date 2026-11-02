@@ -9,6 +9,26 @@ they deliberately do not mean.
 
 ---
 
+## [Unreleased] - feature/cdup
+
+### Added - CDUP, kept off main
+
+Cryptographic Data Usability Protection: assume the payload is stolen, minimise what the thief can
+recover. A fresh DEK per object, AES-256-GCM per chunk with the AAD bound to the object id, and the
+DEK wrapped under a KEK held by a separate authority that mints short-lived, single-use, audited
+capabilities. The store holds no key material; `assert_separated` refuses an authority nested inside
+the store it protects.
+
+Thirteen tests are written from the attacker's side. Expired, forged, replayed and wrong-object
+capabilities all return the same bytes, and a test asserts that.
+
+Not addressed, and stated as such on the page: everything before encryption (keylogger, screen
+capture) and plaintext in memory during use. The boundary is deployment - an authority on the same
+host that answers whatever asks is an envelope, not a boundary.
+
+Held off `main` because the capability model is the same primitive a lawful-access feature would
+need, and that reading should be thought through rather than assumed.
+
 ## [0.13.12] - 2026-11-02
 
 ### Fixed - the two riskiest rows, hardened and re-graded

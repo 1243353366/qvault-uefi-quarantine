@@ -68,6 +68,20 @@ versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versionin
 <strong>HYPOTHESIS</strong>, <strong>UNKNOWN</strong>. See <code>report/EVIDENCE_POLICY.md</code> for what they mean and what
 they deliberately do not mean.</p>
 <hr />
+<h2 id="unreleased-featurecdup">[Unreleased] - feature/cdup</h2>
+<h3 id="added-cdup-kept-off-main">Added - CDUP, kept off main</h3>
+<p>Cryptographic Data Usability Protection: assume the payload is stolen, minimise what the thief can
+recover. A fresh DEK per object, AES-256-GCM per chunk with the AAD bound to the object id, and the
+DEK wrapped under a KEK held by a separate authority that mints short-lived, single-use, audited
+capabilities. The store holds no key material; <code>assert_separated</code> refuses an authority nested inside
+the store it protects.</p>
+<p>Thirteen tests are written from the attacker's side. Expired, forged, replayed and wrong-object
+capabilities all return the same bytes, and a test asserts that.</p>
+<p>Not addressed, and stated as such on the page: everything before encryption (keylogger, screen
+capture) and plaintext in memory during use. The boundary is deployment - an authority on the same
+host that answers whatever asks is an envelope, not a boundary.</p>
+<p>Held off <code>main</code> because the capability model is the same primitive a lawful-access feature would
+need, and that reading should be thought through rather than assumed.</p>
 <h2 id="01312-2026-11-02">[0.13.12] - 2026-11-02</h2>
 <h3 id="fixed-the-two-riskiest-rows-hardened-and-re-graded">Fixed - the two riskiest rows, hardened and re-graded</h3>
 <p><code>store.py</code> and <code>audit.py</code> were the two entries in <code>report/TOOLING_RISK.md</code> that trust data written by
