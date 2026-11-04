@@ -515,3 +515,7 @@ mechanism. Test fixtures are synthetic byte strings. Do not point the tooling at
 live samples outside an authorised, isolated analysis environment.
 
 Defensive research, dual-use by nature; published so defenders can adopt it.
+
+---
+
+Thanks for reading. More of my work: [github.com/1243353366](https://github.com/1243353366).
