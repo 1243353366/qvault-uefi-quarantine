@@ -46,7 +46,7 @@ def test_ciphertext_cannot_be_moved_to_another_record(tmp_path):
     p1, p2 = (os.path.join(str(tmp_path / "records" / "records"), f) for f in ("r1.seal", "r2.seal"))
     a, b = json.load(open(p1)), json.load(open(p2))
     a["ct"], b["ct"] = b["ct"], a["ct"]
-    json.dump(a, open(p1, "w"))
+    dump_writable(a, p1)
     with pytest.raises(SealingError, match="authentication"):
         v.read("r1")
 
@@ -57,7 +57,7 @@ def test_a_tampered_ciphertext_is_refused(tmp_path):
     path = os.path.join(str(tmp_path / "records" / "records"), "r1.seal")
     env = json.load(open(path))
     env["ct"] = env["ct"][:-4] + ("AAAA" if not env["ct"].endswith("AAAA") else "BBBB")
-    json.dump(env, open(path, "w"))
+    dump_writable(env, path)
     with pytest.raises(SealingError):
         v.read("r1")
 
@@ -68,7 +68,7 @@ def test_an_unknown_algorithm_is_refused_not_guessed(tmp_path):
     path = os.path.join(str(tmp_path / "records" / "records"), "r1.seal")
     env = json.load(open(path))
     env["alg"] = "ROT13"
-    json.dump(env, open(path, "w"))
+    dump_writable(env, path)
     with pytest.raises(SealingError, match="algorithm"):
         v.read("r1")
 
@@ -197,7 +197,7 @@ def test_the_chain_catches_edit_delete_and_reorder(tmp_path):
     records = str(tmp_path / "records" / "records")
     env = json.load(open(os.path.join(records, "r2.seal")))
     env["ct"] = "AAAA" + env["ct"][4:]
-    json.dump(env, open(os.path.join(records, "r2.seal"), "w"))
+    dump_writable(env, os.path.join(records, "r2.seal"))
     assert v.verify_chain()["ok"] is False           # edit
 
     v2 = vault(tmp_path / "second")
@@ -214,8 +214,8 @@ def test_reordering_records_breaks_the_chain(tmp_path):
     records = str(tmp_path / "records" / "records")
     a, b = json.load(open(os.path.join(records, "r1.seal"))), json.load(open(os.path.join(records, "r2.seal")))
     a["seq"], b["seq"] = b["seq"], a["seq"]
-    json.dump(a, open(os.path.join(records, "r1.seal"), "w"))
-    json.dump(b, open(os.path.join(records, "r2.seal"), "w"))
+    dump_writable(a, os.path.join(records, "r1.seal"))
+    dump_writable(b, os.path.join(records, "r2.seal"))
     assert v.verify_chain()["ok"] is False
 
 
@@ -237,3 +237,20 @@ def test_the_module_names_all_seven_properties():
     assert set(PROPERTIES) == {"local_encryption", "authenticated_encryption", "key_separation",
                                "hardware_backed", "rotation_and_revocation", "integrity",
                                "fail_closed"}
+
+
+def dump_writable(obj, path) -> None:
+    """Rewrite a seal the way an attacker with disk access would: after taking the lock off.
+
+    Seals are written 0400 on purpose. Asserting that first turns "this test only passes
+    as root" into a test of the protection itself, and keeps the tamper cases running on
+    an ordinary account, which is where CI runs them.
+    """
+    import json as _json
+    import os as _os
+    import stat as _stat
+
+    assert _stat.S_IMODE(_os.stat(path).st_mode) == 0o400, "seals must be read-only at rest"
+    _os.chmod(path, 0o600)
+    with open(path, "w", encoding="utf-8") as fh:
+        _json.dump(obj, fh)

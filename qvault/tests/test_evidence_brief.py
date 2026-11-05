@@ -21,6 +21,16 @@ NOW = datetime(2026, 11, 2, 16, 0, tzinfo=timezone.utc)
 
 def artifact(tmp_path, data=b"captured-bytes", name="sample.bin", **over):
     path = tmp_path / name
+    # Evidence directories are locked read-only once written, so a second artefact in the
+    # same directory has to take the lock off first. That is what an operator with disk
+    # access does anyway, and it keeps this test running as an ordinary user.
+    if path.parent.exists():
+        import os as _os
+
+        _os.chmod(path.parent, 0o700)
+        if path.exists():
+            # evidence is written 0400 on purpose: rewriting it means taking the lock off
+            _os.chmod(path, 0o600)
     path.write_bytes(data)
     os.chmod(path, 0o400)
     rec = {"name": name, "path": str(path), "sha256": hashlib.sha256(data).hexdigest(),

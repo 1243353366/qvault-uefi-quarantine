@@ -33,11 +33,14 @@ import json
 import secrets
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+
+if TYPE_CHECKING:  # annotations are strings here; these names are never resolved at runtime
+    from .attestation import AttestationEvidence, PcrPolicy
 
 DOMAIN = b"QVAULT-AUTHZ-v1"
 ELEMENTS = ("identity", "authority", "intent", "execution")

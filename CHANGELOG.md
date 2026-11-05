@@ -10,6 +10,33 @@ they deliberately do not mean.
 ---
 
 <<<<<<< HEAD
+## 2026-11-05 - main is green again
+
+`main` had been red since 2 November across four jobs. There were three causes, and the first
+one was hiding the other two.
+
+- **Two type annotations named classes nobody imported** (`qvault/authorization.py`).
+  `AttestationEvidence` and `PcrPolicy` appear in string annotations under
+  `from __future__ import annotations`, so they are never evaluated at runtime and no test
+  touched them. Anything that resolves annotations, `typing.get_type_hints` or a framework
+  building a schema from the signature, would have raised `NameError`. Now imported under
+  `TYPE_CHECKING`, and the lint gate that caught it stays.
+- **The tamper tests only passed as root.** Seals are written `0400` on purpose, so a test that
+  rewrites one to prove the chain catches an edit needs the lock off first. Root cannot see
+  that; CI runs as an ordinary user and hit `PermissionError` in ten places. The tamper helpers
+  now assert the `0400` mode and then chmod it, which turns a root dependency into a check of
+  the protection itself.
+- **The published site was stale** against its sources, failing the documentation gate and the
+  rebuild-and-compare job. Regenerated with `tools/build_docs.py`.
+
+Verified unprivileged rather than here: the suite ran as an unprivileged user in a chowned
+copy, 1021 passed and 9 skipped, with the gates, smoke and lint jobs run against the same tree.
+Running as root reports the same green while CI stays red, which is exactly how this lasted
+three days.
+
+Still open: the acquisition path has never been exercised against real firmware, and G9 keeps
+its declared behaviour gaps. This round fixed the pipeline, not the claims.
+
 ## [Unreleased] - feature/cdup
 
 ### Added - CDUP, kept off main
