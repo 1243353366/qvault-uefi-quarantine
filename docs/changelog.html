@@ -71,6 +71,30 @@ versions follow <a href="https://semver.org/spec/v2.0.0.html">Semantic Versionin
 they deliberately do not mean.</p>
 <hr />
 <p>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</p>
+<h2 id="2026-11-05-main-is-green-again">2026-11-05 - main is green again</h2>
+<p><code>main</code> had been red since 2 November across four jobs. There were three causes, and the first
+one was hiding the other two.</p>
+<ul>
+<li><strong>Two type annotations named classes nobody imported</strong> (<code>qvault/authorization.py</code>).
+  <code>AttestationEvidence</code> and <code>PcrPolicy</code> appear in string annotations under
+  <code>from __future__ import annotations</code>, so they are never evaluated at runtime and no test
+  touched them. Anything that resolves annotations, <code>typing.get_type_hints</code> or a framework
+  building a schema from the signature, would have raised <code>NameError</code>. Now imported under
+  <code>TYPE_CHECKING</code>, and the lint gate that caught it stays.</li>
+<li><strong>The tamper tests only passed as root.</strong> Seals are written <code>0400</code> on purpose, so a test that
+  rewrites one to prove the chain catches an edit needs the lock off first. Root cannot see
+  that; CI runs as an ordinary user and hit <code>PermissionError</code> in ten places. The tamper helpers
+  now assert the <code>0400</code> mode and then chmod it, which turns a root dependency into a check of
+  the protection itself.</li>
+<li><strong>The published site was stale</strong> against its sources, failing the documentation gate and the
+  rebuild-and-compare job. Regenerated with <code>tools/build_docs.py</code>.</li>
+</ul>
+<p>Verified unprivileged rather than here: the suite ran as an unprivileged user in a chowned
+copy, 1021 passed and 9 skipped, with the gates, smoke and lint jobs run against the same tree.
+Running as root reports the same green while CI stays red, which is exactly how this lasted
+three days.</p>
+<p>Still open: the acquisition path has never been exercised against real firmware, and G9 keeps
+its declared behaviour gaps. This round fixed the pipeline, not the claims.</p>
 <h2 id="unreleased-featurecdup">[Unreleased] - feature/cdup</h2>
 <h3 id="added-cdup-kept-off-main">Added - CDUP, kept off main</h3>
 <p>Cryptographic Data Usability Protection: assume the payload is stolen, minimise what the thief can
